@@ -1,6 +1,3 @@
-def _register_generic(module_dict, module_name, module):
-    assert module_name not in module_dict
-    module_dict[module_name] = module
 
 class Registry(dict):
     '''
@@ -15,30 +12,36 @@ class Registry(dict):
         some_registry.register("foo_module", foo)
     2): used as decorator when declaring the module:
         @some_registry.register("foo_module")
-        @some_registry.register("foo_modeul_nickname")
+        @some_registry.register("foo_module_nickname")
         def foo():
             ...
     Access of module is just like using a dictionary, eg:
-        f = some_registry["foo_modeul"]
+        f = some_registry["foo_module"] or:
+        f = some_registry.foo_module
     '''
-    def __init__(self, *args, **kwargs):
-        super(Registry, self).__init__(*args, **kwargs)
 
-    def register(self, module_name, module=None):
-        # used as function call
-        if module is not None:
-            _register_generic(self, module_name, module)
-            return
-
-        # used as decorator
+    def register(self, name, module=None):
         def register_fn(fn):
-            _register_generic(self, module_name, fn)
+            assert name not in self,f"{name} is already registered."
+            self[name]=fn
             return fn
 
-        return register_fn
+        if module is not None:
+            # used as function call
+            return register_fn(module)
+        else:
+            # used as decorator
+            return register_fn
 
-models = Registry()
+    def __getattr__(self,name):
+        if name in self.__dict__:
+            return self.__dict__[name]
+        return self[name]
+            
 
-from registry import models
-models.register("Moudle")
-class Module
+DATASETS = Registry()
+BACKBONES = Registry()
+ROI_HEADS = Registry()
+LOSSES = Registry()
+
+
