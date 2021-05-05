@@ -1,2 +1,4 @@
 jittor
 Pillow
+numpy 
+matplotlib
