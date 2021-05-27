@@ -2,3 +2,5 @@ jittor
 Pillow
 numpy 
 matplotlib
+yaml
+tensorboardX

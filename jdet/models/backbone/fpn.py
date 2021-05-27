@@ -1,252 +1,213 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-import math
-import fvcore.nn.weight_init as weight_init
-import torch
-import torch.nn.functional as F
-from torch import nn
-
-from detectron2.layers import Conv2d, ShapeSpec, get_norm
-
-from .backbone import Backbone
-from .build import BACKBONE_REGISTRY
-from .resnet import build_resnet_backbone
-
-__all__ = ["build_resnet_fpn_backbone", "build_retinanet_resnet_fpn_backbone", "FPN"]
+import jittor as jt 
+from jittor import nn
 
 
-class FPN(Backbone):
+from jdet.utils.registry import BACKBONES,NECKS
+
+@NECKS.register_module()
+class FPN(nn.Module):
+    r"""Feature Pyramid Network.
+
+    This is an implementation of paper `Feature Pyramid Networks for Object
+    Detection <https://arxiv.org/abs/1612.03144>`_.
+
+    Args:
+        in_channels (List[int]): Number of input channels per scale.
+        out_channels (int): Number of output channels (used at each scale)
+        num_outs (int): Number of output scales.
+        start_level (int): Index of the start input backbone level used to
+            build the feature pyramid. Default: 0.
+        end_level (int): Index of the end input backbone level (exclusive) to
+            build the feature pyramid. Default: -1, which means the last level.
+        add_extra_convs (bool | str): If bool, it decides whether to add conv
+            layers on top of the original feature maps. Default to False.
+            If True, its actual mode is specified by `extra_convs_on_inputs`.
+            If str, it specifies the source feature map of the extra convs.
+            Only the following options are allowed
+
+            - 'on_input': Last feat map of neck inputs (i.e. backbone feature).
+            - 'on_lateral':  Last feature map after lateral convs.
+            - 'on_output': The last output feature map after fpn convs.
+        extra_convs_on_inputs (bool, deprecated): Whether to apply extra convs
+            on the original feature from the backbone. If True,
+            it is equivalent to `add_extra_convs='on_input'`. If False, it is
+            equivalent to set `add_extra_convs='on_output'`. Default to True.
+        relu_before_extra_convs (bool): Whether to apply relu before the extra
+            conv. Default: False.
+        no_norm_on_lateral (bool): Whether to apply norm on lateral.
+            Default: False.
+        conv_cfg (dict): Config dict for convolution layer. Default: None.
+        norm_cfg (dict): Config dict for normalization layer. Default: None.
+        act_cfg (str): Config dict for activation layer in ConvModule.
+            Default: None.
+        upsample_cfg (dict): Config dict for interpolate layer.
+            Default: `dict(mode='nearest')`
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+
+    Example:
+        >>> import torch
+        >>> in_channels = [2, 3, 5, 7]
+        >>> scales = [340, 170, 84, 43]
+        >>> inputs = [torch.rand(1, c, s, s)
+        ...           for c, s in zip(in_channels, scales)]
+        >>> self = FPN(in_channels, 11, len(in_channels)).eval()
+        >>> outputs = self.forward(inputs)
+        >>> for i in range(len(outputs)):
+        ...     print(f'outputs[{i}].shape = {outputs[i].shape}')
+        outputs[0].shape = torch.Size([1, 11, 340, 340])
+        outputs[1].shape = torch.Size([1, 11, 170, 170])
+        outputs[2].shape = torch.Size([1, 11, 84, 84])
+        outputs[3].shape = torch.Size([1, 11, 43, 43])
     """
-    This module implements :paper:`FPN`.
-    It creates pyramid features built on top of some input feature maps.
-    """
 
-    _fuse_type: torch.jit.Final[str]
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 num_outs,
+                 start_level=0,
+                 end_level=-1,
+                 add_extra_convs=False,
+                 extra_convs_on_inputs=True,
+                 relu_before_extra_convs=False,
+                 no_norm_on_lateral=False,
+                 conv_cfg=None,
+                 norm_cfg=None,
+                 act_cfg=None,
+                 upsample_cfg=dict(mode='nearest'),
+                 init_cfg=dict(
+                     type='Xavier', layer='Conv2d', distribution='uniform')):
+        super(FPN, self).__init__(init_cfg)
+        assert isinstance(in_channels, list)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.num_ins = len(in_channels)
+        self.num_outs = num_outs
+        self.relu_before_extra_convs = relu_before_extra_convs
+        self.no_norm_on_lateral = no_norm_on_lateral
+        self.fp16_enabled = False
+        self.upsample_cfg = upsample_cfg.copy()
 
-    def __init__(
-        self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum"
-    ):
-        """
-        Args:
-            bottom_up (Backbone): module representing the bottom up subnetwork.
-                Must be a subclass of :class:`Backbone`. The multi-scale feature
-                maps generated by the bottom up network, and listed in `in_features`,
-                are used to generate FPN levels.
-            in_features (list[str]): names of the input feature maps coming
-                from the backbone to which FPN is attached. For example, if the
-                backbone produces ["res2", "res3", "res4"], any *contiguous* sublist
-                of these may be used; order must be from high to low resolution.
-            out_channels (int): number of channels in the output feature maps.
-            norm (str): the normalization to use.
-            top_block (nn.Module or None): if provided, an extra operation will
-                be performed on the output of the last (smallest resolution)
-                FPN output, and the result will extend the result list. The top_block
-                further downsamples the feature map. It must have an attribute
-                "num_levels", meaning the number of extra FPN levels added by
-                this block, and "in_feature", which is a string representing
-                its input feature (e.g., p5).
-            fuse_type (str): types for fusing the top down features and the lateral
-                ones. It can be "sum" (default), which sums up element-wise; or "avg",
-                which takes the element-wise mean of the two.
-        """
-        super(FPN, self).__init__()
-        assert isinstance(bottom_up, Backbone)
-        assert in_features, in_features
-
-        # Feature map strides and channels from the bottom up network (e.g. ResNet)
-        input_shapes = bottom_up.output_shape()
-        strides = [input_shapes[f].stride for f in in_features]
-        in_channels_per_feature = [input_shapes[f].channels for f in in_features]
-
-        _assert_strides_are_log2_contiguous(strides)
-        lateral_convs = []
-        output_convs = []
-
-        use_bias = norm == ""
-        for idx, in_channels in enumerate(in_channels_per_feature):
-            lateral_norm = get_norm(norm, out_channels)
-            output_norm = get_norm(norm, out_channels)
-
-            lateral_conv = Conv2d(
-                in_channels, out_channels, kernel_size=1, bias=use_bias, norm=lateral_norm
-            )
-            output_conv = Conv2d(
-                out_channels,
-                out_channels,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                bias=use_bias,
-                norm=output_norm,
-            )
-            weight_init.c2_xavier_fill(lateral_conv)
-            weight_init.c2_xavier_fill(output_conv)
-            stage = int(math.log2(strides[idx]))
-            self.add_module("fpn_lateral{}".format(stage), lateral_conv)
-            self.add_module("fpn_output{}".format(stage), output_conv)
-
-            lateral_convs.append(lateral_conv)
-            output_convs.append(output_conv)
-        # Place convs into top-down order (from low to high resolution)
-        # to make the top-down computation in forward clearer.
-        self.lateral_convs = lateral_convs[::-1]
-        self.output_convs = output_convs[::-1]
-        self.top_block = top_block
-        self.in_features = tuple(in_features)
-        self.bottom_up = bottom_up
-        # Return feature names are "p<stage>", like ["p2", "p3", ..., "p6"]
-        self._out_feature_strides = {"p{}".format(int(math.log2(s))): s for s in strides}
-        # top block output feature maps.
-        if self.top_block is not None:
-            for s in range(stage, stage + self.top_block.num_levels):
-                self._out_feature_strides["p{}".format(s + 1)] = 2 ** (s + 1)
-
-        self._out_features = list(self._out_feature_strides.keys())
-        self._out_feature_channels = {k: out_channels for k in self._out_features}
-        self._size_divisibility = strides[-1]
-        assert fuse_type in {"avg", "sum"}
-        self._fuse_type = fuse_type
-
-    @property
-    def size_divisibility(self):
-        return self._size_divisibility
-
-    def forward(self, x):
-        """
-        Args:
-            input (dict[str->Tensor]): mapping feature map name (e.g., "res5") to
-                feature map tensor for each feature level in high to low resolution order.
-        Returns:
-            dict[str->Tensor]:
-                mapping from feature map name to FPN feature map tensor
-                in high to low resolution order. Returned feature names follow the FPN
-                paper convention: "p<stage>", where stage has stride = 2 ** stage e.g.,
-                ["p2", "p3", ..., "p6"].
-        """
-        bottom_up_features = self.bottom_up(x)
-        results = []
-        prev_features = self.lateral_convs[0](bottom_up_features[self.in_features[-1]])
-        results.append(self.output_convs[0](prev_features))
-
-        # Reverse feature maps into top-down order (from low to high resolution)
-        for idx, (lateral_conv, output_conv) in enumerate(
-            zip(self.lateral_convs, self.output_convs)
-        ):
-            # Slicing of ModuleList is not supported https://github.com/pytorch/pytorch/issues/47336
-            # Therefore we loop over all modules but skip the first one
-            if idx > 0:
-                features = self.in_features[-idx - 1]
-                features = bottom_up_features[features]
-                top_down_features = F.interpolate(prev_features, scale_factor=2.0, mode="nearest")
-                lateral_features = lateral_conv(features)
-                prev_features = lateral_features + top_down_features
-                if self._fuse_type == "avg":
-                    prev_features /= 2
-                results.insert(0, output_conv(prev_features))
-
-        if self.top_block is not None:
-            if self.top_block.in_feature in bottom_up_features:
-                top_block_in_feature = bottom_up_features[self.top_block.in_feature]
+        if end_level == -1:
+            self.backbone_end_level = self.num_ins
+            assert num_outs >= self.num_ins - start_level
+        else:
+            # if end_level < inputs, no extra level is allowed
+            self.backbone_end_level = end_level
+            assert end_level <= len(in_channels)
+            assert num_outs == end_level - start_level
+        self.start_level = start_level
+        self.end_level = end_level
+        self.add_extra_convs = add_extra_convs
+        assert isinstance(add_extra_convs, (str, bool))
+        if isinstance(add_extra_convs, str):
+            # Extra_convs_source choices: 'on_input', 'on_lateral', 'on_output'
+            assert add_extra_convs in ('on_input', 'on_lateral', 'on_output')
+        elif add_extra_convs:  # True
+            if extra_convs_on_inputs:
+                # TODO: deprecate `extra_convs_on_inputs`
+                warnings.simplefilter('once')
+                warnings.warn(
+                    '"extra_convs_on_inputs" will be deprecated in v2.9.0,'
+                    'Please use "add_extra_convs"', DeprecationWarning)
+                self.add_extra_convs = 'on_input'
             else:
-                top_block_in_feature = results[self._out_features.index(self.top_block.in_feature)]
-            results.extend(self.top_block(top_block_in_feature))
-        assert len(self._out_features) == len(results)
-        return {f: res for f, res in zip(self._out_features, results)}
+                self.add_extra_convs = 'on_output'
 
-    def output_shape(self):
-        return {
-            name: ShapeSpec(
-                channels=self._out_feature_channels[name], stride=self._out_feature_strides[name]
-            )
-            for name in self._out_features
-        }
+        self.lateral_convs = nn.ModuleList()
+        self.fpn_convs = nn.ModuleList()
 
+        for i in range(self.start_level, self.backbone_end_level):
+            l_conv = ConvModule(
+                in_channels[i],
+                out_channels,
+                1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg if not self.no_norm_on_lateral else None,
+                act_cfg=act_cfg,
+                inplace=False)
+            fpn_conv = ConvModule(
+                out_channels,
+                out_channels,
+                3,
+                padding=1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                act_cfg=act_cfg,
+                inplace=False)
 
-def _assert_strides_are_log2_contiguous(strides):
-    """
-    Assert that each stride is 2x times its preceding stride, i.e. "contiguous in log2".
-    """
-    for i, stride in enumerate(strides[1:], 1):
-        assert stride == 2 * strides[i - 1], "Strides {} {} are not log2 contiguous".format(
-            stride, strides[i - 1]
-        )
+            self.lateral_convs.append(l_conv)
+            self.fpn_convs.append(fpn_conv)
 
+        # add extra conv layers (e.g., RetinaNet)
+        extra_levels = num_outs - self.backbone_end_level + self.start_level
+        if self.add_extra_convs and extra_levels >= 1:
+            for i in range(extra_levels):
+                if i == 0 and self.add_extra_convs == 'on_input':
+                    in_channels = self.in_channels[self.backbone_end_level - 1]
+                else:
+                    in_channels = out_channels
+                extra_fpn_conv = ConvModule(
+                    in_channels,
+                    out_channels,
+                    3,
+                    stride=2,
+                    padding=1,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=act_cfg,
+                    inplace=False)
+                self.fpn_convs.append(extra_fpn_conv)
 
-class LastLevelMaxPool(nn.Module):
-    """
-    This module is used in the original FPN to generate a downsampled
-    P6 feature from P5.
-    """
+    def execute(self, x):
+        """Forward function."""
+        assert len(x) == len(self.in_channels)
 
-    def __init__(self):
-        super().__init__()
-        self.num_levels = 1
-        self.in_feature = "p5"
+        # build laterals
+        laterals = [
+            lateral_conv(x[i + self.start_level])
+            for i, lateral_conv in enumerate(self.lateral_convs)
+        ]
 
-    def forward(self, x):
-        return [F.max_pool2d(x, kernel_size=1, stride=2, padding=0)]
+        # build top-down path
+        used_backbone_levels = len(laterals)
+        for i in range(used_backbone_levels - 1, 0, -1):
+            # In some cases, fixing `scale factor` (e.g. 2) is preferred, but
+            #  it cannot co-exist with `size` in `F.interpolate`.
+            if 'scale_factor' in self.upsample_cfg:
+                laterals[i - 1] += F.interpolate(laterals[i],
+                                                 **self.upsample_cfg)
+            else:
+                prev_shape = laterals[i - 1].shape[2:]
+                laterals[i - 1] += F.interpolate(
+                    laterals[i], size=prev_shape, **self.upsample_cfg)
 
+        # build outputs
+        # part 1: from original levels
+        outs = [
+            self.fpn_convs[i](laterals[i]) for i in range(used_backbone_levels)
+        ]
+        # part 2: add extra levels
+        if self.num_outs > len(outs):
+            # use max pool to get more levels on top of outputs
+            # (e.g., Faster R-CNN, Mask R-CNN)
+            if not self.add_extra_convs:
+                for i in range(self.num_outs - used_backbone_levels):
+                    outs.append(F.max_pool2d(outs[-1], 1, stride=2))
+            # add conv layers on top of original feature maps (RetinaNet)
+            else:
+                if self.add_extra_convs == 'on_input':
+                    extra_source = inputs[self.backbone_end_level - 1]
+                elif self.add_extra_convs == 'on_lateral':
+                    extra_source = laterals[-1]
+                elif self.add_extra_convs == 'on_output':
+                    extra_source = outs[-1]
+                else:
+                    raise NotImplementedError
+                outs.append(self.fpn_convs[used_backbone_levels](extra_source))
+                for i in range(used_backbone_levels + 1, self.num_outs):
+                    if self.relu_before_extra_convs:
+                        outs.append(self.fpn_convs[i](F.relu(outs[-1])))
+                    else:
+                        outs.append(self.fpn_convs[i](outs[-1]))
+        return outs
 
-class LastLevelP6P7(nn.Module):
-    """
-    This module is used in RetinaNet to generate extra layers, P6 and P7 from
-    C5 feature.
-    """
-
-    def __init__(self, in_channels, out_channels, in_feature="res5"):
-        super().__init__()
-        self.num_levels = 2
-        self.in_feature = in_feature
-        self.p6 = nn.Conv2d(in_channels, out_channels, 3, 2, 1)
-        self.p7 = nn.Conv2d(out_channels, out_channels, 3, 2, 1)
-        for module in [self.p6, self.p7]:
-            weight_init.c2_xavier_fill(module)
-
-    def forward(self, c5):
-        p6 = self.p6(c5)
-        p7 = self.p7(F.relu(p6))
-        return [p6, p7]
-
-
-@BACKBONE_REGISTRY.register()
-def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
-    """
-    Args:
-        cfg: a detectron2 CfgNode
-    Returns:
-        backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
-    """
-    bottom_up = build_resnet_backbone(cfg, input_shape)
-    in_features = cfg.MODEL.FPN.IN_FEATURES
-    out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-    backbone = FPN(
-        bottom_up=bottom_up,
-        in_features=in_features,
-        out_channels=out_channels,
-        norm=cfg.MODEL.FPN.NORM,
-        top_block=LastLevelMaxPool(),
-        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-    )
-    return backbone
-
-
-@BACKBONE_REGISTRY.register()
-def build_retinanet_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
-    """
-    Args:
-        cfg: a detectron2 CfgNode
-    Returns:
-        backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
-    """
-    bottom_up = build_resnet_backbone(cfg, input_shape)
-    in_features = cfg.MODEL.FPN.IN_FEATURES
-    out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-    in_channels_p6p7 = bottom_up.output_shape()["res5"].channels
-    backbone = FPN(
-        bottom_up=bottom_up,
-        in_features=in_features,
-        out_channels=out_channels,
-        norm=cfg.MODEL.FPN.NORM,
-        top_block=LastLevelP6P7(in_channels_p6p7, out_channels),
-        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-    )
-    return backbone

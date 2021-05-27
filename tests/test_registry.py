@@ -1,5 +1,5 @@
 import unittest
-from jdet.config.registry import Registry
+from jdet.utils.registry import Registry
 
 class TestRegistry(unittest.TestCase):
 

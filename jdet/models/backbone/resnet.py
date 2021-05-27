@@ -12,6 +12,8 @@
 import jittor as jt
 from jittor import nn
 
+from jdet.utils.registry import BACKBONES
+
 __all__ = ['ResNet', 'Resnet18', 'Resnet34', 'Resnet26', 'Resnet38', 'Resnet50', 'Resnet101', 'Resnet152', 'Resnext50_32x4d', 'Resnext101_32x8d', 'Wide_resnet50_2', 'Wide_resnet101_2',
     'resnet18', 'resnet34', 'resnet26', 'resnet38', 'resnet50', 'resnet101', 'resnet152', 'resnext50_32x4d', 'resnext101_32x8d', 'wide_resnet50_2', 'wide_resnet101_2']
 
@@ -91,6 +93,7 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
         return out
 
+@BACKBONES.register_module()
 class ResNet(nn.Module):
 
     def __init__(self, block, layers, return_stages=["layer4"],num_classes=None, zero_init_residual=False, groups=1, width_per_group=64, replace_stride_with_dilation=None, norm_layer=None):
@@ -187,6 +190,7 @@ def Resnet26(**kwargs):
     return _resnet(Bottleneck, [1, 2, 4, 1], **kwargs)
 resnet26 = Resnet26
 
+@BACKBONES.register_module()
 def Resnet101(pretrained=False, **kwargs):
     """
     ResNet-101 model architecture.

@@ -1,32 +1,43 @@
-import inspect
-
+# reference mmcv.utils.registry
 class Registry:
-    
-    def __init__(self,name):
-        self.name = name
+    def __init__(self):
+        self._modules = {}
 
-    def register(self, name, module=None):
-        def register_fn(fn):
-            assert name not in self,f"{name} is already registered."
-            self[name]=fn
-            return fn
+    def register_module(self, name=None):
+        def _register_module(module):
+            key = name
+            if key is None:
+                key = module.__name__
+            assert key not in self._modules,f"{key} is already registered."
+            self._modules[key]=module
+            return module
+        return _register_module
 
-        if module is not None:
-            # used as function call
-            return register_fn(module)
-        else:
-            # used as decorator
-            return register_fn
+    def get(self,name):
+        assert name in self._modules,f"{name} is not registered."
+        return self._modules[name]
 
-    def __getattr__(self,name):
-        if name in self.__dict__:
-            return self.__dict__[name]
-        return self[name]
-            
+
+def build_from_cfg(cfg,registry,**kwargs):
+    if isinstance(cfg,str):
+        return registry[cfg](**kwargs)
+    elif isinstance(cfg,dict):
+        args = cfg.copy()
+        obj_type = args.pop('type')
+        obj_cls = registry.get(obj_type)
+        return obj_cls(**args,**kwargs)
+    else:
+        raise TypeError(f"type {type(cfg)} not support")
+
 
 DATASETS = Registry()
+TRANSFORMS = Registry()
+META_ARCHS = Registry()
 BACKBONES = Registry()
 ROI_HEADS = Registry()
 LOSSES = Registry()
+OPTIMS = Registry()
+SOLVERS = Registry()
+HOOKs = Registry()
 
 

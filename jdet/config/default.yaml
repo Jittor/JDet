@@ -1,0 +1,22 @@
+model:
+    type: "RCNN"
+    backbone:
+        type: "ResNetFPN"
+        resnet_args: 
+            type: "Resnet101"
+        fpn_args:
+            type: "FPN"
+    rpn:
+        type: "RPN"
+    roi_heads:
+        type: "BoxHead"
+  
+
+DATASETS:
+  TRAIN:
+    TYPE: "COCODataset"
+    TRANSFORMS:
+      - TYPE: "Resize" 
+        KEEP_RATIO: True
+
+work_dir: "./exp"
