@@ -4,3 +4,4 @@ numpy
 matplotlib
 yaml
 tensorboardX
+opencv-python
