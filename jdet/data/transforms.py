@@ -3,6 +3,7 @@ import jittor as jt
 import cv2
 import numpy as np
 import math
+from PIL import Image
 from jdet.utils.registry import build_from_cfg,TRANSFORMS
 
 @TRANSFORMS.register_module()
@@ -190,7 +191,7 @@ class RandomFlip:
         if random.random() < self.prob:
             image = self._flip_image(image)
             if target is not None:
-                self._flip_boxes(target)
+                self._flip_boxes(target,image.size)
         return image, target
 
 
@@ -300,11 +301,17 @@ class Normalize:
         self.to_bgr = to_bgr
 
     def __call__(self, image, target=None):
-        if self.to_bgr:
-            image = image[::-1]
         if isinstance(image, Image.Image):
-            image = (np.array(image).transpose((2,0,1)) - self.mean*np.float32(255.)) * (np.float32(1./255.)/self.std)
+            image = (np.array(image).transpose((2,0,1)) - self.mean)/self.std
+            image /=255.
         else:
             image = (image - self.mean) / self.std
+
+        if self.to_bgr:
+            image = image[::-1]
+        
+        target["mean"] = self.mean 
+        target["std"] = self.std
+        target["to_bgr"] = self.to_bgr
         return image, target
 

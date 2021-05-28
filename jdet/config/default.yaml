@@ -1,22 +1,59 @@
 model:
-    type: "RCNN"
+    type: RCNN
     backbone:
-        type: "ResNetFPN"
-        resnet_args: 
-            type: "Resnet101"
-        fpn_args:
-            type: "FPN"
+        type: Resnet101
+        return_stages: [layer1,layer2,layer3,layer4]
+    neck:
+        type: "FPN"
+        in_channels: [256,512,1024,2048]
+        out_channels: 256
+        num_outs: 5
     rpn:
         type: "RPN"
+        in_channels: 256
     roi_heads:
         type: "BoxHead"
   
 
-DATASETS:
-  TRAIN:
-    TYPE: "COCODataset"
-    TRANSFORMS:
-      - TYPE: "Resize" 
-        KEEP_RATIO: True
+dataset:
+    train:
+        type: "COCODataset"
+        root: "/mnt/disk/lxl/dataset/coco/images/val2017"
+        anno_file: "/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json"
+        transforms:
+            - type: "Resize"
+              min_size: [800]
+              max_size: 1333
+            - type: "RandomFlip"
+              prob: 1.0
+            - type: "Normalize"
+              mean: [123.675, 116.28, 103.53]
+              std: [58.395, 57.12, 57.375]
+    
+    test:
+        type: ImageDataset
+        img_dir: images
+        transforms:
+            - type: "Resize"
+              min_size: [800]
+              max_size: 1333
+            - type: "RandomFlip"
+              prob: 1.0
+            - type: "Normalize"
+              mean: [123.675, 116.28, 103.53]
+              std: [58.395, 57.12, 57.375]
+
+optim:
+    type: "SGD"
+    lr: 0.01
+
+solver:
+    type: "CosineAnnealingLR"
+    T_max: 200000
+
+logger:
+    type: "RunLogger"
+    log_interval: 20
 
 work_dir: "./exp"
+epoch: 12

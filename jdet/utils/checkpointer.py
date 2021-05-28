@@ -1,7 +1,5 @@
-from .registry import HOOKS
 import pickle
 
-@HOOKS.register_module()
 class Checkpointer:
     def __init__(self,model,optimizer,scheduler):
         self.model = model 

@@ -1,6 +1,6 @@
 import argparse
 import os
-
+import jittor as jt
 from jdet.runner import Runner 
 from jdet.config import init_cfg
 
@@ -20,7 +20,14 @@ def main():
         help="train,val,test,whole",
         type=str,
     )
+    parser.add_argument(
+        "--use_cuda",
+        default=True,
+        type=bool,
+    )
     args = parser.parse_args()
+    if args.use_cuda:
+        jt.flags.use_cuda=1
 
     assert args.task in ["train","val","test","whole"],f"{args.task} not support, please choose [train,val,test,whole]"
     

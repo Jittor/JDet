@@ -3,7 +3,7 @@ class Registry:
     def __init__(self):
         self._modules = {}
 
-    def register_module(self, name=None):
+    def register_module(self, name=None,module=None):
         def _register_module(module):
             key = name
             if key is None:
@@ -11,6 +11,10 @@ class Registry:
             assert key not in self._modules,f"{key} is already registered."
             self._modules[key]=module
             return module
+
+        if module is not None:
+            return _register_module(module)
+
         return _register_module
 
     def get(self,name):
@@ -20,12 +24,15 @@ class Registry:
 
 def build_from_cfg(cfg,registry,**kwargs):
     if isinstance(cfg,str):
-        return registry[cfg](**kwargs)
+        return registry.get(cfg)(**kwargs)
     elif isinstance(cfg,dict):
         args = cfg.copy()
+        args.update(kwargs)
         obj_type = args.pop('type')
         obj_cls = registry.get(obj_type)
-        return obj_cls(**args,**kwargs)
+        return obj_cls(**args)
+    elif cfg is None:
+        return None
     else:
         raise TypeError(f"type {type(cfg)} not support")
 
@@ -38,6 +45,7 @@ ROI_HEADS = Registry()
 LOSSES = Registry()
 OPTIMS = Registry()
 SOLVERS = Registry()
-HOOKs = Registry()
+HOOKS = Registry()
+NECKS = Registry()
 
 

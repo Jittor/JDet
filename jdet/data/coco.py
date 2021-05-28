@@ -38,7 +38,7 @@ class COCODataset(Dataset):
         
         if isinstance(transforms,list):
             transforms = Compose(transforms)
-        if not callable(transforms):
+        if transforms is not None and not callable(transforms):
             raise TypeError("transforms must be list or callable")
 
         self.transforms = transforms
@@ -119,6 +119,7 @@ class COCODataset(Dataset):
             labels=gt_labels,
             bboxes_ignore=gt_bboxes_ignore,
             masks=gt_masks_ann,
+            classes=self.CLASSES,
             ori_img_size=(width,height),
             img_size=(width,height))
 

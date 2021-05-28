@@ -1,5 +1,7 @@
-from .registry import HOOKS 
+from .registry import HOOKS,build_from_cfg 
+from jdet.config.config import get_cfg
 import time 
+import os
 
 @HOOKS.register_module()
 class TextLogger:
@@ -7,9 +9,10 @@ class TextLogger:
         work_dir = get_cfg().work_dir
         file_name = "log_"+time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())+".txt"
         f = os.path.join(work_dir,file_name)
-        self.log_file = open(log_file,"a")
+        self.log_file = open(f,"a")
 
     def log(self,data):
+        data = str(data)+"\n"
         self.log_file.write(data)
         self.log_file.flush()
 
@@ -23,12 +26,12 @@ class TensorboardLogger:
 
 @HOOKS.register_module()
 class RunLogger:
-    def __init__(self,log_interval,loggers=["TextLogger","TensorboardLogger"]):
+    def __init__(self,log_interval=50,loggers=["TextLogger","TensorboardLogger"]):
         self.log_interval = log_interval
         self.loggers = [build_from_cfg(l,HOOKS) for l in loggers]
         self.step = 0
 
-    def iter(self,data):
+    def log(self,data):
         for logger in self.loggers:
             if self.step % self.log_interval==0:
                logger.log(data)

@@ -70,9 +70,6 @@ class FPN(nn.Module):
                  extra_convs_on_inputs=True,
                  relu_before_extra_convs=False,
                  no_norm_on_lateral=False,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 act_cfg=None,
                  upsample_cfg=dict(mode='nearest'),
                  init_cfg=dict(
                      type='Xavier', layer='Conv2d', distribution='uniform')):
@@ -117,23 +114,15 @@ class FPN(nn.Module):
         self.fpn_convs = nn.ModuleList()
 
         for i in range(self.start_level, self.backbone_end_level):
-            l_conv = ConvModule(
+            l_conv = nn.Conv2d(
                 in_channels[i],
                 out_channels,
-                1,
-                conv_cfg=conv_cfg,
-                norm_cfg=norm_cfg if not self.no_norm_on_lateral else None,
-                act_cfg=act_cfg,
-                inplace=False)
-            fpn_conv = ConvModule(
+                1)
+            fpn_conv = nn.Conv2d(
                 out_channels,
                 out_channels,
                 3,
-                padding=1,
-                conv_cfg=conv_cfg,
-                norm_cfg=norm_cfg,
-                act_cfg=act_cfg,
-                inplace=False)
+                padding=1)
 
             self.lateral_convs.append(l_conv)
             self.fpn_convs.append(fpn_conv)
@@ -146,16 +135,12 @@ class FPN(nn.Module):
                     in_channels = self.in_channels[self.backbone_end_level - 1]
                 else:
                     in_channels = out_channels
-                extra_fpn_conv = ConvModule(
+                extra_fpn_conv = nn.Conv2d(
                     in_channels,
                     out_channels,
                     3,
                     stride=2,
-                    padding=1,
-                    conv_cfg=conv_cfg,
-                    norm_cfg=norm_cfg,
-                    act_cfg=act_cfg,
-                    inplace=False)
+                    padding=1)
                 self.fpn_convs.append(extra_fpn_conv)
 
     def execute(self, x):
@@ -174,11 +159,11 @@ class FPN(nn.Module):
             # In some cases, fixing `scale factor` (e.g. 2) is preferred, but
             #  it cannot co-exist with `size` in `F.interpolate`.
             if 'scale_factor' in self.upsample_cfg:
-                laterals[i - 1] += F.interpolate(laterals[i],
+                laterals[i - 1] += nn.interpolate(laterals[i],
                                                  **self.upsample_cfg)
             else:
                 prev_shape = laterals[i - 1].shape[2:]
-                laterals[i - 1] += F.interpolate(
+                laterals[i - 1] += nn.interpolate(
                     laterals[i], size=prev_shape, **self.upsample_cfg)
 
         # build outputs
@@ -192,7 +177,7 @@ class FPN(nn.Module):
             # (e.g., Faster R-CNN, Mask R-CNN)
             if not self.add_extra_convs:
                 for i in range(self.num_outs - used_backbone_levels):
-                    outs.append(F.max_pool2d(outs[-1], 1, stride=2))
+                    outs.append(nn.max_pool2d(outs[-1], 1, stride=2))
             # add conv layers on top of original feature maps (RetinaNet)
             else:
                 if self.add_extra_convs == 'on_input':
