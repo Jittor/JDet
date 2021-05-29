@@ -1,3 +1,5 @@
+import numpy as np
+import jittor as jt
 import cv2 
 
 def draw_box(img,box,text,color):
@@ -14,3 +16,10 @@ def draw_rbox(img,box,text,color):
 
 def draw_mask(img,box,mask,text,color):
     pass
+
+def draw_boxes(img,boxes,cats):
+    if isinstance(img,jt.Var):
+        img = img.numpy()
+    for box,cat in zip(boxes,cats):
+        img = draw_box(img,box,cat,(255,0,0))
+    cv2.imwrite("test.png",img)

@@ -4,7 +4,7 @@ import os
 import yaml
 import copy
 
-__all__ = ["get_cfg","init_cfg","write_cfg"]
+__all__ = ["get_cfg","init_cfg","save_cfg"]
 
 class CfgNode(OrderedDict):
 
@@ -50,7 +50,6 @@ class CfgNode(OrderedDict):
                 d = [dd.dump() if isinstance(dd,CfgNode) else dd for dd in d]
             now[k]=d
         return now
-        
 
 _cfg = CfgNode()
 _cfg.merge_from_file(os.path.join(os.path.dirname(os.path.abspath(__file__)),"default.yaml"))
@@ -63,7 +62,7 @@ def get_cfg():
     global _cfg
     return _cfg
 
-def write_cfg(save_file):
+def save_cfg(save_file):
     global _cfg 
     with open(save_file,"w") as f:
         f.write(yaml.dump(_cfg.dump()))

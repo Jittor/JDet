@@ -3,23 +3,10 @@ import jittor as jt
 import os 
 import cv2 
 
-from jdet.config.config import get_cfg,write_cfg
+import jdet
+from jdet.config.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS
 from jdet.utils.checkpointer import Checkpointer
-import jdet
-
-def draw_box(img,box,text,color):
-    box = [int(x) for x in box]
-    img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=color, thickness=1)
-    img = cv2.putText(img=img, text=text, org=(box[0],box[1]-5), fontFace=0, fontScale=0.5, color=color, thickness=1)
-    return img 
-
-def draw_boxes(img,boxes,cats):
-    if isinstance(img,jt.Var):
-        img = img.numpy()
-    for box,cat in zip(boxes,cats):
-        img = draw_box(img,box,cat,(255,0,0))
-    cv2.imwrite("test.png",img)
 
 
 class Runner:
@@ -35,7 +22,7 @@ class Runner:
 
         os.makedirs(self.work_dir,exist_ok=True)
         save_config_file = os.path.join(self.work_dir,"config.yaml")
-        write_cfg(save_config_file)
+        save_cfg(save_config_file)
 
     
         self.model = build_from_cfg(cfg.model,META_ARCHS)
@@ -49,8 +36,6 @@ class Runner:
         self.checkpointer = Checkpointer(model=self.model,optimizer=self.optimizer,scheduler = self.scheduler)
         self.iter = 0
         self.epoch = 0
-    
-
     
     def run(self):
         print("running") 
