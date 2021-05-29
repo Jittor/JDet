@@ -3,6 +3,7 @@ model:
     backbone:
         type: Resnet101
         return_stages: [layer1,layer2,layer3,layer4]
+        pretrained: True
     neck:
         type: "FPN"
         in_channels: [256,512,1024,2048]
@@ -12,14 +13,16 @@ model:
         type: "RPN"
         in_channels: 256
     roi_heads:
-        type: "BoxHead"
-  
+        type: BoxHead
 
 dataset:
     train:
-        type: "COCODataset"
-        root: "/mnt/disk/lxl/dataset/coco/images/val2017"
-        anno_file: "/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json"
+        type: COCODataset
+        root: /mnt/disk/lxl/dataset/coco/images/train2017
+        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json
+        batch_size: 2
+        num_workers: 2
+        shuffle: True
         transforms:
             - type: "Resize"
               min_size: [800]
@@ -29,31 +32,47 @@ dataset:
             - type: "Normalize"
               mean: [123.675, 116.28, 103.53]
               std: [58.395, 57.12, 57.375]
-    
-    test:
-        type: ImageDataset
-        img_dir: images
+    val:
+        type: COCODataset
+        root: /mnt/disk/lxl/dataset/coco/images/val2017
+        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json
+        batch_size: 2
+        num_workers: 2
         transforms:
-            - type: "Resize"
-              min_size: [800]
-              max_size: 1333
-            - type: "RandomFlip"
-              prob: 1.0
+            - type: "Normalize"
+              mean: [123.675, 116.28, 103.53]
+              std: [58.395, 57.12, 57.375]
+
+    test:
+        type: COCODataset
+        root: /mnt/disk/lxl/dataset/coco/images/val2017
+        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json
+        batch_size: 2
+        num_workers: 2
+        transforms:
             - type: "Normalize"
               mean: [123.675, 116.28, 103.53]
               std: [58.395, 57.12, 57.375]
 
 optim:
     type: "SGD"
-    lr: 0.01
+    lr: 0.02
+    momentum: 0.9
+    weight_decay: 0.0001
 
-solver:
-    type: "CosineAnnealingLR"
-    T_max: 200000
+scheduler:
+    type: StepLR
+    warmup: linear
+    warmup_iters: 500
+    warmup_ratio: 0.001
+    step: [8, 11]
 
 logger:
     type: "RunLogger"
     log_interval: 20
 
 work_dir: "./exp"
-epoch: 12
+max_epoch: 12
+checkpoint_interval: 1
+eval_interval: 1
+
