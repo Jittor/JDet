@@ -23,6 +23,7 @@ class WarmUpLR(object):
         self.warmup_ratio = warmup_ratio
         self.warmup_iters = warmup_iters
         self.warmup = warmup
+        self.base_lrs = list(map(lambda group: group['initial_lr'], optimizer.param_groups))
     
     def get_warmup_lr(self,cur_iters,lr):
         if self.warmup == 'constant':
@@ -37,10 +38,8 @@ class WarmUpLR(object):
         return lr 
     
     def _update_lr(self,steps,get_lr_func):
-        self.optimizer.lr = get_lr_func(self.optimizer.lr,steps)
         for i, param_group in enumerate(self.optimizer.param_groups):
-            if param_group.get("lr") != None:
-                param_group["lr"] = get_lr_func(param_group["lr"],steps)
+            param_group["lr"] = get_lr_func(param_group.get("initial_lr",self.optimizer.lr),steps)
 
     def step(self,iters,epochs,by_epoch=True):
         if self.warmup is not None:
@@ -56,6 +55,9 @@ class WarmUpLR(object):
                 self._update_lr(epochs,self.get_lr)
             else:
                 self._update_lr(iters,self.get_lr)
+
+    def state_dict(self):
+        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
 
 @SCHEDULERS.register_module()
 class StepLR(WarmUpLR):

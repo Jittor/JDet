@@ -5,12 +5,12 @@ model:
         return_stages: [layer1,layer2,layer3,layer4]
         pretrained: True
     neck:
-        type: "FPN"
+        type: FPN
         in_channels: [256,512,1024,2048]
         out_channels: 256
         num_outs: 5
     rpn:
-        type: "RPN"
+        type: RPN
         in_channels: 256
     roi_heads:
         type: BoxHead

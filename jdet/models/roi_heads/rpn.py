@@ -10,9 +10,7 @@ import numpy as np
 
 from .anchor_generator import *
 from .anchor_generator import _unmap
-from jdet.ops.funcs import multi_apply
-from jdet.models.losses.faster_rcnn_loss import _fast_rcnn_loc_loss
-# from utils.box_ops import _enumerate_shifted_anchor,bbox2loc,loc2bbox,generate_anchor_base,_unmap,bbox_iou
+from jdet.models.losses import smooth_l1_loss
 
 class ProposalTargetCreator(nn.Module):
     """Assign ground truth bounding boxes to given RoIs.
@@ -170,13 +168,14 @@ class AnchorTargetCreator(nn.Module):
         img_W, img_H = img_size
 
         n_anchor = len(anchor)
-        # inside_index = jt.where(
-        #         (anchor[:, 0] >= 0) &
-        #         (anchor[:, 1] >= 0) &
-        #         (anchor[:, 2] <= img_W) &
-        #         (anchor[:, 3] <= img_H)
-        #         )[0]
-        inside_index = jt.index((n_anchor,),dim=0)
+        inside_index = jt.where(
+                (anchor[:, 0] >= 0) &
+                (anchor[:, 1] >= 0) &
+                (anchor[:, 2] <= img_W) &
+                (anchor[:, 3] <= img_H)
+                )[0]
+        if inside_index.sum().item()==0:
+            return None,None
 
         anchor = anchor[inside_index]
         argmax_ious, label = self._create_label(anchor, bbox)
@@ -350,44 +349,46 @@ class ProposalCreator(nn.Module):
 class RPN(nn.Module):
 
     def __init__(self, 
-                 in_channels=512, 
-                 mid_channels=512, 
-                 ratios=[0.5, 1, 2],
-                 anchor_scales=[8], 
-                 feat_strides=[4, 8, 16, 32, 64],
-                 nms_thresh=0.7,
-                 n_train_pre_nms=2000,
-                 n_train_post_nms=1000,
-                 n_test_pre_nms=1000,
-                 n_test_post_nms=300,
-                 min_size=16,
+                in_channels=512, 
+                mid_channels=512,
+                ratios=[0.5, 1, 2],
+                anchor_scales=[8], 
+                feat_strides=[4, 8, 16, 32, 64],
+                proposal_creator_cfg=dict(
+                            nms_thresh=0.7,
+                            n_train_pre_nms=2000,
+                            n_train_post_nms=1000,
+                            n_test_pre_nms=1000,
+                            n_test_post_nms=300,
+                            min_size=16),
+                anchor_target_cfg=dict(
+                            n_sample=256,
+                            pos_iou_thresh=0.7, 
+                            neg_iou_thresh=0.3,
+                            pos_ratio=0.5
+                ),
+                proposal_target_cfg=dict(
+                            n_sample=128,
+                            pos_ratio=0.25, 
+                            pos_iou_thresh=0.5,
+                            neg_iou_thresh_hi=0.5, 
+                            neg_iou_thresh_lo=0.0
+                ),
+                 
     ):
         super(RPN, self).__init__()
         self.anchor_bases = generate_multilevel_anchor_base(base_sizes=feat_strides,scales=anchor_scales, ratios=ratios)
         self.feat_strides = feat_strides
-        self.proposal_layer = ProposalCreator(nms_thresh=nms_thresh,
-                                              n_train_pre_nms=n_train_pre_nms,
-                                              n_train_post_nms=n_train_post_nms,
-                                              n_test_pre_nms=n_test_pre_nms,
-                                              n_test_post_nms=n_test_post_nms,
-                                              min_size=min_size)
-        self.anchor_target_creator = AnchorTargetCreator(n_sample=256,
-                                                         pos_iou_thresh=0.7, 
-                                                         neg_iou_thresh=0.3,
-                                                         pos_ratio=0.5)
-
-        self.proposal_target_creator = ProposalTargetCreator(n_sample=128,
-                                                             pos_ratio=0.25, 
-                                                             pos_iou_thresh=0.5,
-                                                             neg_iou_thresh_hi=0.5, 
-                                                             neg_iou_thresh_lo=0.0)
+        self.proposal_layer = ProposalCreator(**proposal_creator_cfg)
+        self.anchor_target_creator = AnchorTargetCreator(**anchor_target_cfg)
+        self.proposal_target_creator = ProposalTargetCreator(**proposal_target_cfg)
 
         n_anchor = self.anchor_bases[0].shape[0]
         self.conv1 = nn.Conv(in_channels, mid_channels, 3, 1, 1)
         self.score = nn.Conv(mid_channels, n_anchor * 2, 1, 1, 0)
         self.loc = nn.Conv(mid_channels, n_anchor * 4, 1, 1, 0)
         self._normal_init()
-        self.rpn_sigma = 3.
+        self.rpn_beta = 1/9.
         
         
     def _normal_init(self):
@@ -482,6 +483,8 @@ class RPN(nn.Module):
             gt_rpn_locs.append(gt_rpn_loc)
             gt_rpn_labels.append(gt_rpn_label)
             
+        if any([label is None for label in gt_rpn_labels]):
+            return None,None
         sample_roi_indexs = jt.contrib.concat(sample_roi_indexs,dim=0)
         sample_rois = jt.contrib.concat(sample_rois,dim=0)
         gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
@@ -492,7 +495,12 @@ class RPN(nn.Module):
         rpn_scores = rpn_scores.reshape(-1,2)
         gt_rpn_labels = jt.contrib.concat(gt_rpn_labels,dim=0)
         gt_rpn_locs = jt.contrib.concat(gt_rpn_locs,dim=0)
-        rpn_loc_loss = _fast_rcnn_loc_loss(rpn_locs,gt_rpn_locs,gt_rpn_labels,self.rpn_sigma)
+        
+        weights = jt.zeros(gt_rpn_locs.shape)
+        weight[gt_label>0,:]=1
+        n_samples = (gt_label>=0).sum().float()
+        rpn_loc_loss = smooth_l1_loss(rpn_locs,gt_rpn_locs,beta=self.rpn_beta,weight=weight,avg_factor=n_samples)
+
         rpn_cls_loss = nn.cross_entropy_loss(rpn_scores[gt_rpn_labels>=0,:],gt_rpn_labels[gt_rpn_labels>=0])
         
         losses = {"rpn_loc_loss": rpn_loc_loss, 
@@ -507,6 +515,8 @@ class RPN(nn.Module):
         for x,anchor_base,feat_stride in zip(xs,self.anchor_bases,self.feat_strides):
             rpn_locs, rpn_scores, rois, roi_indices, anchor  = self.execute_single(x,anchor_base,feat_stride,img_size)
             loss,out = self.loss_single(rpn_locs, rpn_scores, rois, roi_indices, anchor,targets)
+            if loss is None:
+                return None,None
             outs.append(out)
             losses.append(loss)
         return outs,losses

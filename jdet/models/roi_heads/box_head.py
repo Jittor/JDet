@@ -19,7 +19,7 @@ class BoxHead(nn.Module):
         spatial_scale (float): Scale of the roi is resized.
     """
 
-    def __init__(self, in_channels=256,n_class=81, roi_size=7, spatial_scale=1./16,sampling_ratio=0):
+    def __init__(self, in_channels=256,n_class=81, roi_size=7, spatial_scales=[1./4, 1./8, 1./16, 1./32, 1./64]):
         # n_class includes the background
         super(BoxHead, self).__init__()
 
@@ -33,19 +33,20 @@ class BoxHead(nn.Module):
         self.score = nn.Linear(4096, n_class)
 
         self.n_class = n_class
-        self.roi_size = roi_size
-        self.spatial_scale = spatial_scale
-        self.roi = ROIAlign((self.roi_size, self.roi_size),self.spatial_scale,sampling_ratio=sampling_ratio)
+        self.roi_aligns = [ROIAlign(roi_size,spatial_scale) for spatial_scale in self.spatial_scales]
         
+        self.roi_sigma = 1.
+
+        self.init_weights()
+    
+    def init_weights(self):
         init.gauss_(self.cls_loc.weight,0,0.001)
         init.constant_(self.cls_loc.bias,0)
         init.gauss_(self.score.weight,0,0.01)
         init.constant_(self.score.bias,0)
-
-        self.roi_sigma = 1.
             
 
-    def execute_single(self, x, rois, roi_indices):
+    def execute_single(self, x, rois, roi_indices,roi_align):
         """Forward the chain.
         We assume that there are :math:`N` batches.
         Args:
@@ -60,7 +61,7 @@ class BoxHead(nn.Module):
                 which bounding boxes correspond to. Its shape is :math:`(R',)`.
         """
         indices_and_rois = jt.contrib.concat([roi_indices.unsqueeze(1), rois], dim=1)
-        pool = self.roi(x, indices_and_rois)
+        pool = roi_align(x, indices_and_rois)
         pool = pool.view(pool.shape[0], np.prod(pool.shape[1:]).item())
         fc7 = self.classifier(pool)
         roi_cls_locs = self.cls_loc(fc7)
@@ -70,7 +71,8 @@ class BoxHead(nn.Module):
     def loss_single(self,roi_cls_loc, roi_score,gt_roi_locs,gt_roi_labels):
         n_sample = roi_cls_loc.shape[0]
         roi_cls_loc = roi_cls_loc.view(n_sample, np.prod(roi_cls_loc.shape[1:]).item()//4, 4)
-        roi_loc = roi_cls_loc[jt.arange(0, n_sample).int32(), gt_roi_labels]
+        roi_loc = roi_cls_loc[:, gt_roi_labels]
+        
         roi_loc_loss = _fast_rcnn_loc_loss(roi_loc,gt_roi_locs,gt_roi_labels,self.roi_sigma)
         roi_cls_loss = nn.cross_entropy_loss(roi_score, gt_roi_labels) 
 
@@ -83,8 +85,8 @@ class BoxHead(nn.Module):
     def execute(self,xs,proposals,targets):
         losses = []
         outs = []
-        for x,(sample_rois,sample_roi_indexs,gt_roi_locs,gt_roi_labels) in zip(xs,proposals):
-            roi_cls_locs, roi_scores = self.execute_single(x,sample_rois,sample_roi_indexs)
+        for x,(sample_rois,sample_roi_indexs,gt_roi_locs,gt_roi_labels),roi_align in zip(xs,proposals,self.roi_aligns):
+            roi_cls_locs, roi_scores = self.execute_single(x,sample_rois,sample_roi_indexs,roi_align)
             loss = self.loss_single(roi_cls_locs, roi_scores,gt_roi_locs,gt_roi_labels)
             outs.append((roi_cls_locs,roi_scores))
             losses.append(loss)

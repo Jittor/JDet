@@ -50,6 +50,8 @@ class Runner:
         self.model.train()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             results,losses = self.model(images,targets)
+            if results is None:
+                continue
             self.optimizer.step(losses)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
             self.logger.log({"losses":losses.item()})
@@ -88,7 +90,19 @@ class Runner:
         if self.checkpoint_interval is None or self.epoch % self.checkpoint_interval!=0:
             return
         save_file = os.path.join(self.work_dir,f"/ckpt_{self.epoch}.pkl")
-        self.checkpointer.save(save_file)
+        save_data = {
+            "meta":{
+                "jdet_version": jdet.__version__,
+                "lr_scheduler": self.lr_scheduler.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
+                "epoch": self.epoch,
+                "iter": self.iter,
+                "trained_time":self.now_time,
+                "config": self.cfg.dump()
+            },
+            "model":model.parameters()
+        }
+        jt.save(save_data,save_file)
     
     def resume(self):
         self.iter,self.epoch = self.checkpointer.load(self.resume_path)
@@ -107,15 +121,3 @@ class Runner:
             
             classes = [target["classes"][i-1] for i in target["labels"]]
             draw_boxes(image,target["bboxes"],classes)
-
-    def meta(self):
-        states = {
-            "jdet_version": jdet.__version__,
-            "lr_scheduler": self.lr_scheduler.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
-            "epoch": self.epoch,
-            "iter": self.iter,
-            "trained_time":self.now_time,
-            "config": self.cfg.dump()
-        }
-        return states

@@ -36,6 +36,8 @@ class RCNN(nn.Module):
             features = self.neck(features)
 
         proposals,rpn_losses = self.rpn(features,targets)
+        if proposals is None:
+            return None,None
         result, detector_losses = self.roi_heads(features, proposals, targets)
         
         losses = 0.

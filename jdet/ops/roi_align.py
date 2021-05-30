@@ -260,7 +260,7 @@ def roi_align(input, rois, output_size, spatial_scale, sampling_ratio):
 
 
 class ROIAlign(nn.Module):
-    def __init__(self, output_size, spatial_scale, sampling_ratio):
+    def __init__(self, output_size, spatial_scale, sampling_ratio=0):
         super(ROIAlign, self).__init__()
         self.output_size = output_size
         self.spatial_scale = spatial_scale
