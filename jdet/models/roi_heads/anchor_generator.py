@@ -1,8 +1,6 @@
 import jittor as jt 
 import numpy as np 
 
-from jdet.utils.registry import ROI_HEADS
-
 def generate_anchor_base(base_size=16, ratios=[0.5, 1, 2],scales=[8, 16, 32]):
     """Generate anchor base windows by enumerating aspect ratio and scales.
     Generate anchors that are scaled and modified to the given aspect ratios.
@@ -42,10 +40,10 @@ def generate_anchor_base(base_size=16, ratios=[0.5, 1, 2],scales=[8, 16, 32]):
             w = base_size * scales[j] * np.sqrt(1. / ratios[i])
 
             index = i * len(scales) + j
-            anchor_base[index, 0] = py - h / 2.
-            anchor_base[index, 1] = px - w / 2.
-            anchor_base[index, 2] = py + h / 2.
-            anchor_base[index, 3] = px + w / 2.
+            anchor_base[index, 1] = py - h / 2.
+            anchor_base[index, 0] = px - w / 2.
+            anchor_base[index, 3] = py + h / 2.
+            anchor_base[index, 2] = px + w / 2.
     return anchor_base
 
 def generate_multilevel_anchor_base(base_sizes=[16], ratios=[0.5, 1, 2],scales=[8, 16, 32]):
@@ -95,8 +93,8 @@ def loc2bbox(src_bbox,loc):
     center_x = dx*src_width+src_center_x
     center_y = dy*src_height+src_center_y
         
-    w = jt.exp(dw.minimum(20.0)) * src_width
-    h = jt.exp(dh.minimum(20.0)) * src_height
+    w = jt.exp(dw) * src_width
+    h = jt.exp(dh) * src_height
         
     x1,y1,x2,y2 = center_x-0.5*w, center_y-0.5*h, center_x+0.5*w, center_y+0.5*h
         
@@ -130,7 +128,8 @@ def bbox2loc(src_bbox,dst_bbox):
     
 def bbox_iou(bbox_a, bbox_b):
     assert bbox_a.shape[1]==4 and bbox_b.shape[1]==4
-
+    if bbox_a.numel()==0 or bbox_b.numel()==0:
+        return jt.zeros((bbox_a.shape[0],bbox_b.shape[0]))
     # top left
     tl = jt.maximum(bbox_a[:, :2].unsqueeze(1), bbox_b[:, :2])
     # bottom right

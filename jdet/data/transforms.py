@@ -195,6 +195,29 @@ class RandomFlip:
         return image, target
 
 
+@TRANSFORMS.register_module()
+class Pad:
+    def __init__(self, size=None, size_divisor=None, pad_val=0):
+        self.size = size
+        self.size_divisor = size_divisor
+        self.pad_val = pad_val
+        # only one of size and size_divisor should be valid
+        assert size is not None or size_divisor is not None
+        assert size is None or size_divisor is None
+
+    def __call__(self,image,target=None):
+        if self.size is not None:
+            pad_w,pad_h = size
+        else:
+            pad_h = int(np.ceil(image.size[1] / self.size_divisor)) * self.size_divisor
+            pad_w = int(np.ceil(image.size[0] / self.size_divisor)) * self.size_divisor
+        
+        new_image = Image.new(image.mode,(pad_w,pad_h),(self.pad_val,)*len(image.split()))
+        new_image.paste(image,(0,0,image.size[0],image.size[1]))
+        
+        return new_image,target
+    
+
 class ToRect:
     def __init__( self, do=True ):
         self.do=do

@@ -11,15 +11,42 @@ from jittor.dataset import Dataset
 @DATASETS.register_module()
 class ImageDataset(Dataset):
 
-    def __init__(self,img_files,transforms=None,batch_size=1,num_workers=0,shuffle=False):
+    def __init__(self,img_files,
+                      transforms=[
+                          dict(
+                              type="Resize",
+                              min_size=[800],
+                              max_size=1333
+                          ),
+                          dict(
+                              type="Pad",
+                              size_divisor=32
+                          ),
+                          dict(
+                              type="Normalize",
+                              mean=[123.675, 116.28, 103.53],
+                              std = [58.395, 57.12, 57.375],
+                          )
+                      ],
+                      batch_size=1,
+                      num_workers=0,
+                      shuffle=False):
         super(ImageDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
         self.img_files = img_files
         self.total_len = len(img_files)
+        if isinstance(transforms,list):
+            transforms = Compose(transforms)
+        if transforms is not None and not callable(transforms):
+            raise TypeError("transforms must be list or callable")
         self.transforms = transforms
     
     def __getitem__(self,index):
         img = Image.open(self.img_files[index]).convert("RGB")
-        targets = {"ori_img_size":img.size}
+        targets = dict(
+            ori_img_size=img.size,
+            img_file = self.img_files[index]
+        )
+
         if self.transforms:
             img,targets = self.transforms(img,targets)
         return img,targets 

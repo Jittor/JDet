@@ -47,5 +47,6 @@ OPTIMS = Registry()
 SOLVERS = Registry()
 HOOKS = Registry()
 NECKS = Registry()
+SCHEDULERS = Registry()
 
 

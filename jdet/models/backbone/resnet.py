@@ -146,7 +146,7 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-        for i in range(1,5):
+        for i in range(1,4):
             name = f"layer{i}"
             x = getattr(self,name)(x)
             if name in self.return_stages:
@@ -175,6 +175,7 @@ def Resnet34(pretrained=False, **kwargs):
     return model
 resnet34 = Resnet34
 
+@BACKBONES.register_module()
 def Resnet50(pretrained=False, **kwargs):
     model = _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained: model.load("jittorhub://resnet50.pkl")

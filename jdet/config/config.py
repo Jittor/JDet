@@ -56,6 +56,7 @@ _cfg.merge_from_file(os.path.join(os.path.dirname(os.path.abspath(__file__)),"de
 
 def init_cfg(yaml_file):
     global _cfg
+    print("Load config from",yaml_file)
     _cfg.merge_from_file(yaml_file)
 
 def get_cfg():

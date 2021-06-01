@@ -10,113 +10,7 @@ import numpy as np
 
 from .anchor_generator import *
 from .anchor_generator import _unmap
-from jdet.models.losses import smooth_l1_loss
-
-class ProposalTargetCreator(nn.Module):
-    """Assign ground truth bounding boxes to given RoIs.
-    Args:
-        n_sample (int): The number of sampled regions.
-        pos_ratio (float): Fraction of regions that is labeled as a
-            foreground.
-        pos_iou_thresh (float): IoU threshold for a RoI to be considered as a
-            foreground.
-        neg_iou_thresh_hi (float): RoI is considered to be the background
-            if IoU is in
-            [:obj:`neg_iou_thresh_hi`, :obj:`neg_iou_thresh_hi`).
-        neg_iou_thresh_lo (float): See above.
-    """
-
-    def __init__(self,
-                 n_sample=128,
-                 pos_ratio=0.25, 
-                 pos_iou_thresh=0.5,
-                 neg_iou_thresh_hi=0.5, 
-                 neg_iou_thresh_lo=0.0
-                 ):
-        super(ProposalTargetCreator,self).__init__()
-        self.n_sample = n_sample
-        self.pos_ratio = pos_ratio
-        self.pos_iou_thresh = pos_iou_thresh
-        self.neg_iou_thresh_hi = neg_iou_thresh_hi
-        self.neg_iou_thresh_lo = neg_iou_thresh_lo  # NOTE:default 0.1 in py-faster-rcnn
-        
-
-    def execute(self, roi, bbox, label):
-        """Assigns ground truth to sampled proposals.
-        This function samples total of :obj:`self.n_sample` RoIs
-        from the combination of :obj:`roi` and :obj:`bbox`.
-        The RoIs are assigned with the ground truth class labels as well as
-        bounding box offsets and scales to match the ground truth bounding
-        boxes. As many as :obj:`pos_ratio * self.n_sample` RoIs are
-        sampled as foregrounds.
-        Offsets and scales of bounding boxes are calculated using
-        :func:`model.utils.bbox_tools.bbox2loc`.
-        Also, types of input arrays and output arrays are same.
-        Here are notations.
-        * :math:`S` is the total number of sampled RoIs, which equals \
-            :obj:`self.n_sample`.
-        * :math:`L` is number of object classes possibly including the \
-            background.
-        Args:
-            roi (array): Region of Interests (RoIs) from which we sample.
-                Its shape is :math:`(R, 4)`
-            bbox (array): The coordinates of ground truth bounding boxes.
-                Its shape is :math:`(R', 4)`.
-            label (array): Ground truth bounding box labels. Its shape
-                is :math:`(R',)`. Its range is :math:`[0, L - 1]`, where
-                :math:`L` is the number of foreground classes.
-        Returns:
-            (array, array, array):
-            * **sample_roi**: Regions of interests that are sampled. \
-                Its shape is :math:`(S, 4)`.
-            * **gt_roi_loc**: Offsets and scales to match \
-                the sampled RoIs to the ground truth bounding boxes. \
-                Its shape is :math:`(S, 4)`.
-            * **gt_roi_label**: Labels assigned to sampled RoIs. Its shape is \
-                :math:`(S,)`. Its range is :math:`[0, L]`. The label with \
-                value 0 is the background.
-        """
-        pos_roi_per_image = np.round(self.n_sample * self.pos_ratio)
-        iou = bbox_iou(roi, bbox)
-        gt_assignment,max_iou = iou.argmax(dim=1)
-        # Offset range of classes from [0, n_fg_class - 1] to [1, n_fg_class].
-        # The label with value 0 is the background.
-        gt_roi_label = label[gt_assignment]
-
-        # Select foreground RoIs as those with >= pos_iou_thresh IoU.
-        pos_index = jt.where(max_iou >= self.pos_iou_thresh)[0]
-        pos_roi_per_this_image = int(min(pos_roi_per_image, pos_index.shape[0]))
-        if pos_index.shape[0] > 0:
-            tmp_indexes = np.arange(0,pos_index.shape[0])
-            np.random.shuffle(tmp_indexes)
-            tmp_indexes = tmp_indexes[:pos_roi_per_this_image]
-            pos_index = pos_index[tmp_indexes]
-
-        # Select background RoIs as those within
-        # [neg_iou_thresh_lo, neg_iou_thresh_hi).
-        neg_index = jt.where((max_iou < self.neg_iou_thresh_hi) &
-                             (max_iou >= self.neg_iou_thresh_lo))[0]
-        neg_roi_per_this_image = self.n_sample - pos_roi_per_this_image
-        neg_roi_per_this_image = int(min(neg_roi_per_this_image,
-                                         neg_index.shape[0]))
-        if neg_index.shape[0] > 0:
-            tmp_indexes = np.arange(0,neg_index.shape[0])
-            np.random.shuffle(tmp_indexes)
-            tmp_indexes = tmp_indexes[:neg_roi_per_this_image]
-            neg_index = neg_index[tmp_indexes]
-        
-
-        # The indices that we're selecting (both positive and negative).
-        keep_index = jt.contrib.concat((pos_index, neg_index),dim=0)
-        gt_roi_label = gt_roi_label[keep_index]
-        gt_roi_label[pos_roi_per_this_image:] = 0  # negative labels --> 0
-        sample_roi = roi[keep_index]
-
-        # Compute offsets and scales to match sampled RoIs to the GTs.
-        gt_roi_loc = bbox2loc(sample_roi, bbox[gt_assignment[keep_index]])
-
-        return sample_roi, gt_roi_loc, gt_roi_label
-
+from jdet.models.losses.faster_rcnn_loss import faster_rcnn_loss
 
 class AnchorTargetCreator(nn.Module):
     """Assign the ground truth bounding boxes to anchors.
@@ -174,9 +68,6 @@ class AnchorTargetCreator(nn.Module):
                 (anchor[:, 2] <= img_W) &
                 (anchor[:, 3] <= img_H)
                 )[0]
-        if inside_index.sum().item()==0:
-            return None,None
-
         anchor = anchor[inside_index]
         argmax_ious, label = self._create_label(anchor, bbox)
 
@@ -215,7 +106,7 @@ class AnchorTargetCreator(nn.Module):
             label[disable_index] = -1
 
         # subsample negative labels if we have too many
-        n_neg = self.n_sample - jt.sum(label == 1).item()
+        n_neg = self.n_sample - jt.sum(label == 1).item() if label.numel()>0 else 0
         neg_index = jt.where(label == 0)[0]
         if len(neg_index) > n_neg:
             tmp_index = np.arange(0,neg_index.shape[0])
@@ -271,7 +162,7 @@ class ProposalCreator(nn.Module):
         self.n_test_post_nms = n_test_post_nms
         self.min_size = min_size
 
-    def execute(self, loc, score,anchor, img_size, scale=1.):
+    def execute(self, loc, score,anchor, img_size):
         """input should  be ndarray
         Propose RoIs.
         Inputs :obj:`loc, score, anchor` refer to the same anchor when indexed
@@ -319,9 +210,9 @@ class ProposalCreator(nn.Module):
         roi[:,3] = jt.clamp(roi[:,3],min_v=0,max_v=img_size[1])
 
         # Remove predicted boxes with either height or width < threshold.
-        min_size = self.min_size * scale
-        hs = roi[:, 2] - roi[:, 0]
-        ws = roi[:, 3] - roi[:, 1]
+        min_size = self.min_size
+        ws = roi[:, 2] - roi[:, 0]
+        hs = roi[:, 3] - roi[:, 1]
         keep = jt.where((hs >= min_size) & (ws >= min_size))[0]
         roi = roi[keep, :]
         score = score[keep]
@@ -356,24 +247,18 @@ class RPN(nn.Module):
                 feat_strides=[4, 8, 16, 32, 64],
                 proposal_creator_cfg=dict(
                             nms_thresh=0.7,
-                            n_train_pre_nms=2000,
-                            n_train_post_nms=1000,
-                            n_test_pre_nms=1000,
+                            n_train_pre_nms=12000,
+                            n_train_post_nms=2000,
+                            n_test_pre_nms=2000,
                             n_test_post_nms=300,
-                            min_size=16),
+                            min_size=1),
                 anchor_target_cfg=dict(
                             n_sample=256,
                             pos_iou_thresh=0.7, 
                             neg_iou_thresh=0.3,
                             pos_ratio=0.5
                 ),
-                proposal_target_cfg=dict(
-                            n_sample=128,
-                            pos_ratio=0.25, 
-                            pos_iou_thresh=0.5,
-                            neg_iou_thresh_hi=0.5, 
-                            neg_iou_thresh_lo=0.0
-                ),
+
                  
     ):
         super(RPN, self).__init__()
@@ -381,15 +266,13 @@ class RPN(nn.Module):
         self.feat_strides = feat_strides
         self.proposal_layer = ProposalCreator(**proposal_creator_cfg)
         self.anchor_target_creator = AnchorTargetCreator(**anchor_target_cfg)
-        self.proposal_target_creator = ProposalTargetCreator(**proposal_target_cfg)
 
         n_anchor = self.anchor_bases[0].shape[0]
         self.conv1 = nn.Conv(in_channels, mid_channels, 3, 1, 1)
         self.score = nn.Conv(mid_channels, n_anchor * 2, 1, 1, 0)
         self.loc = nn.Conv(mid_channels, n_anchor * 4, 1, 1, 0)
         self._normal_init()
-        self.rpn_beta = 1/9.
-        
+        self.rpn_beta = 1/9.        
         
     def _normal_init(self):
         for var in [self.conv1,self.score,self.loc]:
@@ -426,100 +309,67 @@ class RPN(nn.Module):
                 Its shape is :math:`(H W A, 4)`.
         """
         n, _, hh, ww = x.shape
+        
         anchor = grid_anchors(anchor_base,feat_stride, (hh, ww))
         anchor = jt.array(anchor)
 
-        n_anchor = anchor.shape[0] // (hh * ww)
-        h = nn.relu(self.conv1(x))
+        feat = nn.relu(self.conv1(x))
+        rpn_loc = self.loc(feat)
+        rpn_score = self.score(feat)
+
+        rpn_loc = rpn_loc.permute(0, 2, 3, 1).reshape(n, -1, 4)
+        rpn_score = rpn_score.permute(0, 2, 3, 1)
+        rpn_score = rpn_score.reshape(n, -1, 2)
+        rpn_fg_score = nn.softmax(rpn_score, dim=2)[...,1]
         
-        rpn_locs = self.loc(h)
-       
-        rpn_locs = rpn_locs.permute(0, 2, 3, 1).view(n, -1, 4)
-        rpn_scores = self.score(h)
-        rpn_scores = rpn_scores.permute(0, 2, 3, 1)
-        rpn_softmax_scores = nn.softmax(rpn_scores.view(n, hh, ww, n_anchor, 2), dim=4)
-        rpn_fg_scores = rpn_softmax_scores[:, :, :, :, 1]
-        rpn_fg_scores = rpn_fg_scores.view(n, -1)
-        rpn_scores = rpn_scores.view(n, -1, 2)
-        rois = []
-        roi_indices = []
+        proposals = []
         for i in range(n):
-            roi = self.proposal_layer(
-                                    rpn_locs[i],
-                                    rpn_fg_scores[i],
-                                    anchor, 
-                                    img_sizes[i],
-                                    scale=1.)
-            batch_index = i * jt.ones((len(roi),), dtype='int32')
-            rois.append(roi)
-            roi_indices.append(batch_index)
+            proposal = self.proposal_layer(rpn_loc[i],rpn_fg_score[i],anchor,img_sizes[i])
+            proposals.append(proposal)
+        return rpn_loc, rpn_score, proposals, anchor
 
-        rois = jt.contrib.concat(rois, dim=0)
-        roi_indices = jt.contrib.concat(roi_indices, dim=0)
-        return rpn_locs, rpn_scores, rois, roi_indices, anchor
-
-    def loss_single(self,rpn_locs, rpn_scores, rois, roi_indices, anchor,targets):
-        sample_rois = []
-        gt_roi_locs = []
-        gt_roi_labels = []
-        sample_roi_indexs = []
+    def loss_single(self,rpn_loc, rpn_score, proposals, anchor, targets):
         gt_rpn_locs = []
         gt_rpn_labels = []
-        for i,target in enumerate(targets):
-            index = jt.where(roi_indices == i)[0]
-            roi = rois[index,:]
-            box = target["bboxes"]
-            label = target["labels"]
+        for (proposal,target) in zip(proposals,targets):
+            gt_bbox = target["bboxes"]
             img_size = target["img_size"]
-            sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi,box,label)
-            sample_roi_index = i*jt.ones((sample_roi.shape[0],))
-            
-            sample_rois.append(sample_roi)
-            gt_roi_labels.append(gt_roi_label)
-            gt_roi_locs.append(gt_roi_loc)
-            sample_roi_indexs.append(sample_roi_index)
-            
-            gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(box,anchor,img_size)
+            gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(gt_bbox,anchor,img_size)
             gt_rpn_locs.append(gt_rpn_loc)
             gt_rpn_labels.append(gt_rpn_label)
             
-        if any([label is None for label in gt_rpn_labels]):
-            return None,None
-        sample_roi_indexs = jt.contrib.concat(sample_roi_indexs,dim=0)
-        sample_rois = jt.contrib.concat(sample_rois,dim=0)
-        gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
-        gt_roi_labels = jt.contrib.concat(gt_roi_labels,dim=0)
-        
-        # ------------------ RPN losses -------------------#
-        rpn_locs = rpn_locs.reshape(-1,4)
-        rpn_scores = rpn_scores.reshape(-1,2)
         gt_rpn_labels = jt.contrib.concat(gt_rpn_labels,dim=0)
         gt_rpn_locs = jt.contrib.concat(gt_rpn_locs,dim=0)
         
-        weights = jt.zeros(gt_rpn_locs.shape)
-        weight[gt_label>0,:]=1
-        n_samples = (gt_label>=0).sum().float()
-        rpn_loc_loss = smooth_l1_loss(rpn_locs,gt_rpn_locs,beta=self.rpn_beta,weight=weight,avg_factor=n_samples)
-
-        rpn_cls_loss = nn.cross_entropy_loss(rpn_scores[gt_rpn_labels>=0,:],gt_rpn_labels[gt_rpn_labels>=0])
+        rpn_loc = rpn_loc.reshape(-1,4)
+        rpn_score  = rpn_score.reshape(-1,2)
         
-        losses = {"rpn_loc_loss": rpn_loc_loss, 
-                   "rpn_cls_loss": rpn_cls_loss}
+        rpn_loc_loss = faster_rcnn_loss(rpn_loc,gt_rpn_locs,gt_rpn_labels,beta=self.rpn_beta)
+        rpn_cls_loss = nn.cross_entropy_loss(rpn_score[gt_rpn_labels>=0,:],gt_rpn_labels[gt_rpn_labels>=0])
         
-        return losses,(sample_rois,sample_roi_indexs,gt_roi_locs,gt_roi_labels)
+        return rpn_loc_loss,rpn_cls_loss
 
     def execute(self,xs,targets):
         img_size = [t["img_size"] for t in targets]
-        losses = []
-        outs = []
+        proposals = []
+        cls_losses = []
+        loc_losses = []
         for x,anchor_base,feat_stride in zip(xs,self.anchor_bases,self.feat_strides):
-            rpn_locs, rpn_scores, rois, roi_indices, anchor  = self.execute_single(x,anchor_base,feat_stride,img_size)
-            loss,out = self.loss_single(rpn_locs, rpn_scores, rois, roi_indices, anchor,targets)
-            if loss is None:
-                return None,None
-            outs.append(out)
-            losses.append(loss)
-        return outs,losses
+            rpn_loc, rpn_score, proposal, anchor = self.execute_single(x,anchor_base,feat_stride,img_size)
+            if self.is_training():
+                rpn_loc_loss,rpn_cls_loss = self.loss_single(rpn_loc, rpn_score, proposal, anchor,targets)
+                loc_losses.append(rpn_loc_loss)
+                cls_losses.append(rpn_cls_loss)
+            proposals.append(proposal)
+        
+        results=dict(
+            rpn_losses = dict(
+                rpn_cls_loss = cls_losses,
+                rpn_loc_loss = loc_losses
+            ),
+            proposals = proposals
+        )
+        return results
             
 
          

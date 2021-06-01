@@ -10,7 +10,7 @@ def smooth_l1_loss(pred,target,beta=1.,weight=None,avg_factor=None,reduction="me
         loss *= weight
 
     if avg_factor is None:
-        avg_factor = loss.numel()
+        avg_factor = max(loss.numel(),1)
 
     if reduction == "mean":
         return loss.sum()/avg_factor
@@ -20,6 +20,10 @@ def smooth_l1_loss(pred,target,beta=1.,weight=None,avg_factor=None,reduction="me
     return loss 
 
 
-def faster_rcnn_loss(pred_locs,gt_locs,gt_labels):
-    
+def faster_rcnn_loss(pred_locs,gt_locs,gt_labels,beta):
+    weights = jt.zeros(pred_locs.shape)
+    weights[gt_labels>0,:]=1
+    n_samples = (gt_labels>=0).sum().float()
+    loss = smooth_l1_loss(pred_locs,gt_locs,beta=beta,weight=weights,avg_factor=n_samples)
+    return loss
         

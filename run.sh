@@ -1,1 +1,1 @@
-python3.7 tools/run_net.py 
+log_silent=0 python3.7 tools/run_net.py --config-file=configs/faster_rcnn_coco128.yaml

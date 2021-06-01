@@ -2,11 +2,15 @@ import logging
 import jittor as jt
 import os 
 import cv2 
-
+import glob
+import time
+import warnings
 import jdet
 from jdet.config.config import get_cfg,save_cfg
-from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS
+from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.utils.checkpointer import Checkpointer
+from jdet.config.constant import COCO_CLASSES
+from jdet.utils.visualization import visualize_results,visual_gts
 
 
 class Runner:
@@ -18,6 +22,7 @@ class Runner:
         self.max_iter = cfg.max_iter
         self.checkpoint_interval = cfg.checkpoint_interval
         self.eval_interval = cfg.eval_interval
+        self.log_interval = cfg.log_interval
         self.resume_path = cfg.resume_path
 
         os.makedirs(self.work_dir,exist_ok=True)
@@ -39,38 +44,56 @@ class Runner:
     
     def run(self):
         print("running") 
+        test_files = list(glob.glob("/home/lxl/workspace/JDet/coco128/images/train2017/*.jpg"))[:10]
         while self.epoch < self.max_epoch:
             self.train()
             self.val()
             self.save()
             self.epoch +=1
+            if self.epoch%5==0:
+                self.run_on_images(test_files,"exp/images")
         self.test()
 
     def train(self):
         self.model.train()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
-            results,losses = self.model(images,targets)
-            if results is None:
-                continue
-            self.optimizer.step(losses)
+            losses = self.model(images,targets)
+            all_loss = sum(losses.values())
+            self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
-            self.logger.log({"losses":losses.item()})
+            lr = self.optimizer.param_groups[0].get("lr")
+            if self.iter % self.log_interval ==0:
+                data = dict(
+                    times=time.asctime( time.localtime(time.time())),
+                    lr = lr,
+                    iter = self.iter,
+                    epoch = self.epoch,
+                    batch_idx = batch_idx,
+                    total_loss = all_loss,
+                )
+                data.update(losses)
+                self.logger.log(data)
+
             self.iter+=1
    
     @jt.no_grad()
     def run_on_images(self,img_files,save_dir=None):
-        self.model.val()
-        dataset = build_from_cfg("ImageDataset",img_files=img_files)
+        self.model.eval()
+        dataset = build_from_cfg("ImageDataset",DATASETS,img_files=img_files)
         for i,(images,targets) in enumerate(dataset):
             results = self.model(images,targets)
+            results = results["outs"]
+            if save_dir:
+                visualize_results(results[0],COCO_CLASSES,[t["img_file"] for t in targets],save_dir)
+                # visual_gts(targets,save_dir)                
 
     @jt.no_grad()
     def val(self):
-        if self.eval_interval is not None and self.epoch % eval_interval ==0:
+        if self.eval_interval is not None and self.epoch % self.eval_interval ==0:
             if self.val_dataset is None:
                 warnings.warn("Please set Val dataset")
             else:
-                self.model.val()
+                self.model.eval()
                 results = []
                 for batch_idx,(images,targets) in enumerate(self.val_dataset):
                     result = self.model(images,targets)
@@ -84,23 +107,23 @@ class Runner:
         if self.test_dataset is None:
             print("Please set test dataset")
             return
-        self.model.val()
+        self.model.eval()
 
     def save(self):
         if self.checkpoint_interval is None or self.epoch % self.checkpoint_interval!=0:
             return
-        save_file = os.path.join(self.work_dir,f"/ckpt_{self.epoch}.pkl")
+        save_file = os.path.join(self.work_dir,f"ckpt_{self.epoch}.pkl")
         save_data = {
             "meta":{
                 "jdet_version": jdet.__version__,
-                "lr_scheduler": self.lr_scheduler.state_dict(),
+                "lr_scheduler": self.scheduler.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
                 "epoch": self.epoch,
                 "iter": self.iter,
-                "trained_time":self.now_time,
+                "trained_time":time.asctime( time.localtime(time.time())),
                 "config": self.cfg.dump()
             },
-            "model":model.parameters()
+            "model":self.model.parameters()
         }
         jt.save(save_data,save_file)
     

@@ -23,9 +23,8 @@ class WarmUpLR(object):
         self.warmup_ratio = warmup_ratio
         self.warmup_iters = warmup_iters
         self.warmup = warmup
-        self.base_lrs = list(map(lambda group: group['initial_lr'], optimizer.param_groups))
     
-    def get_warmup_lr(self,cur_iters,lr):
+    def get_warmup_lr(self,lr,cur_iters):
         if self.warmup == 'constant':
             k = self.warmup_ratio
         elif self.warmup == 'linear':
@@ -72,25 +71,25 @@ class StepLR(WarmUpLR):
             is given, we don't perform lr clipping. Default: None.
     """
 
-    def __init__(self, step, gamma=0.1, min_lr=None, **kwargs):
-        if isinstance(step, list):
-            assert all([s > 0 for s in step])
-        elif isinstance(step, int):
-            assert step > 0
+    def __init__(self, milestones, gamma=0.1, min_lr=None, **kwargs):
+        if isinstance(milestones, list):
+            assert all([s > 0 for s in milestones])
+        elif isinstance(milestones, int):
+            assert milestones > 0
         else:
             raise TypeError('"step" must be a list or integer')
-        self.step = step
+        self.milestones = milestones
         self.gamma = gamma
         self.min_lr = min_lr
         super(StepLR, self).__init__(**kwargs)
 
     def get_lr(self,base_lr, steps):
         # calculate exponential term
-        if isinstance(self.step, int):
-            exp = steps // self.step
+        if isinstance(self.milestones, int):
+            exp = steps // self.milestones
         else:
-            exp = len(self.step)
-            for i, s in enumerate(self.step):
+            exp = len(self.milestones)
+            for i, s in enumerate(self.milestones):
                 if steps < s:
                     exp = i
                     break

@@ -2,38 +2,51 @@ from .registry import HOOKS,build_from_cfg
 from jdet.config.config import get_cfg
 import time 
 import os
+from tensorboardX import SummaryWriter
 
 @HOOKS.register_module()
 class TextLogger:
     def __init__(self):
         work_dir = get_cfg().work_dir
-        file_name = "log_"+time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())+".txt"
+        os.makedirs(os.path.join(work_dir,"textlog"),exist_ok=True)
+        file_name = "textlog/log_"+time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())+".txt"
         f = os.path.join(work_dir,file_name)
         self.log_file = open(f,"a")
 
     def log(self,data):
-        data = str(data)+"\n"
-        self.log_file.write(data)
+        msg = ",".join([f"{k}={d}" for k,d in data.items()])
+        msg+="\n"
+        self.log_file.write(msg)
         self.log_file.flush()
 
 @HOOKS.register_module()
 class TensorboardLogger:
     def __init__(self):
-        pass 
+        work_dir = get_cfg().work_dir
+        tensorboard_dir = os.path.join(work_dir,"tensorboard")
+        self.writer = SummaryWriter(tensorboard_dir)
 
     def log(self,data):
-        pass
+        step = data["iter"]
+        for k,d in data.items():
+            if k in ["iter","epoch","batch_idx","times"]:
+                continue
+            self.writer.add_scalar(k,d,global_step=step)
 
 @HOOKS.register_module()
 class RunLogger:
-    def __init__(self,log_interval=50,loggers=["TextLogger","TensorboardLogger"]):
-        self.log_interval = log_interval
+    def __init__(self,loggers=["TextLogger","TensorboardLogger"]):
         self.loggers = [build_from_cfg(l,HOOKS) for l in loggers]
-        self.step = 0
 
     def log(self,data):
+        data = {k:d.item() if hasattr(d,"item") else d for k,d in data.items()}
         for logger in self.loggers:
-            if self.step % self.log_interval==0:
-               logger.log(data)
+            logger.log(data)
         
-        self.step+=1
+        self.print_log(data)
+    
+    def print_log(self,msg):
+        if isinstance(msg,dict):
+            msg = ",".join([f"{k}={d} " for k,d in msg.items()])
+        msg+="\n"
+        print(msg)
