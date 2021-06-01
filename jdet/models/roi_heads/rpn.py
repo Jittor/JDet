@@ -8,8 +8,7 @@ import jittor as jt
 from jittor import nn,init
 import numpy as np
 
-from .anchor_generator import *
-from .anchor_generator import _unmap
+from .anchor_generator import _unmap,bbox_iou,bbox2loc,loc2bbox,generate_anchor_base,grid_anchors
 from jdet.models.losses.faster_rcnn_loss import faster_rcnn_loss
 
 class AnchorTargetCreator(nn.Module):
@@ -82,7 +81,7 @@ class AnchorTargetCreator(nn.Module):
 
     def _create_label(self, anchor, bbox):
         # label: 1 is positive, 0 is negative, -1 is dont care
-        label = -jt.ones((anchor.shape[0],), dtype="int32")
+        label = -jt.ones((anchor.shape[0],)).int32()
 
         argmax_ious, max_ious, gt_argmax_ious = self._calc_ious(anchor, bbox)
 
@@ -243,7 +242,7 @@ class RPN(nn.Module):
                 in_channels=512, 
                 mid_channels=512,
                 ratios=[0.5, 1, 2],
-                anchor_scales=[8], 
+                scales=[8], 
                 feat_strides=[4, 8, 16, 32, 64],
                 proposal_creator_cfg=dict(
                             nms_thresh=0.7,
@@ -262,7 +261,7 @@ class RPN(nn.Module):
                  
     ):
         super(RPN, self).__init__()
-        self.anchor_bases = generate_multilevel_anchor_base(base_sizes=feat_strides,scales=anchor_scales, ratios=ratios)
+        self.anchor_bases = [generate_anchor_base(base_size,ratios,scales) for base_size in feat_strides]
         self.feat_strides = feat_strides
         self.proposal_layer = ProposalCreator(**proposal_creator_cfg)
         self.anchor_target_creator = AnchorTargetCreator(**anchor_target_cfg)
@@ -371,6 +370,4 @@ class RPN(nn.Module):
         )
         return results
             
-
-         
     

@@ -2,11 +2,12 @@ from .registry import HOOKS,build_from_cfg
 from jdet.config.config import get_cfg
 import time 
 import os
+import logging
 from tensorboardX import SummaryWriter
 
 @HOOKS.register_module()
 class TextLogger:
-    def __init__(self):
+    def __init__(self,work_dir):
         work_dir = get_cfg().work_dir
         os.makedirs(os.path.join(work_dir,"textlog"),exist_ok=True)
         file_name = "textlog/log_"+time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())+".txt"
@@ -21,8 +22,7 @@ class TextLogger:
 
 @HOOKS.register_module()
 class TensorboardLogger:
-    def __init__(self):
-        work_dir = get_cfg().work_dir
+    def __init__(self,work_dir):
         tensorboard_dir = os.path.join(work_dir,"tensorboard")
         self.writer = SummaryWriter(tensorboard_dir)
 
@@ -35,18 +35,17 @@ class TensorboardLogger:
 
 @HOOKS.register_module()
 class RunLogger:
-    def __init__(self,loggers=["TextLogger","TensorboardLogger"]):
-        self.loggers = [build_from_cfg(l,HOOKS) for l in loggers]
+    def __init__(self,work_dir,loggers=["TextLogger","TensorboardLogger"]):
+        self.loggers = [build_from_cfg(l,HOOKS,work_dir=work_dir) for l in loggers]
 
     def log(self,data):
         data = {k:d.item() if hasattr(d,"item") else d for k,d in data.items()}
         for logger in self.loggers:
             logger.log(data)
-        
         self.print_log(data)
     
     def print_log(self,msg):
         if isinstance(msg,dict):
-            msg = ",".join([f"{k}={d} " for k,d in msg.items()])
-        msg+="\n"
+            msg = ",".join([f"{k}={d:.4f} " if isinstance(d,float) else f"{k}={d} "  for k,d in msg.items()])
+            msg+="\n"
         print(msg)

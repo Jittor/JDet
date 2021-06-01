@@ -21,12 +21,11 @@ def is_img(f):
 
 def list_images(img_dir):
     img_files = []
-    for img_d in img_dir.split(",")
+    for img_d in img_dir.split(","):
         if len(img_d)==0:
             continue
         if not os.path.exists(img_d):
             raise f"{img_d} not exists"
         img_d = os.path.abspath(img_d)
         img_files.extend([f for f in list_files(img_d) if is_img(f)])
-
     return img_files

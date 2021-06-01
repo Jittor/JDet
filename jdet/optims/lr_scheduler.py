@@ -55,8 +55,15 @@ class WarmUpLR(object):
             else:
                 self._update_lr(iters,self.get_lr)
 
-    def state_dict(self):
+    def parameters(self):
         return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
+    
+    def load_parameters(self,data):
+        if isinstance(data,dict):
+            for k,d in data.items():
+                if k in self.__dict__:
+                    self.__dict__[k]=d 
+
 
 @SCHEDULERS.register_module()
 class StepLR(WarmUpLR):
@@ -108,7 +115,7 @@ class CosineAnnealingLR(WarmUpLR):
         self.min_lr = min_lr
         self.min_lr_ratio = min_lr_ratio
         self.max_steps = max_steps
-        super(CosineAnnealingLrUpdaterHook, self).__init__(**kwargs)
+        super(CosineAnnealingLR, self).__init__(**kwargs)
 
     def get_lr(self, base_lr,steps):
         if self.min_lr_ratio is not None:
@@ -124,7 +131,7 @@ class ExpLR(WarmUpLR):
 
     def __init__(self, gamma, **kwargs):
         self.gamma = gamma
-        super(ExpLrUpdaterHook, self).__init__(**kwargs)
+        super(ExpLR, self).__init__(**kwargs)
 
     def get_lr(self,base_lr,steps):
         return base_lr * self.gamma**steps
@@ -136,7 +143,7 @@ class PolyLR(WarmUpLR):
         self.power = power
         self.min_lr = min_lr
         self.max_steps = max_steps
-        super(PolyLrUpdaterHook, self).__init__(**kwargs)
+        super(PolyLR, self).__init__(**kwargs)
 
     def get_lr(self, base_lr,steps):
         coeff = (1 - steps / self.max_steps)**self.power
@@ -149,7 +156,7 @@ class InvLR(WarmUpLR):
     def __init__(self, gamma, power=1., **kwargs):
         self.gamma = gamma
         self.power = power
-        super(InvLrUpdaterHook, self).__init__(**kwargs)
+        super(InvLR, self).__init__(**kwargs)
 
     def get_lr(self, base_lr,steps):
         return base_lr * (1 + self.gamma * steps)**(-self.power)

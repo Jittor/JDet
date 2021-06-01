@@ -16,30 +16,29 @@ def main():
     )
     parser.add_argument(
         "--task",
-        default="whole",
-        help="train,val,test,whole",
+        default="train",
+        help="train,val,test",
         type=str,
     )
     parser.add_argument(
         "--use_cuda",
-        default=True,
-        type=bool,
+        action='store_true'
     )
+    
     args = parser.parse_args()
+
     if args.use_cuda:
         jt.flags.use_cuda=1
 
-    assert args.task in ["train","val","test","whole"],f"{args.task} not support, please choose [train,val,test,whole]"
+    assert args.task in ["train","val","test"],f"{args.task} not support, please choose [train,val,test]"
     
     if args.config_file:
         init_cfg(args.config_file)
     
     runner = Runner()
 
-    if args.task == "whole":
+    if args.task == "train":
         runner.run()
-    elif args.task == "train":
-        runner.train()
     elif args.task == "val":
         runner.val()
     elif args.task == "test":

@@ -1,3 +1,4 @@
+from genericpath import isfile
 import logging
 import jittor as jt
 import os 
@@ -8,10 +9,8 @@ import warnings
 import jdet
 from jdet.config.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
-from jdet.utils.checkpointer import Checkpointer
 from jdet.config.constant import COCO_CLASSES
 from jdet.utils.visualization import visualize_results,visual_gts
-
 
 class Runner:
     def __init__(self,mode="whole"):
@@ -24,11 +23,6 @@ class Runner:
         self.eval_interval = cfg.eval_interval
         self.log_interval = cfg.log_interval
         self.resume_path = cfg.resume_path
-
-        os.makedirs(self.work_dir,exist_ok=True)
-        save_config_file = os.path.join(self.work_dir,"config.yaml")
-        save_cfg(save_config_file)
-
     
         self.model = build_from_cfg(cfg.model,META_ARCHS)
         self.optimizer = build_from_cfg(cfg.optim,OPTIMS,params=self.model.parameters())
@@ -36,22 +30,61 @@ class Runner:
         self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS)
         self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
         self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
-        
         self.logger = build_from_cfg(cfg.logger,HOOKS)
-        self.checkpointer = Checkpointer(model=self.model,optimizer=self.optimizer,scheduler = self.scheduler)
+
+        self.initialize()
+    
+    def initialize(self):
+        assert (self.max_iter is None)^(self.max_epoch is None),"You must set max_iter or max_epoch"
+
+        os.makedirs(self.work_dir,exist_ok=True)
+        save_config_file = os.path.join(self.work_dir,"config.yaml")
+        save_cfg(save_config_file)
+
         self.iter = 0
         self.epoch = 0
+
+        if self.resume_path:
+            self.resume()
+
+    @property
+    def finish(self):
+        if self.max_epoch:
+            return self.epoch<self.max_epoch
+        else:
+            return self.iter<self.max_iter
+
+    @property
+    def time(self):
+        return time.asctime( time.localtime(time.time()))
+    
+    @property
+    def is_main(self):
+        return not jt.in_mpi or jt.rank==0
+
+    def sync_data(self,data,reduce_mode="sum"):
+        def sync(d):
+            if jt.in_mpi:
+                d = d.mpi_all_reduce(reduce_mode)
+            return d.numpy()
+        
+        if isinstance(data,jt.Var):
+            data = sync(data)
+        elif isinstance(data,list):
+            data = [sync(d) if isinstance(d,jt.Var) else d for d in data]
+            return data 
+        elif isinstance(data,dict):
+            data = {k:sync(d) if isinstance(d,jt.Var) else d for k,d in data.items() }
+        return data 
     
     def run(self):
-        print("running") 
-        test_files = list(glob.glob("/home/lxl/workspace/JDet/coco128/images/train2017/*.jpg"))[:10]
-        while self.epoch < self.max_epoch:
+        self.logger.print_log("Start running")
+        while not self.finish:
             self.train()
-            self.val()
-            self.save()
-            self.epoch +=1
-            if self.epoch%5==0:
-                self.run_on_images(test_files,"exp/images")
+            if self.eval_interval is not None and self.epoch % self.eval_interval ==0:
+                self.val()
+            if self.checkpoint_interval is None or self.epoch % self.checkpoint_interval!=0:
+                self.save()
         self.test()
 
     def train(self):
@@ -61,10 +94,11 @@ class Runner:
             all_loss = sum(losses.values())
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
-            lr = self.optimizer.param_groups[0].get("lr")
+
             if self.iter % self.log_interval ==0:
+                lr = self.optimizer.param_groups[0].get("lr")
                 data = dict(
-                    times=time.asctime( time.localtime(time.time())),
+                    times=self.time,
                     lr = lr,
                     iter = self.iter,
                     epoch = self.epoch,
@@ -72,9 +106,15 @@ class Runner:
                     total_loss = all_loss,
                 )
                 data.update(losses)
-                self.logger.log(data)
-
+                if self.is_main:
+                    self.logger.log(self.sync_data(data))
+            
             self.iter+=1
+            if self.finish:
+                break
+
+        self.epoch +=1
+
    
     @jt.no_grad()
     def run_on_images(self,img_files,save_dir=None):
@@ -89,58 +129,78 @@ class Runner:
 
     @jt.no_grad()
     def val(self):
-        if self.eval_interval is not None and self.epoch % self.eval_interval ==0:
-            if self.val_dataset is None:
-                warnings.warn("Please set Val dataset")
-            else:
-                self.model.eval()
-                results = []
-                for batch_idx,(images,targets) in enumerate(self.val_dataset):
-                    result = self.model(images,targets)
-                    results.append(result)
-                results_save_file = os.path.join(self.work_dir,f"val_{self.epoch}.json")
-                eval_results = self.val_dataset.evaluate(results,results_save_file)
-                self.logger.print_log(eval_results)
+        if self.val_dataset is None:
+            warnings.warn("Please set Val dataset")
+        else:
+            self.logger.print_log("Validating....")
+            self.model.eval()
+            results = []
+            for batch_idx,(images,targets) in enumerate(self.val_dataset):
+                result = self.model(images,targets)
+                results.append(result)
+            results_save_file = os.path.join(self.work_dir,f"val_{self.epoch}.json")
+            eval_results = self.val_dataset.evaluate(results,results_save_file)
+            self.logger.print_log(eval_results)
+
 
     @jt.no_grad()
     def test(self):
         if self.test_dataset is None:
-            print("Please set test dataset")
-            return
-        self.model.eval()
+            warnings.warn("Please set Test dataset")
+        else:
+            self.model.eval()
+            results = []
+            for batch_idx,(images,targets) in enumerate(self.val_dataset):
+                result = self.model(images,targets)
+                results.append(result)
+
 
     def save(self):
-        if self.checkpoint_interval is None or self.epoch % self.checkpoint_interval!=0:
+        if not self.is_main:
             return
-        save_file = os.path.join(self.work_dir,f"ckpt_{self.epoch}.pkl")
+        # multi gpus need to sync before save
+        if jt.in_mpi:
+            jt.sync_all()
+        
+        checkpoint_dir = os.path.join(self.work_dir,"checkpoints")
+        os.makedirs(checkpoint_dir,exist_ok=True)
+        save_file = os.path.join(checkpoint_dir,f"ckpt_{self.epoch}.pkl")
         save_data = {
             "meta":{
                 "jdet_version": jdet.__version__,
-                "lr_scheduler": self.scheduler.state_dict(),
-                "optimizer": self.optimizer.state_dict(),
                 "epoch": self.epoch,
                 "iter": self.iter,
-                "trained_time":time.asctime( time.localtime(time.time())),
+                "max_iter": self.max_iter,
+                "max_epoch": self.max_epoch,
+                "trained_time":self.time,
                 "config": self.cfg.dump()
             },
-            "model":self.model.parameters()
+            "model":self.model.parameters(),
+            "scheduler": self.scheduler.parameters(),
+            "optimizer": self.optimizer.parameters()
         }
         jt.save(save_data,save_file)
     
+
     def resume(self):
-        self.iter,self.epoch = self.checkpointer.load(self.resume_path)
+        if not os.path.exists(self.resume_path):
+            warnings.warn(f"{self.resume_path} is not exists")
+            return
+        if not os.path.isfile(self.resume_path):
+            warnings.warn(f"{self.resume_path} must be a file")
+            return 
+        resume_path = os.path.abspath(self.resume_path)
         
-    def display(self,images,targets):
-        for image,target in zip(images,targets):
-            mean = target["mean"]
-            std = target["std"]
-            to_bgr = target["to_bgr"]
-            if to_bgr:
-                image = image[::-1]
-            image *=255.
-            image = image*std+mean
-            image = image[::-1]
-            image = image.transpose(1,2,0)
-            
-            classes = [target["classes"][i-1] for i in target["labels"]]
-            draw_boxes(image,target["bboxes"],classes)
+        resume_data = jt.load(resume_path)
+        
+        meta = resume_data.get("meta",dict())
+        self.epoch = meta.get("epoch",self.epoch)
+        self.iter = meta.get("iter",self.iter)
+        self.max_iter = meta.get("max_iter",self.max_iter)
+        self.max_epoch = meta.get("max_epoch",self.max_epoch)
+
+        self.scheduler.load_paramters(resume_data.get("scheduler",dict()))
+        self.optimizer.load_paramters(resume_data.get("optimizer",dict()))
+        self.model.load_parameters(resume_data.get("model",dict()))
+
+        self.logger.print_log(f"Loading model parameters from {self.resume_path}")

@@ -1,4 +1,3 @@
-# reference mmcv.utils.registry
 class Registry:
     def __init__(self):
         self._modules = {}
@@ -44,7 +43,6 @@ BACKBONES = Registry()
 ROI_HEADS = Registry()
 LOSSES = Registry()
 OPTIMS = Registry()
-SOLVERS = Registry()
 HOOKS = Registry()
 NECKS = Registry()
 SCHEDULERS = Registry()

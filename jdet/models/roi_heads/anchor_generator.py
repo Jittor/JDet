@@ -46,9 +46,6 @@ def generate_anchor_base(base_size=16, ratios=[0.5, 1, 2],scales=[8, 16, 32]):
             anchor_base[index, 2] = px + w / 2.
     return anchor_base
 
-def generate_multilevel_anchor_base(base_sizes=[16], ratios=[0.5, 1, 2],scales=[8, 16, 32]):
-    return [generate_anchor_base(base_size,ratios,scales) for base_size in base_sizes]
-
 def grid_anchors(anchor_base, feat_stride, feat_size):
     # Enumerate all shifted anchors:
     #
@@ -71,10 +68,6 @@ def grid_anchors(anchor_base, feat_stride, feat_size):
              shift.reshape((1, K, 4)).transpose((1, 0, 2))
     anchor = anchor.reshape((K * A, 4)).astype(np.float32)
     return anchor
-
-def grid_multilevel_anchors(anchor_bases,feat_strides,feat_sizes):
-    return [grid_anchors(anchor_base, feat_stride, feat_size) for anchor_base, feat_stride, feat_size in zip(anchor_bases,feat_strides,feat_sizes)]
-
 
 def loc2bbox(src_bbox,loc):
     if src_bbox.shape[0] == 0:
