@@ -2,6 +2,7 @@ import numpy as np
 import jittor as jt
 import cv2 
 import os
+from jdet.config.constant import COCO_CLASSES
 
 _COLORS = np.array(
     [
@@ -120,7 +121,7 @@ def visualize_results(detections,classes,files,save_dir):
             text = f"{cate}:{score:.2f}"
             img = draw_box(img,box,text,(255,0,0))
         cv2.imwrite(os.path.join(save_dir,img_f.split("/")[-1]),img)
-
+    
 def visual_gts(targets,save_dir):
     for t in targets:
         bbox = t["bboxes"]

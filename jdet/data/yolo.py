@@ -6,9 +6,11 @@ from PIL import Image
 import cv2
 import glob
 import os 
+import json
 
 from jdet.utils.registry import DATASETS
-from .transforms import Compose
+from jdet.config.constant import COCO_CLASSES
+from jdet.data.transforms import Compose
 
 def xywhn2xyxy(x,w,h,padw=0,padh=0):
     y = np.copy(x)
@@ -18,18 +20,68 @@ def xywhn2xyxy(x,w,h,padw=0,padh=0):
     y[:, 3] = h * (x[:, 1] + x[:, 3] / 2) + padh  # bottom right y
     return y 
 
+def yolo2coco(path,save_file):
+    img_files = sorted(glob.glob(os.path.join(path,"*.jpg")))
+    images = []
+    annos = []
+    anno_id = 0
+    for i,img_f in enumerate(img_files):
+        file_name = img_f.split("/")[-1]
+        try:
+            img_id = int(file_name.split(".jpg")[0])
+        except:
+            img_id = i
+        
+        label_f = img_f.replace("images","labels",1).replace(".jpg",".txt")
+        img = Image.open(img_f).convert("RGB")
+        width,height = img.size 
+
+        images.append({
+            "file_name":file_name,
+            "id":img_id,
+            "height": height,
+            "width": width,
+        })
+        
+        with open(label_f) as f:
+            l = [x.split() for x in f.read().strip().splitlines() if len(x)]
+            l = np.array(l,dtype=np.float32).reshape(-1,5)
+            gt_labels = l[:,0].astype(np.int32)
+            gt_bboxes = l[:,1:]
+        
+        for box,label in zip(gt_bboxes,gt_labels):
+            x,y,w,h = box.tolist()
+            x -= w/2
+            y -= h/2
+            x,y,w,h = x*width,y*height,w*width,h*height
+            anno = {
+                "id" : anno_id,
+                "image_id" : img_id,
+                "category_id" : int(label),
+                "area" : w*h, 
+                "bbox" : [x,y,w,h], 
+                "iscrowd" : 0, 
+                }
+            anno_id +=1 
+            annos.append(anno)
+        
+    categories = [{
+        "id" : i, 
+        "name" : c,
+        "supercategory" : "",
+    } for i,c in enumerate(COCO_CLASSES)]
+
+    data = {
+        "images":images,
+        "annotations":annos,
+        "categories":categories
+    }
+    json.dump(data,open(save_file,"w"))
+
 @DATASETS.register_module()
 class YOLODataset(Dataset):
 
-    CLASSES = [ 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-         'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-         'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-         'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
-         'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-         'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-         'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-         'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
-         'hair drier', 'toothbrush' ]
+    CLASSES = COCO_CLASSES
     
     def __init__(self,path,transforms=[
                           dict(
@@ -46,8 +98,8 @@ class YOLODataset(Dataset):
                               mean=[123.675, 116.28, 103.53],
                               std = [58.395, 57.12, 57.375],
                           )
-                      ],batch_size=1,num_workers=0,shuffle=False,filter_empty_gt=True):
-        super(YOLODataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
+                      ],batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
+        super(YOLODataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
         self.path = path 
         
         if isinstance(transforms,list):
@@ -121,3 +173,7 @@ class YOLODataset(Dataset):
             batch_imgs[i,:,:image.shape[-2],:image.shape[-1]] = image
         
         return batch_imgs,anns
+
+
+if __name__ == "__main__":
+    yolo2coco("coco128/images/train2017","coco128/detections_train2017.json")

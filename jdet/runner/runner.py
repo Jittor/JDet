@@ -6,6 +6,7 @@ import cv2
 import glob
 import time
 import warnings
+from tqdm import tqdm
 import jdet
 from jdet.config.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
@@ -30,12 +31,19 @@ class Runner:
         self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS)
         self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
         self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
-        self.logger = build_from_cfg(cfg.logger,HOOKS)
 
         self.initialize()
     
     def initialize(self):
         assert (self.max_iter is None)^(self.max_epoch is None),"You must set max_iter or max_epoch"
+        
+        # work_dir = self.work_dir
+        # i = 1
+        # while os.path.exists(work_dir):
+        #     work_dir = self.work_dir+f"_{i}"
+        #     i+=1
+        # self.work_dir = work_dir
+        self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
         os.makedirs(self.work_dir,exist_ok=True)
         save_config_file = os.path.join(self.work_dir,"config.yaml")
@@ -50,9 +58,9 @@ class Runner:
     @property
     def finish(self):
         if self.max_epoch:
-            return self.epoch<self.max_epoch
+            return self.epoch>=self.max_epoch
         else:
-            return self.iter<self.max_iter
+            return self.iter>=self.max_iter
 
     @property
     def time(self):
@@ -61,6 +69,10 @@ class Runner:
     @property
     def is_main(self):
         return not jt.in_mpi or jt.rank==0
+
+    @property
+    def is_parallel(self):
+        return jt.in_mpi
 
     def sync_data(self,data,reduce_mode="sum"):
         def sync(d):
@@ -94,7 +106,6 @@ class Runner:
             all_loss = sum(losses.values())
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
-
             if self.iter % self.log_interval ==0:
                 lr = self.optimizer.param_groups[0].get("lr")
                 data = dict(
@@ -120,7 +131,7 @@ class Runner:
     def run_on_images(self,img_files,save_dir=None):
         self.model.eval()
         dataset = build_from_cfg("ImageDataset",DATASETS,img_files=img_files)
-        for i,(images,targets) in enumerate(dataset):
+        for i,(images,targets) in tqdm(enumerate(dataset)):
             results = self.model(images,targets)
             results = results["outs"]
             if save_dir:
@@ -135,12 +146,18 @@ class Runner:
             self.logger.print_log("Validating....")
             self.model.eval()
             results = []
-            for batch_idx,(images,targets) in enumerate(self.val_dataset):
+            for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset)):
                 result = self.model(images,targets)
-                results.append(result)
-            results_save_file = os.path.join(self.work_dir,f"val_{self.epoch}.json")
-            eval_results = self.val_dataset.evaluate(results,results_save_file)
-            self.logger.print_log(eval_results)
+                results.extend(result["outs"][0])
+
+            detection_dir = os.path.join(self.work_dir,"detections")
+            os.makedirs(detection_dir,exist_ok=True)
+            results_save_file = os.path.join(detection_dir,f"val_{self.epoch}.json")
+            
+            self.val_dataset.save_results2json(results,results_save_file)
+            eval_results = self.val_dataset.evaluate(results_save_file,logger=self.logger)
+            eval_results["iter"]=self.iter
+            self.logger.log(eval_results)
 
 
     @jt.no_grad()
@@ -150,7 +167,7 @@ class Runner:
         else:
             self.model.eval()
             results = []
-            for batch_idx,(images,targets) in enumerate(self.val_dataset):
+            for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset)):
                 result = self.model(images,targets)
                 results.append(result)
 

@@ -12,3 +12,4 @@ work_dirs
 coco128
 *.zip
 .vscode
+exp*

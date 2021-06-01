@@ -157,7 +157,7 @@ class BoxHead(nn.Module):
         
         self.roi_beta = 1.
         self.nms_thresh = 0.3
-        self.score_thresh = 0.3
+        self.score_thresh = 0.01
 
         self.init_weights()
     
@@ -254,7 +254,11 @@ class BoxHead(nn.Module):
             boxes = jt.contrib.concat(boxes,dim=0)
             scores = jt.contrib.concat(scores,dim=0)
             labels = jt.contrib.concat(labels,dim=0)
-            results.append((boxes,scores,labels))
+            results.append(dict(
+                boxes=boxes.numpy(),
+                scores=scores.numpy(),
+                labels=labels.numpy(),
+                img_id=target["img_id"]))
         return results
 
     def execute(self,xs,proposals,targets):

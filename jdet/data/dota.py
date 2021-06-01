@@ -14,11 +14,12 @@ from .coco import COCODataset
 
 @DATASETS.register_module()
 class DOTADataset(COCODataset):
-    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,filter_empty_gt=True):
+    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
         super(DOTADataset,self).__init__(root,anno_file,transforms=transforms,
                                                         batch_size=batch_size,
                                                         num_workers=num_workers,
                                                         shuffle=shuffle,
+                                                        drop_last=drop_last,
                                                         filter_empty_gt=filter_empty_gt,
                                                         use_anno_cats=True)
     def _filter_imgs(self):

@@ -7,7 +7,7 @@ model:
     rpn:
         type: RPN
         in_channels: 1024
-        anchor_scales: [8, 16, 32]
+        scales: [8, 16, 32]
         feat_strides: [16]
     roi_heads:
         type: BoxHead
@@ -16,10 +16,11 @@ model:
 
 dataset:
     train:
-        type: YOLODataset
-        path: /home/lxl/workspace/JDet/coco128/images/train2017
-        batch_size: 8
-        num_workers: 8
+        type: COCODataset
+        root: /home/lxl/workspace/JDet/coco128/images/train2017
+        anno_file: /home/lxl/workspace/JDet/coco128/detections_train2017.json
+        batch_size: 4
+        num_workers: 4
         shuffle: True
         transforms:
             - type: "Resize"
@@ -32,26 +33,36 @@ dataset:
             - type: "Normalize"
               mean: [123.675, 116.28, 103.53]
               std: [58.395, 57.12, 57.375]
-
+    val:
+        type: COCODataset
+        root: /home/lxl/workspace/JDet/coco128/images/train2017
+        anno_file: /home/lxl/workspace/JDet/coco128/detections_train2017.json
+        batch_size: 2
+        num_workers: 2
+        shuffle: False
+        transforms:
+            - type: Pad
+              size_divisor: 32
+            - type: "Normalize"
+              mean: [123.675, 116.28, 103.53]
+              std: [58.395, 57.12, 57.375]
 optim:
     type: "SGD"
-    lr: 0.01
+    lr: 0.0025
     momentum: 0.9
     weight_decay: 0.0001
 
 scheduler:
-    type: StepLR
+    type: WarmUpLR
     warmup: linear
     warmup_iters: 500
     warmup_ratio: 0.001
-    milestones: [133,183]
 
 logger:
     type: "RunLogger"
 
 work_dir: "./exp"
-max_epoch: 200
-checkpoint_interval: 10
-eval_interval: 1
+max_epoch: 300
+eval_interval: 10
 log_interval: 20
 

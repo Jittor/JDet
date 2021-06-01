@@ -1,15 +1,15 @@
-# reference a little of mmdetection cocodataset
-import jittor as jt
 from jittor.dataset import Dataset 
-
-
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-
 import os 
 from PIL import Image
 import numpy as np 
 import json 
+import warnings
+import itertools
+from collections import OrderedDict
+from terminaltables import AsciiTable
+
 
 from jdet.utils.registry import DATASETS
 from jdet.config.constant import COCO_CLASSES
@@ -20,8 +20,8 @@ class COCODataset(Dataset):
 
     CLASSES = COCO_CLASSES
     
-    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,filter_empty_gt=True,use_anno_cats=False):
-        super(COCODataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
+    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,use_anno_cats=False):
+        super(COCODataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
         self.root = root 
         self.coco = COCO(anno_file)
         
@@ -46,6 +46,7 @@ class COCODataset(Dataset):
 
     def _filter_imgs(self):
         """Filter images without ground truths."""
+        # reference mmdetection
         # obtain images that contain annotation
         ids_with_ann = set(_['image_id'] for _ in self.coco.anns.values())
         # obtain images that contain annotations of the required categories
@@ -104,6 +105,7 @@ class COCODataset(Dataset):
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
 
         ann = dict(
+            img_id = img_id,
             bboxes=gt_bboxes,
             labels=gt_labels,
             bboxes_ignore=gt_bboxes_ignore,
@@ -143,29 +145,28 @@ class COCODataset(Dataset):
         return batch_imgs,anns 
 
     
-    def convert_results2json(self,results,save_file):
+    def save_results2json(self,results,save_file):
         """Convert detection results to COCO json style."""
+        def xyxy2xywh(box):
+            x1,y1,x2,y2 = box.tolist()
+            return [x1,y1,x2-x1,y2-y1]
+        
         json_results = []
-        for idx in range(len(self)):
-            img_id = self.img_ids[idx]
-            result = results[idx]
-            for label in range(len(result)):
-                bboxes = result[label]
-                for i in range(bboxes.shape[0]):
-                    data = dict()
-                    data['image_id'] = img_id
-                    data['bbox'] = self.xyxy2xywh(bboxes[i])
-                    data['score'] = float(bboxes[i][4])
-                    data['category_id'] = self.cat_ids[label]
-                    json_results.append(data)
+        for result in results:
+            img_id = result["img_id"]
+            for box,score,label in zip(result["boxes"],result["scores"],result["labels"]):
+                data = dict()
+                data['image_id'] = img_id
+                data['bbox'] = xyxy2xywh(box)
+                data['score'] = float(score)
+                data['category_id'] = self.cat_ids[int(label)-1]
+                json_results.append(data)
         json.dump(json_results,open(save_file,"w"))
     
     def evaluate(self,
-                 results,
-                 save_file,
+                 results_file,
                  metric='bbox',
                  logger=None,
-                 jsonfile_prefix=None,
                  classwise=False,
                  proposal_nums=(100, 300, 1000),
                  iou_thrs=None,
@@ -213,8 +214,6 @@ class COCODataset(Dataset):
             if not isinstance(metric_items, list):
                 metric_items = [metric_items]
         
-        result_files = self.convert_results2json(results,save_file)
-
         eval_results = OrderedDict()
         cocoGt = self.coco
         for metric in metrics:
@@ -225,7 +224,7 @@ class COCODataset(Dataset):
 
             iou_type = metric
             try:
-                predictions = json.load(open(save_file))
+                predictions = json.load(open(results_file))
                 if iou_type == 'segm':
                     # Refer to https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/coco.py#L331  # noqa
                     # When evaluating mask AP, if the results contain bbox,
@@ -323,7 +322,8 @@ class COCODataset(Dataset):
                     table_data = [headers]
                     table_data += [result for result in results_2d]
                     table = AsciiTable(table_data)
-                    print_log('\n' + table.table, logger=logger)
+                    if logger:
+                        logger.print_log('\n' + table.table)
 
                 if metric_items is None:
                     metric_items = [

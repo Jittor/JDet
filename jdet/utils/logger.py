@@ -31,6 +31,8 @@ class TensorboardLogger:
         for k,d in data.items():
             if k in ["iter","epoch","batch_idx","times"]:
                 continue
+            if isinstance(d,str):
+                continue
             self.writer.add_scalar(k,d,global_step=step)
 
 @HOOKS.register_module()
@@ -47,5 +49,4 @@ class RunLogger:
     def print_log(self,msg):
         if isinstance(msg,dict):
             msg = ",".join([f"{k}={d:.4f} " if isinstance(d,float) else f"{k}={d} "  for k,d in msg.items()])
-            msg+="\n"
         print(msg)
