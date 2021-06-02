@@ -201,7 +201,6 @@ class COCODataset(Dataset):
         Returns:
             dict[str, float]: COCO style evaluation metric.
         """
-
         metrics = metric if isinstance(metric, list) else [metric]
         allowed_metrics = ['bbox', 'segm', 'proposal', 'proposal_fast']
         for metric in metrics:
@@ -213,7 +212,6 @@ class COCODataset(Dataset):
         if metric_items is not None:
             if not isinstance(metric_items, list):
                 metric_items = [metric_items]
-        
         eval_results = OrderedDict()
         cocoGt = self.coco
         for metric in metrics:
@@ -223,28 +221,26 @@ class COCODataset(Dataset):
                 logger.print_log(msg)
 
             iou_type = metric
-            try:
-                predictions = json.load(open(results_file))
-                if iou_type == 'segm':
-                    # Refer to https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/coco.py#L331  # noqa
-                    # When evaluating mask AP, if the results contain bbox,
-                    # cocoapi will use the box area instead of the mask area
-                    # for calculating the instance area. Though the overall AP
-                    # is not affected, this leads to different
-                    # small/medium/large mask AP results.
-                    for x in predictions:
-                        x.pop('bbox')
-                    warnings.simplefilter('once')
-                    warnings.warn(
-                        'The key "bbox" is deleted for more accurate mask AP '
-                        'of small/medium/large instances since v2.12.0. This '
-                        'does not change the overall mAP calculation.',
-                        UserWarning)
-                cocoDt = cocoGt.loadRes(predictions)
-            except IndexError:
+            predictions = json.load(open(results_file))
+            if iou_type == 'segm':
+                # Refer to https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/coco.py#L331  # noqa
+                # When evaluating mask AP, if the results contain bbox,
+                # cocoapi will use the box area instead of the mask area
+                # for calculating the instance area. Though the overall AP
+                # is not affected, this leads to different
+                # small/medium/large mask AP results.
+                for x in predictions:
+                    x.pop('bbox')
+                warnings.simplefilter('once')
+                warnings.warn(
+                    'The key "bbox" is deleted for more accurate mask AP '
+                    'of small/medium/large instances since v2.12.0. This '
+                    'does not change the overall mAP calculation.',
+                    UserWarning)
+            if len(predictions)==0:
                 warnings.warn('The testing results of the whole dataset is empty.')
                 break
-
+            cocoDt = cocoGt.loadRes(predictions)
             cocoEval = COCOeval(cocoGt, cocoDt, iou_type)
             cocoEval.params.catIds = self.cat_ids
             cocoEval.params.imgIds = self.img_ids

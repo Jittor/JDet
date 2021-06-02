@@ -166,31 +166,45 @@ class BoxHead(nn.Module):
         init.constant_(self.cls_loc.bias,0)
         init.gauss_(self.score.weight,0,0.01)
         init.constant_(self.score.bias,0)
-            
 
-    def execute_single(self, x, proposals,roi_align,targets):
-        # print(proposals[0])
+
+    def execute(self,xs,all_proposals,targets):
+        xs = xs[:len(self.roi_aligns)]
+        all_proposals = all_proposals[:len(self.roi_aligns)]
         if self.is_training():
-            rois = []
-            indexes = []
-            gt_roi_locs = []
-            gt_roi_labels = []
-            for i,(proposal,target) in enumerate(zip(proposals,targets)):
-                gt_bbox = target["bboxes"]
-                gt_label = target["labels"]
-                proposal,gt_roi_loc,gt_roi_label= self.proposal_target_creator(proposal,gt_bbox,gt_label)
-                index = i*jt.ones((proposal.shape[0],1))
-                
-                indexes.append(index)
-                rois.append(proposal)
-                gt_roi_locs.append(gt_roi_loc)
-                gt_roi_labels.append(gt_roi_label)
+            all_level_proposals = []
+            all_level_indexes = []
+            all_level_gt_locs = []
+            all_level_gt_labels = []
+            for one_level_proposals in all_proposals:
+                gt_roi_locs = []
+                gt_roi_labels = []
+                proposals = []
+                indexes = []
+                for i,(proposal,target) in enumerate(zip(one_level_proposals,targets)):
+                    gt_bbox = target["bboxes"]
+                    gt_label = target["labels"]
+                    proposal,gt_roi_loc,gt_roi_label= self.proposal_target_creator(proposal,gt_bbox,gt_label)
+                    index = i*jt.ones((proposal.shape[0],1))
+                    indexes.append(index)
+                    proposals.append(proposal)
+                    gt_roi_locs.append(gt_roi_loc)
+                    gt_roi_labels.append(gt_roi_label)
+
+                gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
+                gt_roi_labels = jt.contrib.concat(gt_roi_labels,dim=0)
+
+                all_level_proposals.append(proposals)
+                all_level_indexes.append(indexes)
+                all_level_gt_labels.append(gt_roi_labels)
+                all_level_gt_locs.append(gt_roi_locs)
             
-            indexes = jt.contrib.concat(indexes,dim=0)
-            rois = jt.contrib.concat(rois,dim=0)
-            gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
-            gt_roi_labels = jt.contrib.concat(gt_roi_labels,dim=0)
         else:
+            all_level_proposals = all_proposals
+
+        features = []
+        all_rois = []
+        for roi_align,x,proposals in zip(self.roi_aligns,xs,all_level_proposals):
             rois = []
             indexes = []
             for i,proposal in enumerate(proposals):
@@ -199,88 +213,81 @@ class BoxHead(nn.Module):
                 rois.append(proposal)
             indexes = jt.contrib.concat(indexes,dim=0)
             rois = jt.contrib.concat(rois,dim=0)
+            index_rois = jt.contrib.concat([indexes,rois],dim=1)
+            all_rois.append(index_rois)
+
+            level_feature = roi_align(x, index_rois)
+            features.append(level_feature)
         
-        index_rois = jt.contrib.concat([indexes,rois],dim=1)
-        feat = roi_align(x, index_rois)
-        feat = feat.view(feat.shape[0], self.fc_channels)
-        fc7 = self.fc(feat)
+        features = jt.contrib.concat(features,dim=0)
+
+        features = features.reshape(features.shape[0],self.fc_channels)
+        fc7 = self.fc(features)
         roi_cls_loc = self.cls_loc(fc7)
         roi_score = self.score(fc7)
-    
+
         roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)
-
         
-
-        if self.is_training():
-            roi_loc = roi_cls_loc[jt.index((gt_roi_labels.shape[0],),dim=0), gt_roi_labels]
-            roi_loc_loss = faster_rcnn_loss(roi_loc,gt_roi_locs,gt_roi_labels,beta=self.roi_beta)
-            roi_cls_loss = nn.cross_entropy_loss(roi_score, gt_roi_labels)
-            return roi_cls_loss,roi_loc_loss
-        
-        probs = nn.softmax(roi_score,dim=-1)
-        # print(rois)
-        rois = rois.unsqueeze(1).repeat(1,self.n_class,1)
-        cls_bbox = loc2bbox(rois.reshape(-1,4),roi_cls_loc.reshape(-1,4))
-        cls_bbox = cls_bbox.reshape(-1,self.n_class,4)
-        
+        losses = dict()
         results = []
-        for i,target in enumerate(targets):
-            img_size = target["img_size"]
-            ori_img_size = target["ori_img_size"]
+        if self.is_training():
 
-            index = jt.where(indexes==i)[0]
-            score = probs[index,:]
-            bbox = cls_bbox[index,:,:]
-            bbox[:,:,0::2] = jt.clamp(bbox[:,:,0::2],min_v=0,max_v=img_size[0])*(ori_img_size[0]/img_size[0])
-            bbox[:,:,1::2] = jt.clamp(bbox[:,:,1::2],min_v=0,max_v=img_size[1])*(ori_img_size[1]/img_size[1])
-            boxes = []
-            scores = []
-            labels = []
-            for j in range(1,self.n_class):
-                bbox_j = bbox[:,j,:]
-                score_j = score[:,j]
-                mask = jt.where(score_j>self.score_thresh)[0]
-                bbox_j = bbox_j[mask,:]
-                score_j = score_j[mask]
-                dets = jt.contrib.concat([bbox_j,score_j.unsqueeze(1)],dim=1)
-                keep = jt.nms(dets,self.nms_thresh)
-                bbox_j = bbox_j[keep]
-                score_j = score_j[keep]
-                label_j = jt.ones_like(score_j).int32()*j
-                boxes.append(bbox_j)
-                scores.append(score_j)
-                labels.append(label_j)
-            
-            boxes = jt.contrib.concat(boxes,dim=0)
-            scores = jt.contrib.concat(scores,dim=0)
-            labels = jt.contrib.concat(labels,dim=0)
-            results.append(dict(
-                boxes=boxes.numpy(),
-                scores=scores.numpy(),
-                labels=labels.numpy(),
-                img_id=target["img_id"]))
-        return results
-
-    def execute(self,xs,proposals,targets):
-        cls_losses = []
-        loc_losses = []
-        outs = []
-        for x,proposal,roi_align in zip(xs,proposals,self.roi_aligns):
-            if self.is_training():
-                roi_cls_loss,roi_loc_loss = self.execute_single(x,proposal,roi_align,targets)
-                cls_losses.append(roi_cls_loss)
-                loc_losses.append(roi_loc_loss)
-            else:
-                results = self.execute_single(x,proposal,roi_align,targets)
-                outs.append(results)
+            all_level_gt_labels = jt.contrib.concat(all_level_gt_labels,dim=0)
+            all_level_gt_locs = jt.contrib.concat(all_level_gt_locs,dim=0)
         
-        results = dict(
-            roi_losses = dict(
-                roi_cls_loss = sum(cls_losses)/max(1,len(cls_losses)),
-                roi_loc_loss = sum(loc_losses)/max(1,len(loc_losses))
-            ),
-            outs=outs
-        )
-        return results
+            roi_loc = roi_cls_loc[jt.index((all_level_gt_labels.shape[0],),dim=0), all_level_gt_labels]
+            roi_loc_loss = faster_rcnn_loss(roi_loc,all_level_gt_locs,all_level_gt_labels,beta=self.roi_beta)
+            roi_cls_loss = nn.cross_entropy_loss(roi_score, all_level_gt_labels)
+
+            losses = dict(
+                roi_cls_loss=roi_cls_loss,
+                roi_loc_loss=roi_loc_loss
+            )
+
+        else:
+            all_rois = jt.contrib.concat(all_rois,dim=0)
+            indexes = all_rois[:,0]
+            rois = all_rois[:,1:]
+            probs = nn.softmax(roi_score,dim=-1)
+            rois = rois.unsqueeze(1).repeat(1,self.n_class,1)
+            cls_bbox = loc2bbox(rois.reshape(-1,4),roi_cls_loc.reshape(-1,4))
+            cls_bbox = cls_bbox.reshape(-1,self.n_class,4)
             
+            for i,target in enumerate(targets):
+                img_size = target["img_size"]
+                ori_img_size = target["ori_img_size"]
+
+                index = jt.where(indexes==i)[0]
+                score = probs[index,:]
+                bbox = cls_bbox[index,:,:]
+                bbox[:,:,0::2] = jt.clamp(bbox[:,:,0::2],min_v=0,max_v=img_size[0])*(ori_img_size[0]/img_size[0])
+                bbox[:,:,1::2] = jt.clamp(bbox[:,:,1::2],min_v=0,max_v=img_size[1])*(ori_img_size[1]/img_size[1])
+                boxes = []
+                scores = []
+                labels = []
+                for j in range(1,self.n_class):
+                    bbox_j = bbox[:,j,:]
+                    score_j = score[:,j]
+                    mask = jt.where(score_j>self.score_thresh)[0]
+                    bbox_j = bbox_j[mask,:]
+                    score_j = score_j[mask]
+                    dets = jt.contrib.concat([bbox_j,score_j.unsqueeze(1)],dim=1)
+                    keep = jt.nms(dets,self.nms_thresh)
+                    bbox_j = bbox_j[keep]
+                    score_j = score_j[keep]
+                    label_j = jt.ones_like(score_j).int32()*j
+                    boxes.append(bbox_j)
+                    scores.append(score_j)
+                    labels.append(label_j)
+                
+                boxes = jt.contrib.concat(boxes,dim=0)
+                scores = jt.contrib.concat(scores,dim=0)
+                labels = jt.contrib.concat(labels,dim=0)
+                results.append(dict(
+                    boxes=boxes,
+                    scores=scores,
+                    labels=labels,
+                    img_id=target["img_id"]))
+
+        return results,losses 
         

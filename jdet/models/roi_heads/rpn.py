@@ -327,10 +327,10 @@ class RPN(nn.Module):
             proposals.append(proposal)
         return rpn_loc, rpn_score, proposals, anchor
 
-    def loss_single(self,rpn_loc, rpn_score, proposals, anchor, targets):
+    def loss(self,rpn_loc, rpn_score, anchor, targets):
         gt_rpn_locs = []
         gt_rpn_labels = []
-        for (proposal,target) in zip(proposals,targets):
+        for target in targets:
             gt_bbox = target["bboxes"]
             img_size = target["img_size"]
             gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(gt_bbox,anchor,img_size)
@@ -351,23 +351,29 @@ class RPN(nn.Module):
     def execute(self,xs,targets):
         img_size = [t["img_size"] for t in targets]
         proposals = []
-        cls_losses = []
-        loc_losses = []
+        rpn_locs = []
+        rpn_scores = []
+        anchors = []
+        
         for x,anchor_base,feat_stride in zip(xs,self.anchor_bases,self.feat_strides):
             rpn_loc, rpn_score, proposal, anchor = self.execute_single(x,anchor_base,feat_stride,img_size)
-            if self.is_training():
-                rpn_loc_loss,rpn_cls_loss = self.loss_single(rpn_loc, rpn_score, proposal, anchor,targets)
-                loc_losses.append(rpn_loc_loss)
-                cls_losses.append(rpn_cls_loss)
+            rpn_locs.append(rpn_loc)
+            rpn_scores.append(rpn_score)
+            anchors.append(anchor)
             proposals.append(proposal)
         
-        results=dict(
-            rpn_losses = dict(
-                rpn_cls_loss = cls_losses,
-                rpn_loc_loss = loc_losses
-            ),
-            proposals = proposals
-        )
-        return results
+        rpn_locs = jt.contrib.concat(rpn_locs,dim=1)
+        rpn_scores = jt.contrib.concat(rpn_scores,dim=1)
+        anchors = jt.contrib.concat(anchors,dim=0)
+        
+        losses = dict()
+        if self.is_training():
+            rpn_loc_loss,rpn_cls_loss = self.loss(rpn_locs, rpn_scores, anchors,targets)
+            losses = dict(
+                rpn_loc_loss = rpn_loc_loss,
+                rpn_cls_loss = rpn_cls_loss
+            )
+        
+        return proposals,losses
             
     

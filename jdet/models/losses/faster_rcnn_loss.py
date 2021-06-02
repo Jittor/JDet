@@ -19,6 +19,24 @@ def smooth_l1_loss(pred,target,beta=1.,weight=None,avg_factor=None,reduction="me
 
     return loss 
 
+def l1_loss(pred,target,weight=None,avg_factor=None,reduction="mean"):
+    
+    loss = jt.abs(pred-target)
+
+    if weight is not None:
+        loss *= weight
+
+    if avg_factor is None:
+        avg_factor = max(loss.numel(),1)
+
+    if reduction == "mean":
+        return loss.sum()/avg_factor
+    elif reduction == "sum":
+        return loss.sum()
+
+    return loss 
+
+
 
 def faster_rcnn_loss(pred_locs,gt_locs,gt_labels,beta):
     weights = jt.zeros(pred_locs.shape)

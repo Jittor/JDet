@@ -146,7 +146,7 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-        for i in range(1,4):
+        for i in range(1,5):
             name = f"layer{i}"
             x = getattr(self,name)(x)
             if name in self.return_stages:

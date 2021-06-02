@@ -35,21 +35,18 @@ class RCNN(nn.Module):
         if self.neck:
             features = self.neck(features)
         
-        results = self.rpn(features,targets)
+        proposals,rpn_losses = self.rpn(features,targets)
         
         if self.roi_heads:
-            detections = self.roi_heads(features, results["proposals"], targets)
+            results,losses = self.roi_heads(features, proposals, targets)
+            losses.update(rpn_losses)
+        else:
+            results = proposals
+            losses = rpn_losses
         
         if self.is_training():
-            losses = results["rpn_losses"]
-            if self.roi_heads:
-                losses.update(detections["roi_losses"])
-            losses = {k:sum(d)/len(d) for k,d in losses.items()}
             return losses 
         else:
-            if self.roi_heads:
-                return detections
-            else:
-                return results
+            return results
 
 

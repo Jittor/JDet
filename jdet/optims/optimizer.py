@@ -18,6 +18,8 @@ class Optimizer(object):
             for k,d in data.items():
                 if k in self.__dict__:
                     self.__dict__[k]=d 
+    def cur_lr(self):
+        return self.param_groups[0].get("lr",self.lr)
     
 @OPTIMS.register_module()
 class SGD(optim.SGD,Optimizer):
