@@ -139,6 +139,7 @@ class Runner:
                 # visual_gts(targets,save_dir)                
 
     @jt.no_grad()
+    @jt.single_process_scope()
     def val(self):
         if self.val_dataset is None:
             warnings.warn("Please set Val dataset")

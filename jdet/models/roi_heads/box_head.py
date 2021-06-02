@@ -156,8 +156,8 @@ class BoxHead(nn.Module):
         self.roi_aligns = [ROIAlign(roi_size,1./f_s) for f_s in feat_strides]
         
         self.roi_beta = 1.
-        self.nms_thresh = 0.3
-        self.score_thresh = 0.01
+        self.nms_thresh = 0.5
+        self.score_thresh = 0.05
 
         self.init_weights()
     
