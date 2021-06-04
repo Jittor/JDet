@@ -1,6 +1,5 @@
 from jdet.utils.general import build_file, current_time
 from .registry import HOOKS,build_from_cfg 
-from jdet.config.config import get_cfg
 import time 
 import os
 import logging
@@ -9,7 +8,7 @@ from tensorboardX import SummaryWriter
 @HOOKS.register_module()
 class TextLogger:
     def __init__(self,work_dir):
-        save_file = build_file(get_cfg().work_dir,prefix="textlog/log_"+time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())+".txt")
+        save_file = build_file(work_dir,prefix="textlog/log_"+time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())+".txt")
         self.log_file = open(save_file,"a")
 
     def log(self,data):

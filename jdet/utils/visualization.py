@@ -2,7 +2,7 @@ import numpy as np
 import jittor as jt
 import cv2 
 import os
-from jdet.config.constant import COCO_CLASSES
+from jdet.config import COCO_CLASSES
 
 _COLORS = np.array(
     [

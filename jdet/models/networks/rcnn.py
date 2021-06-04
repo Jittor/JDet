@@ -1,7 +1,6 @@
 import jittor as jt 
 from jittor import nn 
 
-from jdet.config.config import get_cfg
 from jdet.utils.registry import META_ARCHS,build_from_cfg,BACKBONES,ROI_HEADS,NECKS
 
 

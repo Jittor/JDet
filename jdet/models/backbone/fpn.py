@@ -1,12 +1,14 @@
 import jittor as jt 
 from jittor import nn
+import warnings
 
-
-from jdet.utils.registry import BACKBONES,NECKS
+from jdet.utils.registry import NECKS
 
 @NECKS.register_module()
 class FPN(nn.Module):
     r"""Feature Pyramid Network.
+
+    this code is from mmdetection
 
     This is an implementation of paper `Feature Pyramid Networks for Object
     Detection <https://arxiv.org/abs/1612.03144>`_.
@@ -36,28 +38,23 @@ class FPN(nn.Module):
             conv. Default: False.
         no_norm_on_lateral (bool): Whether to apply norm on lateral.
             Default: False.
-        conv_cfg (dict): Config dict for convolution layer. Default: None.
-        norm_cfg (dict): Config dict for normalization layer. Default: None.
-        act_cfg (str): Config dict for activation layer in ConvModule.
-            Default: None.
         upsample_cfg (dict): Config dict for interpolate layer.
             Default: `dict(mode='nearest')`
-        init_cfg (dict or list[dict], optional): Initialization config dict.
 
     Example:
-        >>> import torch
+        >>> import jittor as jt
         >>> in_channels = [2, 3, 5, 7]
         >>> scales = [340, 170, 84, 43]
-        >>> inputs = [torch.rand(1, c, s, s)
+        >>> inputs = [jt.rand(1, c, s, s)
         ...           for c, s in zip(in_channels, scales)]
-        >>> self = FPN(in_channels, 11, len(in_channels)).eval()
-        >>> outputs = self.forward(inputs)
+        >>> fpn = FPN(in_channels, 11, len(in_channels)).eval()
+        >>> outputs = fpn(inputs)
         >>> for i in range(len(outputs)):
         ...     print(f'outputs[{i}].shape = {outputs[i].shape}')
-        outputs[0].shape = torch.Size([1, 11, 340, 340])
-        outputs[1].shape = torch.Size([1, 11, 170, 170])
-        outputs[2].shape = torch.Size([1, 11, 84, 84])
-        outputs[3].shape = torch.Size([1, 11, 43, 43])
+        outputs[0].shape = [1, 11, 340, 340]
+        outputs[1].shape = [1, 11, 170, 170]
+        outputs[2].shape = [1, 11, 84, 84]
+        outputs[3].shape = [1, 11, 43, 43]
     """
 
     def __init__(self,
@@ -70,10 +67,8 @@ class FPN(nn.Module):
                  extra_convs_on_inputs=True,
                  relu_before_extra_convs=False,
                  no_norm_on_lateral=False,
-                 upsample_cfg=dict(mode='nearest'),
-                 init_cfg=dict(
-                     type='Xavier', layer='Conv2d', distribution='uniform')):
-        super(FPN, self).__init__(init_cfg)
+                 upsample_cfg=dict(mode='nearest')):
+        super(FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -181,7 +176,7 @@ class FPN(nn.Module):
             # add conv layers on top of original feature maps (RetinaNet)
             else:
                 if self.add_extra_convs == 'on_input':
-                    extra_source = inputs[self.backbone_end_level - 1]
+                    extra_source = x[self.backbone_end_level - 1]
                 elif self.add_extra_convs == 'on_lateral':
                     extra_source = laterals[-1]
                 elif self.add_extra_convs == 'on_output':

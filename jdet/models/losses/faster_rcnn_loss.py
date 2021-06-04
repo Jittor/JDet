@@ -19,7 +19,7 @@ def smooth_l1_loss(pred,target,beta=1.,weight=None,avg_factor=None,reduction="me
 
     return loss 
 
-def l1_loss(pred,target,weight=None,avg_factor=None,reduction="mean"):
+def l1_loss(pred,target,weight=None,avg_factor=None,reduction="mean",**kwargs):
     
     loss = jt.abs(pred-target)
 
@@ -35,7 +35,6 @@ def l1_loss(pred,target,weight=None,avg_factor=None,reduction="mean"):
         return loss.sum()
 
     return loss 
-
 
 
 def faster_rcnn_loss(pred_locs,gt_locs,gt_labels,beta):

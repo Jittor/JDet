@@ -12,11 +12,23 @@ from terminaltables import AsciiTable
 
 
 from jdet.utils.registry import DATASETS
-from jdet.config.constant import COCO_CLASSES
+from jdet.config import COCO_CLASSES
 from .transforms import Compose
 
 @DATASETS.register_module()
 class COCODataset(Dataset):
+    """ COCO Dataset.
+    Args:
+        root(str): the image root path.
+        anno_file(str): the annotation file.
+        transforms(list): the transforms for dataset, it can be list(dict) or list(transform), default None.
+        batch_size(int): default 1.
+        num_workers(int): default 0.
+        shuffle(bool): default False.
+        drop_last(bool): drop the last batch if len(batch) % gpu_nums !=0, must be True when use multi gpus, default False.
+        filter_empty_gt(bool): filter the image without groundtruth, default True.
+        use_anno_cats(bool): use the classnames from annotation file instead of COCO_CLASSES(80), default False.
+    """
 
     CLASSES = COCO_CLASSES
     

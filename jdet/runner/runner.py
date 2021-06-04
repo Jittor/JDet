@@ -4,9 +4,9 @@ import jittor as jt
 from tqdm import tqdm
 import jdet
 import pickle
-from jdet.config.config import get_cfg,save_cfg
+from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
-from jdet.config.constant import COCO_CLASSES
+from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval
 
@@ -15,6 +15,7 @@ class Runner:
         cfg = get_cfg()
         self.cfg = cfg
         self.work_dir = cfg.work_dir
+
         self.max_epoch = cfg.max_epoch 
         self.max_iter = cfg.max_iter
         assert (self.max_iter is None)^(self.max_epoch is None),"You must set max_iter or max_epoch"
@@ -41,10 +42,6 @@ class Runner:
 
         if check_file(self.resume_path):
             self.resume()
-
-
-        # TODO:  remove this
-        # self.optimizer.param_sync_iter = 60
 
     @property
     def finish(self):
@@ -122,15 +119,17 @@ class Runner:
             self.logger.print_log("Validating....")
             # TODO: need move eval into this function
             # self.model.eval()
+            if self.model.is_training():
+                self.model.eval()
             results = []
-            for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset)):
+            for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
                 result = self.model(images,targets)
                 results.extend(sync(result))
 
             save_file = build_file(self.work_dir,prefix=f"detections/val_{self.epoch}.json")
-            
             self.val_dataset.save_results2json(results,save_file)
             eval_results = self.val_dataset.evaluate(save_file,logger=self.logger)
+
             self.logger.log(eval_results,iter=self.iter)
 
 
@@ -140,9 +139,10 @@ class Runner:
         if self.test_dataset is None:
             self.logger.print_log("Please set Test dataset")
         else:
+            self.logger.print_log("Testing...")
             self.model.eval()
             results = []
-            for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset)):
+            for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
                 results.extend(sync(result))
             
@@ -162,7 +162,7 @@ class Runner:
                 "save_time":current_time(),
                 "config": self.cfg.dump()
             },
-            "model":self.model.parameters(),
+            "model":self.model.state_dict(),
             "scheduler": self.scheduler.parameters(),
             "optimizer": self.optimizer.parameters()
         }
@@ -180,8 +180,8 @@ class Runner:
         self.max_iter = meta.get("max_iter",self.max_iter)
         self.max_epoch = meta.get("max_epoch",self.max_epoch)
 
-        self.scheduler.load_paramters(resume_data.get("scheduler",dict()))
-        self.optimizer.load_paramters(resume_data.get("optimizer",dict()))
+        self.scheduler.load_parameters(resume_data.get("scheduler",dict()))
+        self.optimizer.load_parameters(resume_data.get("optimizer",dict()))
         self.model.load_parameters(resume_data.get("model",dict()))
 
         self.logger.print_log(f"Loading model parameters from {self.resume_path}")

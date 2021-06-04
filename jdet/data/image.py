@@ -1,5 +1,4 @@
 
-import os 
 from PIL import Image
 import numpy as np 
 
@@ -10,7 +9,9 @@ from jittor.dataset import Dataset
 
 @DATASETS.register_module()
 class ImageDataset(Dataset):
-
+    """ ImageDataset
+    Load image without groundtruth for visual or test
+    """
     def __init__(self,img_files,
                       transforms=[
                           dict(
@@ -34,6 +35,7 @@ class ImageDataset(Dataset):
         super(ImageDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
         self.img_files = img_files
         self.total_len = len(img_files)
+
         if isinstance(transforms,list):
             transforms = Compose(transforms)
         if transforms is not None and not callable(transforms):

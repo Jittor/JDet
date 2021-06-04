@@ -3,7 +3,6 @@ from jdet.utils.registry import OPTIMS
 
 from jittor import optim 
 
-
 class Optimizer(object):
     def parameters(self):
         data = {}

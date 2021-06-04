@@ -9,7 +9,7 @@ import os
 import json
 
 from jdet.utils.registry import DATASETS
-from jdet.config.constant import COCO_CLASSES
+from jdet.config import COCO_CLASSES
 from jdet.data.transforms import Compose
 
 def xywhn2xyxy(x,w,h,padw=0,padh=0):
@@ -173,7 +173,3 @@ class YOLODataset(Dataset):
             batch_imgs[i,:,:image.shape[-2],:image.shape[-1]] = image
         
         return batch_imgs,anns
-
-
-if __name__ == "__main__":
-    yolo2coco("coco128/images/train2017","coco128/detections_train2017.json")

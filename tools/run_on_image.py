@@ -3,11 +3,7 @@ import os
 
 from jdet.runner import Runner 
 from jdet.config import init_cfg
-from jdet.utils.path_utils import list_images
-
-
-        
-    
+from jdet.utils.general import list_images
         
 
 def main():
