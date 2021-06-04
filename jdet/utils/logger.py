@@ -12,7 +12,7 @@ class TextLogger:
         self.log_file = open(save_file,"a")
 
     def log(self,data):
-        msg = ",".join([f"{k}={d}" for k,d in data.items()])
+        msg = ",".join([f"{k}:{d}" for k,d in data.items()])
         msg= current_time()+msg+"\n"
         self.log_file.write(msg)
         self.log_file.flush()
@@ -46,5 +46,5 @@ class RunLogger:
     
     def print_log(self,msg):
         if isinstance(msg,dict):
-            msg = ",".join([f"{k}={d:.4f} " if isinstance(d,float) else f"{k}={d} "  for k,d in msg.items()])
+            msg = ",".join([f" {k}:{d:.4f}" if isinstance(d,float) else f" {k}:{d}"  for k,d in msg.items()])
         print(current_time(),msg)

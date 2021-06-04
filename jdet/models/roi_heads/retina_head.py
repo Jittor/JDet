@@ -1,6 +1,6 @@
 from jdet.models.losses.focal_loss import sigmoid_focal_loss
 from jdet.models.losses.faster_rcnn_loss import faster_rcnn_loss
-from jdet.models.roi_heads.anchor_generator import generate_anchor_base, grid_anchors
+from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, generate_anchor_base, grid_anchors, loc2bbox
 from jdet.utils.registry import ROI_HEADS
 from jittor import nn 
 import jittor as jt
@@ -27,16 +27,28 @@ class RetinaHead(nn.Module):
     """
 
     def __init__(self,
-                 num_classes,
+                 n_class,
                  in_channels,
                  feat_channels=256,
                  stacked_convs=4,
                  octave_base_scale=4,
                  scales_per_octave=3,
                  ratios=[0.5, 1.0, 2.0],
-                 feat_strides=[8, 16, 32, 64, 128]):
-        self.stacked_convs = stacked_convs
+                 feat_strides=[8, 16, 32, 64, 128],
+                 pos_iou_thresh=0.5,
+                 neg_iou_thresh_hi=0.4,
+                 neg_iou_thresh_lo=0.,
+
+                 ):
         super(RetinaHead, self).__init__()
+
+        self.feat_strides = feat_strides
+        self.pos_iou_thresh = pos_iou_thresh
+        self.neg_iou_thresh_hi = neg_iou_thresh_hi
+        self.neg_iou_thresh_lo = neg_iou_thresh_lo
+        self.stacked_convs = stacked_convs
+
+        
         self.anchor_bases = [generate_anchor_base(base_size,
                                                   ratios=ratios,
                                                   scales=None,
@@ -49,12 +61,17 @@ class RetinaHead(nn.Module):
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
-            chn = self.in_channels if i == 0 else feat_channels
+            chn = in_channels if i == 0 else feat_channels
             self.cls_convs.append(nn.Conv(chn,feat_channels,3,stride=1,padding=1))
             self.reg_convs.append(nn.Conv(chn,feat_channels,3,stride=1,padding=1))
-
-        self.retina_cls = nn.Conv(feat_channels,n_anchor * num_classes,3,padding=1)
+        
+        self.n_class = n_class
+        self.retina_cls = nn.Conv(feat_channels,n_anchor * n_class,3,padding=1)
         self.retina_reg = nn.Conv(feat_channels, n_anchor * 4, 3, padding=1)
+
+        self.roi_beta = 1/9.
+        self.nms_thresh = 0.5
+        self.score_thresh = 0.05
 
     def execute_single(self, x,anchor_base,feat_stride):
         """Forward feature of a single scale level.
@@ -82,53 +99,131 @@ class RetinaHead(nn.Module):
             reg_feat = reg_conv(reg_feat)
         cls_score = self.retina_cls(cls_feat)
         bbox_pred = self.retina_reg(reg_feat)
-        return cls_score, bbox_pred
 
-    def loss(self,rpn_loc, rpn_score, anchor, targets):
-        gt_rpn_locs = []
-        gt_rpn_labels = []
-        for target in targets:
-            gt_bbox = target["bboxes"]
-            img_size = target["img_size"]
-            gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(gt_bbox,anchor,img_size)
-            gt_rpn_locs.append(gt_rpn_loc)
-            gt_rpn_labels.append(gt_rpn_label)
-            
-        gt_rpn_labels = jt.contrib.concat(gt_rpn_labels,dim=0)
-        gt_rpn_locs = jt.contrib.concat(gt_rpn_locs,dim=0)
-        
-        rpn_loc = rpn_loc.reshape(-1,4)
-        rpn_score  = rpn_score.reshape(-1,2)
-        
-        rpn_loc_loss = faster_rcnn_loss(rpn_loc,gt_rpn_locs,gt_rpn_labels,beta=self.rpn_beta)
-        rpn_cls_loss = sigmoid_focal_loss(rpn_score[gt_rpn_labels>=0,:],gt_rpn_labels[gt_rpn_labels>=0])
-        
-        return rpn_loc_loss,rpn_cls_loss
+        bbox_pred = bbox_pred.permute(0,2,3,1).reshape(-1,4)
+        cls_score = cls_score.permute(0,2,3,1).reshape(-1,self.n_class)
+
+        return bbox_pred, cls_score, anchor
     
+    def get_locs(self,roi, bbox, label):
+        iou = bbox_iou(roi, bbox)
+        gt_assignment,max_iou = iou.argmax(dim=1)
+
+        gt_roi_label = -jt.ones((gt_assignment.shape[0],))
+
+        pos_index = jt.where(max_iou >= self.pos_iou_thresh)[0]
+
+        neg_index = jt.where((max_iou < self.neg_iou_thresh_hi) & (max_iou >= self.neg_iou_thresh_lo))[0]        
+        
+        gt_roi_label[neg_index] = 0  # negative labels --> 0
+        gt_roi_label[pos_index] = label[gt_assignment[pos_index]]
+
+        # Compute offsets and scales to match sampled RoIs to the GTs.
+        gt_roi_loc = bbox2loc(roi, bbox[gt_assignment])
+
+        return gt_roi_loc, gt_roi_label
+
     def execute(self,xs,targets):
-        img_size = [t["img_size"] for t in targets]
-        proposals = []
-        rpn_locs = []
-        rpn_scores = []
-        anchors = []
-        
+        all_bbox_pred = []
+        all_cls_score = []
+        all_proposals = []
+        all_gt_roi_labels = []
+        all_gt_roi_locs = []
+        all_indexes = []
         for x,anchor_base,feat_stride in zip(xs,self.anchor_bases,self.feat_strides):
-            rpn_loc, rpn_score, proposal, anchor = self.execute_single(x,anchor_base,feat_stride,img_size)
-            rpn_locs.append(rpn_loc)
-            rpn_scores.append(rpn_score)
-            anchors.append(anchor)
-            proposals.append(proposal)
+            bbox_pred, cls_score, anchor = self.execute_single(x,anchor_base,feat_stride)
+            gt_roi_locs = []
+            gt_roi_labels = []
+            proposals = []
+            indexes = []
+            for i,target in enumerate(targets):
+                if self.is_training():
+                    gt_bbox = target["bboxes"]
+                    gt_label = target["labels"]
+                    gt_roi_loc,gt_roi_label= self.get_locs(anchor,gt_bbox,gt_label)
+                    gt_roi_locs.append(gt_roi_loc)
+                    gt_roi_labels.append(gt_roi_label)
+
+                index = i*jt.ones((anchor.shape[0],))
+                indexes.append(index)
+                proposals.append(anchor)
+
+
+            proposals = jt.contrib.concat(proposals,dim=0)
+            indexes = jt.contrib.concat(indexes,dim=0)
+
+            all_bbox_pred.append(bbox_pred)
+            all_cls_score.append(cls_score)
+            all_proposals.append(proposals)
+            all_indexes.append(indexes)
+
+            if self.is_training():
+                gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
+                gt_roi_labels = jt.contrib.concat(gt_roi_labels,dim=0)
+                all_gt_roi_locs.append(gt_roi_locs)
+                all_gt_roi_labels.append(gt_roi_labels)
         
-        rpn_locs = jt.contrib.concat(rpn_locs,dim=1)
-        rpn_scores = jt.contrib.concat(rpn_scores,dim=1)
-        anchors = jt.contrib.concat(anchors,dim=0)
+
+        all_bbox_pred = jt.contrib.concat(all_bbox_pred,dim=0)
+        all_cls_score = jt.contrib.concat(all_cls_score,dim=0)
+        all_proposals = jt.contrib.concat(all_proposals,dim=0)
+        all_indexes = jt.contrib.concat(all_indexes,dim=0)
+    
+        if self.is_training():
+            all_gt_roi_locs = jt.contrib.concat(all_gt_roi_locs,dim=0)
+            all_gt_roi_labels = jt.contrib.concat(all_gt_roi_labels,dim=0)
         
         losses = dict()
+        results = []
         if self.is_training():
-            rpn_loc_loss,rpn_cls_loss = self.loss(rpn_locs, rpn_scores, anchors,targets)
+    
+            roi_loc_loss = faster_rcnn_loss(all_bbox_pred,all_gt_roi_locs,all_gt_roi_labels,beta=self.roi_beta)
+            roi_cls_loss = sigmoid_focal_loss(all_cls_score[all_gt_roi_labels>=0], all_gt_roi_labels[all_gt_roi_labels>=0])
+
             losses = dict(
-                rpn_loc_loss = rpn_loc_loss,
-                rpn_cls_loss = rpn_cls_loss
+                roi_cls_loss=roi_cls_loss,
+                roi_loc_loss=roi_loc_loss
             )
+
+        else:
+            cls_bbox = loc2bbox(all_proposals,all_bbox_pred)
+            probs = all_cls_score.sigmoid(dim=-1)
+
+            for i,target in enumerate(targets):
+                img_size = target["img_size"]
+                ori_img_size = target["ori_img_size"]
+
+                index = jt.where(all_indexes==i)[0]
+                score = probs[index,:]
+                bbox = cls_bbox[index,:]
+                bbox[:,0::2] = jt.clamp(bbox[:,0::2],min_v=0,max_v=img_size[0])*(ori_img_size[0]/img_size[0])
+                bbox[:,1::2] = jt.clamp(bbox[:,1::2],min_v=0,max_v=img_size[1])*(ori_img_size[1]/img_size[1])
+                boxes = []
+                scores = []
+                labels = []
+                for j in range(self.n_class):
+                    score_j = score[:,j]
+                    bbox_j = bbox
+                    mask = jt.where(score_j>self.score_thresh)[0]
+                    bbox_j = bbox_j[mask,:]
+                    score_j = score_j[mask]
+                    dets = jt.contrib.concat([bbox_j,score_j.unsqueeze(1)],dim=1)
+                    keep = jt.nms(dets,self.nms_thresh)
+                    bbox_j = bbox_j[keep]
+                    score_j = score_j[keep]
+                    label_j = jt.ones_like(score_j).int32()*(j+1)
+                    boxes.append(bbox_j)
+                    scores.append(score_j)
+                    labels.append(label_j)
+                
+                boxes = jt.contrib.concat(boxes,dim=0)
+                scores = jt.contrib.concat(scores,dim=0)
+                labels = jt.contrib.concat(labels,dim=0)
+                results.append(dict(
+                    boxes=boxes,
+                    scores=scores,
+                    labels=labels,
+                    img_id=target["img_id"]))
+
+        return results,losses 
         
-        return proposals,losses

@@ -67,4 +67,3 @@ def test_focal_loss():
     loss2 = _softmax_focal_loss(torch.from_numpy(pred).cuda(),torch.from_numpy(target).long().cuda(),2.0,0.25,torch.from_numpy(weight).cuda(),"sum")
     print(loss1,loss2)
 
-test_focal_loss()
