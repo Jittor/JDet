@@ -3,9 +3,17 @@ from jittor import nn,init
 from jdet.utils.registry import ROI_HEADS
 from jdet.ops.roi_align import ROIAlign
 import numpy as np
-from jdet.models.losses.faster_rcnn_loss import faster_rcnn_loss
+from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
 from .anchor_generator import ProposalTargetCreator, loc2bbox
 
+
+def faster_rcnn_loss(pred_locs,gt_locs,gt_labels,beta):
+    weights = jt.zeros(pred_locs.shape)
+    weights[gt_labels>0,:]=1
+    n_samples = (gt_labels>=0).sum().float()
+    loss = smooth_l1_loss(pred_locs,gt_locs,beta=beta,weight=weights,avg_factor=n_samples)
+    return loss
+        
 
 @ROI_HEADS.register_module()
 class BoxHead(nn.Module):

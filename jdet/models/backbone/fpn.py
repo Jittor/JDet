@@ -76,7 +76,6 @@ class FPN(nn.Module):
         self.num_outs = num_outs
         self.relu_before_extra_convs = relu_before_extra_convs
         self.no_norm_on_lateral = no_norm_on_lateral
-        self.fp16_enabled = False
         self.upsample_cfg = upsample_cfg.copy()
 
         if end_level == -1:

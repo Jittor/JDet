@@ -1,5 +1,6 @@
+
 model:
-    type: RCNN
+    type: RetinaNet
     backbone:
         type: Resnet50
         return_stages:  [layer1,layer2,layer3,layer4]
@@ -11,7 +12,7 @@ model:
         start_level: 1
         add_extra_convs: on_input
         num_outs: 5
-    rpn:
+    roi_head:
         type: RetinaHead
         n_class: 80
         in_channels: 256
