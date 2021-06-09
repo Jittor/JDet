@@ -13,3 +13,11 @@ coco128
 *.zip
 .vscode
 exp*
+
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+dist
+develop-eggs/
+build/
