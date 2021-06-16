@@ -2,6 +2,9 @@ jittor
 Pillow
 numpy 
 matplotlib
-yaml
+pyyaml
 tensorboardX
 opencv-python
+tqdm
+pycocotools
+terminaltables
