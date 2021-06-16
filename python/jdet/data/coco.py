@@ -68,7 +68,26 @@ class COCODataset(Dataset):
         # merge the image id sets of the two conditions and use the merged set
         ids_in_cat &= ids_with_ann
 
-        img_ids = [img_id for img_id in self.img_ids if img_id in ids_in_cat]
+        tmp_img_ids = [img_id for img_id in self.img_ids if img_id in ids_in_cat]
+
+        img_ids = []
+        for img_id in tmp_img_ids:
+            ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
+            anno = self.coco.loadAnns(ann_ids)
+
+            # remove ignored or crowd box
+            anno = [obj for obj in anno if ("is_crowd" not in obj or obj["iscrowd"] == 0) and ("ignore" not in obj or obj["ignore"] == 0) ]
+            # if it's empty, there is no annotation
+            if len(anno) == 0:
+                continue
+            # if all boxes have close to zero area, there is no annotation
+            if all(any(o <= 1 for o in obj["bbox"][2:]) for obj in anno):
+                continue
+            img_ids.append(img_id)
+
+        # sort indices for reproducible results
+        img_ids = sorted(img_ids)
+
         return img_ids
 
     def _read_ann_info(self, img_id):

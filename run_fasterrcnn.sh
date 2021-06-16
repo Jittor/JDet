@@ -1,0 +1,1 @@
+HWLOC_COMPONENTS=-gl PYTHONPATH=$PYTHONPATH:./python mpirun -np 8 python3 tools/run_net.py --config-file=configs/faster_rcnn_coco_dist.yaml --use_cuda

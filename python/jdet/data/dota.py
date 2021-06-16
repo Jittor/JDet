@@ -10,39 +10,12 @@ from PIL import Image
 import numpy as np 
 
 from jdet.utils.registry import DATASETS
+from jdet.config.constant import DOTA1_ClASSES
 from .coco import COCODataset
 
 @DATASETS.register_module()
 class DOTADataset(COCODataset):
-    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
-        super(DOTADataset,self).__init__(root,anno_file,transforms=transforms,
-                                                        batch_size=batch_size,
-                                                        num_workers=num_workers,
-                                                        shuffle=shuffle,
-                                                        drop_last=drop_last,
-                                                        filter_empty_gt=filter_empty_gt,
-                                                        use_anno_cats=True)
-    def _filter_imgs(self):
-        tmp_img_ids = super(DOTADataset,self)._filter_imgs()
-        
-        img_ids = []
-        for img_id in tmp_img_ids:
-            ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
-            anno = self.coco.loadAnns(ann_ids)
-
-            # remove ignored or crowd box
-            anno = [obj for obj in anno if obj["iscrowd"] == 0 and obj["ignore"] == 0 ]
-            # if it's empty, there is no annotation
-            if len(anno) == 0:
-                continue
-            # if all boxes have close to zero area, there is no annotation
-            if all(any(o <= 1 for o in obj["bbox"][2:]) for obj in anno):
-                continue
-            img_ids.append(img_id)
-
-        # sort indices for reproducible results
-        img_ids = sorted(img_ids)
-        return img_ids
+    CLASSES = DOTA1_CLASSES
 
     def _convert_seg2box(self,seg):
         seg_np = np.array(seg).reshape(4,2)

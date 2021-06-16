@@ -1,0 +1,1 @@
+HWLOC_COMPONENTS=-gl PYTHONPATH=$PYTHONPATH:./python mpirun -np 8 python3 tools/run_net.py --config-file=configs/retinanet.yaml --use_cuda

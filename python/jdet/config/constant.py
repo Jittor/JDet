@@ -66,3 +66,8 @@ IMAGENET_CLASSES = [
         'volleyball', 'waffle_iron', 'washer', 'water_bottle', 'watercraft',
         'whale', 'wine_bottle', 'zebra'
     ]
+
+DOTA1_CLASSES = ['plane', 'baseball-diamond', 'bridge', 'ground-track-field',
+               'small-vehicle', 'large-vehicle', 'ship', 'tennis-court',
+               'basketball-court', 'storage-tank', 'soccer-ball-field',
+               'roundabout', 'harbor', 'swimming-pool', 'helicopter']
