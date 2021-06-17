@@ -1,7 +1,7 @@
 import jittor as jt 
 from jittor import nn 
 
-from jdet.utils.registry import ROI_HEADS
+from jdet.utils.registry import HEADS
 
 
 import jittor as jt 
@@ -12,7 +12,7 @@ from .anchor_generator import AnchorTargetCreator, ProposalCreator, generate_anc
 from jdet.models.losses.faster_rcnn_loss import faster_rcnn_loss
 
 
-@ROI_HEADS.register_module()
+@HEADS.register_module()
 class RPN(nn.Module):
 
     def __init__(self, 

@@ -1,10 +1,10 @@
 import jittor as jt 
 from jittor import nn 
 
-from jdet.utils.registry import META_ARCHS,build_from_cfg,BACKBONES,ROI_HEADS,NECKS
+from jdet.utils.registry import MODELS,build_from_cfg,BACKBONES,HEADS,NECKS
 
 
-@META_ARCHS.register_module()
+@MODELS.register_module()
 class RCNN(nn.Module):
     """
     Generalized R-CNN. Any models that contains the following three components:
@@ -17,8 +17,8 @@ class RCNN(nn.Module):
         super(RCNN,self).__init__()
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
-        self.rpn = build_from_cfg(rpn,ROI_HEADS)
-        self.roi_heads = build_from_cfg(roi_heads,ROI_HEADS)
+        self.rpn = build_from_cfg(rpn,HEADS)
+        self.roi_heads = build_from_cfg(roi_heads,HEADS)
 
     def execute(self,images,targets):
         '''

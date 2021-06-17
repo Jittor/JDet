@@ -38,9 +38,9 @@ def build_from_cfg(cfg,registry,**kwargs):
 
 DATASETS = Registry()
 TRANSFORMS = Registry()
-META_ARCHS = Registry()
+MODELS = Registry()
 BACKBONES = Registry()
-ROI_HEADS = Registry()
+HEADS = Registry()
 LOSSES = Registry()
 OPTIMS = Registry()
 HOOKS = Registry()

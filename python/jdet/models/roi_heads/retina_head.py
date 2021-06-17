@@ -3,12 +3,12 @@ import math
 from jdet.models.losses.focal_loss import sigmoid_focal_loss
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
 from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, generate_anchor_base, grid_anchors, loc2bbox
-from jdet.utils.registry import ROI_HEADS
+from jdet.utils.registry import HEADS
 from jittor import nn,init 
 import jittor as jt
 
 
-@ROI_HEADS.register_module()
+@HEADS.register_module()
 class RetinaHead(nn.Module):
     r"""An anchor-based head used in `RetinaNet
     <https://arxiv.org/pdf/1708.02002.pdf>`_.

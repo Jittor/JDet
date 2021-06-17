@@ -1,6 +1,6 @@
 import jittor as jt 
 from jittor import nn,init 
-from jdet.utils.registry import ROI_HEADS
+from jdet.utils.registry import HEADS
 from jdet.ops.roi_align import ROIAlign
 import numpy as np
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
@@ -15,7 +15,7 @@ def faster_rcnn_loss(pred_locs,gt_locs,gt_labels,beta):
     return loss
         
 
-@ROI_HEADS.register_module()
+@HEADS.register_module()
 class BoxHead(nn.Module):
     """
     This class is used as a head for Faster R-CNN.

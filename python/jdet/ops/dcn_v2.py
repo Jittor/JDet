@@ -3,7 +3,7 @@ import jittor as jt
 from jittor import nn
 from jittor.misc import _pair 
 import math
-from jdet.utils.registry import ROI_HEADS
+from jdet.utils.registry import HEADS
 
 __all__ = ['DCN']
 
@@ -1247,7 +1247,7 @@ class DCNv2(nn.Module):
                            self.dilation,
                            self.deformable_groups)
 
-@ROI_HEADS.register_module()
+@HEADS.register_module()
 class DCN(DCNv2):
 
     def __init__(self, in_channels, out_channels,

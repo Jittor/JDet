@@ -5,7 +5,7 @@ from tqdm import tqdm
 import jdet
 import pickle
 from jdet.config import get_cfg,save_cfg
-from jdet.utils.registry import build_from_cfg,META_ARCHS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
+from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval
@@ -25,7 +25,7 @@ class Runner:
         self.log_interval = cfg.log_interval
         self.resume_path = cfg.resume_path
     
-        self.model = build_from_cfg(cfg.model,META_ARCHS)
+        self.model = build_from_cfg(cfg.model,MODELS)
         self.optimizer = build_from_cfg(cfg.optim,OPTIMS,params=self.model.parameters())
         self.scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=self.optimizer)
         self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
