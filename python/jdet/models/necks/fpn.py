@@ -3,16 +3,13 @@ from jittor import nn
 import warnings
 
 from jdet.utils.registry import NECKS
+from jdet.models.utils.modules import ConvModule
 
 @NECKS.register_module()
 class FPN(nn.Module):
     r"""Feature Pyramid Network.
-
-    this code is from mmdetection
-
     This is an implementation of paper `Feature Pyramid Networks for Object
     Detection <https://arxiv.org/abs/1612.03144>`_.
-
     Args:
         in_channels (List[int]): Number of input channels per scale.
         out_channels (int): Number of output channels (used at each scale)
@@ -26,7 +23,6 @@ class FPN(nn.Module):
             If True, its actual mode is specified by `extra_convs_on_inputs`.
             If str, it specifies the source feature map of the extra convs.
             Only the following options are allowed
-
             - 'on_input': Last feat map of neck inputs (i.e. backbone feature).
             - 'on_lateral':  Last feature map after lateral convs.
             - 'on_output': The last output feature map after fpn convs.
@@ -38,23 +34,27 @@ class FPN(nn.Module):
             conv. Default: False.
         no_norm_on_lateral (bool): Whether to apply norm on lateral.
             Default: False.
+        conv_cfg (dict): Config dict for convolution layer. Default: None.
+        norm_cfg (dict): Config dict for normalization layer. Default: None.
+        act_cfg (str): Config dict for activation layer in ConvModule.
+            Default: None.
         upsample_cfg (dict): Config dict for interpolate layer.
             Default: `dict(mode='nearest')`
-
+        init_cfg (dict or list[dict], optional): Initialization config dict.
     Example:
-        >>> import jittor as jt
+        >>> import torch
         >>> in_channels = [2, 3, 5, 7]
         >>> scales = [340, 170, 84, 43]
-        >>> inputs = [jt.rand(1, c, s, s)
+        >>> inputs = [torch.rand(1, c, s, s)
         ...           for c, s in zip(in_channels, scales)]
-        >>> fpn = FPN(in_channels, 11, len(in_channels)).eval()
-        >>> outputs = fpn(inputs)
+        >>> self = FPN(in_channels, 11, len(in_channels)).eval()
+        >>> outputs = self.forward(inputs)
         >>> for i in range(len(outputs)):
         ...     print(f'outputs[{i}].shape = {outputs[i].shape}')
-        outputs[0].shape = [1, 11, 340, 340]
-        outputs[1].shape = [1, 11, 170, 170]
-        outputs[2].shape = [1, 11, 84, 84]
-        outputs[3].shape = [1, 11, 43, 43]
+        outputs[0].shape = torch.Size([1, 11, 340, 340])
+        outputs[1].shape = torch.Size([1, 11, 170, 170])
+        outputs[2].shape = torch.Size([1, 11, 84, 84])
+        outputs[3].shape = torch.Size([1, 11, 43, 43])
     """
 
     def __init__(self,
@@ -67,7 +67,12 @@ class FPN(nn.Module):
                  extra_convs_on_inputs=True,
                  relu_before_extra_convs=False,
                  no_norm_on_lateral=False,
-                 upsample_cfg=dict(mode='nearest')):
+                 conv_cfg=None,
+                 norm_cfg=None,
+                 act_cfg=None,
+                 upsample_cfg=dict(mode='nearest'),
+                 init_cfg=dict(
+                     type='Xavier', layer='Conv2d', distribution='uniform')):
         super(FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
@@ -108,15 +113,21 @@ class FPN(nn.Module):
         self.fpn_convs = nn.ModuleList()
 
         for i in range(self.start_level, self.backbone_end_level):
-            l_conv = nn.Conv2d(
+            l_conv = ConvModule(
                 in_channels[i],
                 out_channels,
-                1)
-            fpn_conv = nn.Conv2d(
+                1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg if not self.no_norm_on_lateral else None,
+                act_cfg=act_cfg)
+            fpn_conv = ConvModule(
                 out_channels,
                 out_channels,
                 3,
-                padding=1)
+                padding=1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                act_cfg=act_cfg)
 
             self.lateral_convs.append(l_conv)
             self.fpn_convs.append(fpn_conv)
@@ -129,21 +140,24 @@ class FPN(nn.Module):
                     in_channels = self.in_channels[self.backbone_end_level - 1]
                 else:
                     in_channels = out_channels
-                extra_fpn_conv = nn.Conv2d(
+                extra_fpn_conv = ConvModule(
                     in_channels,
                     out_channels,
                     3,
                     stride=2,
-                    padding=1)
+                    padding=1,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=act_cfg)
                 self.fpn_convs.append(extra_fpn_conv)
 
-    def execute(self, x):
+    def execute(self, inputs):
         """Forward function."""
-        assert len(x) == len(self.in_channels)
+        assert len(inputs) == len(self.in_channels)
 
         # build laterals
         laterals = [
-            lateral_conv(x[i + self.start_level])
+            lateral_conv(inputs[i + self.start_level])
             for i, lateral_conv in enumerate(self.lateral_convs)
         ]
 
@@ -171,11 +185,11 @@ class FPN(nn.Module):
             # (e.g., Faster R-CNN, Mask R-CNN)
             if not self.add_extra_convs:
                 for i in range(self.num_outs - used_backbone_levels):
-                    outs.append(nn.max_pool2d(outs[-1], 1, stride=2))
+                    outs.append(nn.pool(outs[-1], 1, stride=2,op="maximum"))
             # add conv layers on top of original feature maps (RetinaNet)
             else:
                 if self.add_extra_convs == 'on_input':
-                    extra_source = x[self.backbone_end_level - 1]
+                    extra_source = inputs[self.backbone_end_level - 1]
                 elif self.add_extra_convs == 'on_lateral':
                     extra_source = laterals[-1]
                 elif self.add_extra_convs == 'on_output':
@@ -185,8 +199,8 @@ class FPN(nn.Module):
                 outs.append(self.fpn_convs[used_backbone_levels](extra_source))
                 for i in range(used_backbone_levels + 1, self.num_outs):
                     if self.relu_before_extra_convs:
-                        outs.append(self.fpn_convs[i](F.relu(outs[-1])))
+                        outs.append(self.fpn_convs[i](nn.relu(outs[-1])))
                     else:
                         outs.append(self.fpn_convs[i](outs[-1]))
-        return outs
+        return tuple(outs)
 

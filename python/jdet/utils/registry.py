@@ -30,6 +30,8 @@ def build_from_cfg(cfg,registry,**kwargs):
         obj_type = args.pop('type')
         obj_cls = registry.get(obj_type)
         return obj_cls(**args)
+    elif isinstance(cfg,list):
+        return nn.Sequential([build_from_cfg(c,registry,**kwargs) for c in cfg])
     elif cfg is None:
         return None
     else:
@@ -43,8 +45,9 @@ BACKBONES = Registry()
 HEADS = Registry()
 LOSSES = Registry()
 OPTIMS = Registry()
-HOOKS = Registry()
+BRICKS = Registry()
 NECKS = Registry()
 SCHEDULERS = Registry()
+HOOKS = Registry()
 
 

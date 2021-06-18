@@ -2,20 +2,22 @@ import numpy as np
 import jittor as jt
 from jittor import nn
 
-from jdet.models.utils.weight_init import normal_init
+from jdet.models.utils.weight_init import normal_init,bias_init_with_prob
+from jdet.models.utils.modules import ConvModule
+from jdet.utils.general import multi_apply
+from jdet.utils.registry import HEADS,LOSSES,build_from_cfg
+
+
+from jdet.ops.dcn import DeformConv
+from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 
 from mmdet.core import (AnchorGeneratorRotated, anchor_target,
-                        build_bbox_coder, delta2bbox_rotated, force_fp32,
-                        images_to_levels, multi_apply, multiclass_nms_rotated)
-
-from ...ops import DeformConv
-from ...ops.orn import ORConv2d, RotationInvariantPooling
-from ..builder import build_loss
-from jdet.utils.registry import HEADS
-from ..utils import ConvModule, bias_init_with_prob
+                        build_bbox_coder, delta2bbox_rotated,
+                        images_to_levels, multiclass_nms_rotated)
 
 
-@HEADS.register_module
+
+@HEADS.register_module()
 class S2ANetHead(nn.Module):
 
     def __init__(self,
@@ -69,10 +71,10 @@ class S2ANetHead(nn.Module):
 
         if self.cls_out_channels <= 0:
             raise ValueError('num_classes={} is too small'.format(num_classes))
-        self.loss_fam_cls = build_loss(loss_fam_cls)
-        self.loss_fam_bbox = build_loss(loss_fam_bbox)
-        self.loss_odm_cls = build_loss(loss_odm_cls)
-        self.loss_odm_bbox = build_loss(loss_odm_bbox)
+        self.loss_fam_cls = build_from_cfg(loss_fam_cls,LOSSES)
+        self.loss_fam_bbox = build_from_cfg(loss_fam_bbox,LOSSES)
+        self.loss_odm_cls = build_from_cfg(loss_odm_cls,LOSSES)
+        self.loss_odm_bbox = build_from_cfg(loss_odm_bbox,LOSSES)
         self.fp16_enabled = False
 
         self.anchor_generators = []
@@ -212,7 +214,7 @@ class S2ANetHead(nn.Module):
 
         return fam_cls_score, fam_bbox_pred, refine_anchor, odm_cls_score, odm_bbox_pred
 
-    def forward(self, feats):
+    def execute(self, feats):
         return multi_apply(self.forward_single, feats, self.anchor_strides)
 
     def get_init_anchors(self,
@@ -289,11 +291,6 @@ class S2ANetHead(nn.Module):
                 valid_flag_list.append(multi_level_flags)
         return refine_anchors_list, valid_flag_list
 
-    @force_fp32(apply_to=(
-        'fam_cls_scores',
-        'fam_bbox_preds',
-        'odm_cls_scores',
-        'odm_bbox_preds'))
     def loss(self,
              fam_cls_scores,
              fam_bbox_preds,
@@ -485,11 +482,6 @@ class S2ANetHead(nn.Module):
             avg_factor=num_total_samples)
         return loss_odm_cls, loss_odm_bbox
 
-    @force_fp32(apply_to=(
-        'fam_cls_scores',
-        'fam_bbox_preds',
-        'odm_cls_scores',
-        'odm_bbox_preds'))
     def get_bboxes(self,
                    fam_cls_scores,
                    fam_bbox_preds,
@@ -621,7 +613,7 @@ class AlignConv(nn.Module):
                                       kernel_size=kernel_size,
                                       padding=(kernel_size - 1) // 2,
                                       deformable_groups=deformable_groups)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
     def init_weights(self):
         normal_init(self.deform_conv, std=0.01)
@@ -665,7 +657,7 @@ class AlignConv(nn.Module):
             0), -1).permute(1, 0).reshape(-1, feat_h, feat_w)
         return offset
 
-    def forward(self, x, anchors, stride):
+    def execute(self, x, anchors, stride):
         num_imgs, H, W = anchors.shape[:3]
         offset_list = [
             self.get_offset(anchors[i].reshape(-1, 5), (H, W), stride)
