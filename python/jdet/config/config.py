@@ -6,6 +6,7 @@ import yaml
 import copy
 from importlib import import_module
 import sys
+import inspect
 
 __all__ = ["get_cfg","init_cfg","save_cfg","print_cfg"]
 BASE_KEY = "_base_"
@@ -102,7 +103,20 @@ class Config(OrderedDict):
     def load_from_file(self, filename):
         cfg = Config._load_dict_from_file(filename)
         self.clear()
-        self.update(cfg)
+        self.update(self.dfs(cfg))
+    
+    def dfs(self, cfg_other):
+        if isinstance(cfg_other,dict):
+            now_cfg = Config()
+            for k,d in cfg_other.items():
+                if (inspect.ismodule(d)):
+                    continue
+                now_cfg[k]=self.dfs(d)
+        elif isinstance(cfg_other,list):
+            now_cfg = [self.dfs(d) for d in cfg_other if (not inspect.ismodule(d))]
+        else:
+            now_cfg = copy.deepcopy(cfg_other)
+        return now_cfg
     
     def dump(self):
         """convert Config to dict"""

@@ -10,6 +10,10 @@ class TestConfig(unittest.TestCase):
         print(cfg)
         ans = {'a':1,'b':{'a':2,'b':3}}
         assert(ans==cfg.dump())
+        assert(cfg.a==1)
+        assert(cfg.b=={'a':2,'b':3})
+        assert(cfg.b.a==2)
+        assert(cfg.b.b==3)
 
     # test _base_
     def test2(self):
@@ -85,7 +89,6 @@ class TestConfig(unittest.TestCase):
     def test9(self):
         init_cfg("9.py")
         cfg = get_cfg()
-        cfg.pop('os') # ignore import os
         print(cfg)
         ans = {
             'gpus':[1,2,3,4],
