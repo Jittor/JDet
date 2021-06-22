@@ -1210,6 +1210,56 @@ class DCN_V2_POOLING(jt.Function):
 dcn_v2_pooling = DCN_V2_POOLING()
 
 
+class DeformConv(nn.Module):
+
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 stride=1,
+                 padding=0,
+                 dilation=1,
+                 deformable_groups=1,
+                 bias=False):
+        super(DeformConv, self).__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = _pair(kernel_size)
+        self.stride = _pair(stride)
+        self.padding = _pair(padding)
+        self.dilation = _pair(dilation)
+        self.deformable_groups = deformable_groups
+
+        self.weight = jt.zeros((out_channels, in_channels,*self.kernel_size))
+        if bias:
+          self.bias = jt.zeros((out_channels,))
+        else:
+          self.bias = jt.zeros((out_channels,)).stop_grad()
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        n = self.in_channels
+        for k in self.kernel_size:
+            n *= k
+        stdv = 1. / math.sqrt(n)
+        nn.init.uniform_(self.weight,-stdv, stdv)
+
+    def execute(self, x, offset):
+        assert x.size(2) > self.kernel_size[0] and x.size(3) > self.kernel_size[1]
+        mask_shape = offset.size()
+        mask_shape[1] //= 2
+        mask = jt.ones(mask_shape,x.dtype)
+        return dcn_v2_conv(x, offset, mask,
+                           self.weight,
+                           self.bias,
+                           self.stride,
+                           self.padding,
+                           self.dilation,
+                           self.deformable_groups)
+
+
 class DCNv2(nn.Module):
 
     def __init__(self, in_channels, out_channels,

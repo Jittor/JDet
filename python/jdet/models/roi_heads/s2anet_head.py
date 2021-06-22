@@ -8,13 +8,16 @@ from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,LOSSES,build_from_cfg
 
 
-from jdet.ops.dcn import DeformConv
+from jdet.ops.dcn_v2 import DeformConv
 from jdet.ops.orn import ORConv2d, RotationInvariantPooling
+from jdet.ops.nms_rotated import multiclass_nms_rotated
+from jdet.models.boxes.box_converter import delta2bbox_rotated
+from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
+from jdet.models.boxes.anchor_generator import AnchorGeneratorRotated
 
-from mmdet.core import (AnchorGeneratorRotated, anchor_target,
-                        build_bbox_coder, delta2bbox_rotated,
-                        images_to_levels, multiclass_nms_rotated)
 
+
+from mmdet.core import build_bbox_coder
 
 
 @HEADS.register_module()
