@@ -1,5 +1,6 @@
 import jittor as jt 
 from jittor import nn
+from jdet.utils.registry import LOSSES
 
 def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=None, reduction="none"):
     max_val = jt.clamp(-output,min_v=0)
@@ -18,9 +19,9 @@ def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=Non
     else:
         return loss
 
-def sigmoid_focal_loss(inputs,targets,alpha: float = -1,gamma: float = 2,reduction: str = "none"):
+def sigmoid_focal_loss(inputs,targets,weight=None, alpha = -1,gamma = 2,reduction = "none",avg_factor=None):
     p = inputs.sigmoid()
-    ce_loss = binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+    ce_loss = binary_cross_entropy_with_logits(inputs, targets,weight, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
 
@@ -29,7 +30,49 @@ def sigmoid_focal_loss(inputs,targets,alpha: float = -1,gamma: float = 2,reducti
         loss = alpha_t * loss
 
     if reduction == "mean":
-        loss = loss.mean()
+        if avg_factor is None:
+            avg_factor = loss.numel()
+        loss = loss.sum()/avg_factor
     elif reduction == "sum":
         loss = loss.sum()
     return loss
+
+
+@LOSSES.register_module()
+class FocalLoss(nn.Module):
+
+    def __init__(self,
+                 use_sigmoid=True,
+                 gamma=2.0,
+                 alpha=0.25,
+                 reduction='mean',
+                 loss_weight=1.0):
+        super(FocalLoss, self).__init__()
+        assert use_sigmoid is True, 'Only sigmoid focal loss supported now.'
+        self.use_sigmoid = use_sigmoid
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+        self.loss_weight = loss_weight
+
+    def execute(self,
+                pred,
+                target,
+                weight=None,
+                avg_factor=None,
+                reduction_override=None):
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+        if self.use_sigmoid:
+            loss_cls = self.loss_weight * sigmoid_focal_loss(
+                pred,
+                target,
+                weight,
+                gamma=self.gamma,
+                alpha=self.alpha,
+                reduction=reduction,
+                avg_factor=avg_factor)
+        else:
+            raise NotImplementedError
+        return loss_cls

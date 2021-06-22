@@ -48,6 +48,7 @@ OPTIMS = Registry()
 BRICKS = Registry()
 NECKS = Registry()
 SCHEDULERS = Registry()
+BOXES = Registry()
 HOOKS = Registry()
 
 
