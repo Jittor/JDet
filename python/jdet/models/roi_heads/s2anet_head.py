@@ -5,7 +5,7 @@ from jittor import nn
 from jdet.models.utils.weight_init import normal_init,bias_init_with_prob
 from jdet.models.utils.modules import ConvModule
 from jdet.utils.general import multi_apply
-from jdet.utils.registry import HEADS,LOSSES,build_from_cfg
+from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 
 
 from jdet.ops.dcn_v2 import DeformConv
@@ -14,10 +14,6 @@ from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_converter import delta2bbox_rotated
 from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
 from jdet.models.boxes.anchor_generator import AnchorGeneratorRotated
-
-
-
-from mmdet.core import build_bbox_coder
 
 
 @HEADS.register_module()
@@ -419,7 +415,7 @@ class S2ANetHead(nn.Module):
             bbox_coder_cfg = cfg.get('bbox_coder', '')
             if bbox_coder_cfg == '':
                 bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
-            bbox_coder = build_bbox_coder(bbox_coder_cfg)
+            bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
             anchors = anchors.reshape(-1, 5)
             fam_bbox_pred = bbox_coder.decode(anchors, fam_bbox_pred)
         loss_fam_bbox = self.loss_fam_bbox(
@@ -459,7 +455,7 @@ class S2ANetHead(nn.Module):
             bbox_coder_cfg = cfg.get('bbox_coder', '')
             if bbox_coder_cfg == '':
                 bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
-            bbox_coder = build_bbox_coder(bbox_coder_cfg)
+            bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
             anchors = anchors.reshape(-1, 5)
             odm_bbox_pred = bbox_coder.decode(anchors, odm_bbox_pred)
         loss_odm_bbox = self.loss_odm_bbox(

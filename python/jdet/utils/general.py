@@ -42,6 +42,21 @@ def unmap(data, count, inds, fill=0):
         ret[inds, :] = data
     return ret
     
+def parse_losses(losses):
+    _losses = dict()
+    for loss_name, loss_value in losses.items():
+        if isinstance(loss_value, jt.Var):
+            _losses[loss_name] = loss_value.mean()
+        elif isinstance(loss_value, list):
+            _losses[loss_name] = sum(_loss.mean() for _loss in loss_value)
+        else:
+            raise TypeError(
+                '{} is not a tensor or list of tensors'.format(loss_name))
+                
+    total_loss = sum(_value for _key, _value in _losses.items() if 'loss' in _key)
+    return total_loss, _losses
+
+    
 def current_time():
     return time.asctime( time.localtime(time.time()))
 

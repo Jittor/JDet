@@ -8,7 +8,7 @@ from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import visualize_results,visual_gts
-from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval
+from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses
 
 class Runner:
     def __init__(self):
@@ -68,8 +68,8 @@ class Runner:
         img_num = 0
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
-            all_loss = sum(losses.values())
-
+            all_loss,losses = parse_losses(losses)
+            
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
 
