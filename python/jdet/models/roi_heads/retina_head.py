@@ -17,9 +17,8 @@ class RetinaHead(nn.Module):
     the second regresses deltas for the anchors.
 
     Example:
-        >>> import torch
         >>> self = RetinaHead(11, 7)
-        >>> x = torch.rand(1, 7, 32, 32)
+        >>> x = jt.randn(1, 7, 32, 32)
         >>> cls_score, bbox_pred = self.forward_single(x)
         >>> # Each anchor predicts a score for each class except background
         >>> cls_per_anchor = cls_score.shape[1] / self.num_anchors

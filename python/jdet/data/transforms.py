@@ -218,42 +218,6 @@ class Pad:
         return new_image,target
     
 
-class ToRect:
-    def __init__( self, do=True ):
-        self.do=do
-
-    @staticmethod
-    def _to_rrect( x ):
-        x = cv2.minAreaRect( x )
-        x = cv2.boxPoints( x )
-        return x
-
-    def __call__( self, image, target=None ):
-        if target is None:
-            return image
-
-        if not self.do:
-            return image, target
-
-        masks = target.get_field( "masks" )
-        polygons = list( map( lambda x: x.polygons[0].numpy(), masks.instances.polygons ) )
-        polygons = np.stack( polygons, axis=0 ).reshape( (-1, 4, 2) )
-        rrects = list( map( self._to_rrect, polygons ) )
-
-        rrects_np = np.array( rrects, dtype=np.float32 ).reshape( (-1, 8) )
-        xmins = np.min( rrects_np[:,  ::2], axis=1 )
-        ymins = np.min( rrects_np[:, 1::2], axis=1 )
-        xmaxs = np.max( rrects_np[:,  ::2], axis=1 )
-        ymaxs = np.max( rrects_np[:, 1::2], axis=1 )
-        xyxy = np.vstack( [xmins, ymins, xmaxs, ymaxs] ).transpose()
-        boxes = torch.from_numpy( xyxy ).reshape(-1, 4)  # guard against no boxes
-
-        new_target = BoxList( boxes, image.size, mode="xyxy" )
-        new_target._copy_extra_fields( target )
-        new_masks = SegmentationMask( rrects_np.reshape( (-1, 1, 8)).tolist(), image.size, mode='poly' )
-        new_target.add_field( "masks", new_masks )
-
-        return image, new_target
 
 class SortForQuad( object ):
     def __init__( self, do=True ):

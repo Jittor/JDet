@@ -1,7 +1,18 @@
 import jittor as jt
 
-from ..bbox import PseudoSampler, assign_and_sample, build_assigner, build_bbox_coder
-from jdet.utils.general import multi_apply
+from .sampler import PseudoSampler
+from jdet.utils.general import multi_apply,unmap
+from jdet.utils.registry import build_from_cfg,BOXES
+
+
+def assign_and_sample(bboxes, gt_bboxes, gt_bboxes_ignore, gt_labels, cfg):
+    bbox_assigner = build_from_cfg(cfg.assigner,BOXES)
+    bbox_sampler = build_from_cfg(cfg.sampler,BOXES)
+    assign_result = bbox_assigner.assign(bboxes, gt_bboxes, gt_bboxes_ignore,
+                                         gt_labels)
+    sampling_result = bbox_sampler.sample(assign_result, bboxes, gt_bboxes,
+                                          gt_labels)
+    return assign_result, sampling_result
 
 
 def anchor_target(anchor_list,
@@ -122,7 +133,7 @@ def anchor_target_single(flat_anchors,
         assign_result, sampling_result = assign_and_sample(
             anchors, gt_bboxes, gt_bboxes_ignore, None, cfg)
     else:
-        bbox_assigner = build_assigner(cfg.assigner)
+        bbox_assigner = build_from_cfg(cfg.assigner,BOXES)
         assign_result = bbox_assigner.assign(anchors, gt_bboxes,
                                              gt_bboxes_ignore, gt_labels)
         bbox_sampler = PseudoSampler()
@@ -183,14 +194,4 @@ def anchor_inside_flags(flat_anchors, valid_flags, img_shape,
     return inside_flags
 
 
-def unmap(data, count, inds, fill=0):
-    """ Unmap a subset of item (data) back to the original set of items (of
-    size count) """
-    if data.ndim == 1:
-        ret = jt.full((count,), fill,dtype=data.dtype)
-        ret[inds] = data
-    else:
-        new_size = (count,) + data.size()[1:]
-        ret = jt.full(new_size, fill,dtype=data.dtype)
-        ret[inds, :] = data
-    return ret
+

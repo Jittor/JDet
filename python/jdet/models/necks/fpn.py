@@ -42,19 +42,18 @@ class FPN(nn.Module):
             Default: `dict(mode='nearest')`
         init_cfg (dict or list[dict], optional): Initialization config dict.
     Example:
-        >>> import torch
         >>> in_channels = [2, 3, 5, 7]
         >>> scales = [340, 170, 84, 43]
-        >>> inputs = [torch.rand(1, c, s, s)
+        >>> inputs = [jt.randn(1, c, s, s)
         ...           for c, s in zip(in_channels, scales)]
         >>> self = FPN(in_channels, 11, len(in_channels)).eval()
         >>> outputs = self.forward(inputs)
         >>> for i in range(len(outputs)):
         ...     print(f'outputs[{i}].shape = {outputs[i].shape}')
-        outputs[0].shape = torch.Size([1, 11, 340, 340])
-        outputs[1].shape = torch.Size([1, 11, 170, 170])
-        outputs[2].shape = torch.Size([1, 11, 84, 84])
-        outputs[3].shape = torch.Size([1, 11, 43, 43])
+        outputs[0].shape = ([1, 11, 340, 340])
+        outputs[1].shape = ([1, 11, 170, 170])
+        outputs[2].shape = ([1, 11, 84, 84])
+        outputs[3].shape = ([1, 11, 43, 43])
     """
 
     def __init__(self,
