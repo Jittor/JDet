@@ -1,0 +1,5 @@
+_base_: '3_base.yaml'
+b:
+  _cover_: True
+  a: 5
+  c: 6

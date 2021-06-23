@@ -1,0 +1,5 @@
+_base_: '../5_base0.yaml'
+a: 1
+b:
+  a: 2
+  b: 3

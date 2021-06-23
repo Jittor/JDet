@@ -1,0 +1,4 @@
+_base_: ['6_base1.yaml', '6_base2.yaml']
+b:
+  b: 8
+c: 0

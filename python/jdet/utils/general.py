@@ -56,7 +56,7 @@ def check_file(file,ext=None):
         return False
     if ext:
         if not os.path.splitext(file)[1] in ext:
-            warnings.warn(f"the type of {file} must be in {ext}")
+            # warnings.warn(f"the type of {file} must be in {ext}")
             return False
     return True
 

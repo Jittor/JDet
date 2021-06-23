@@ -1,5 +1,6 @@
 import jittor as jt 
 from jdet.utils.registry import LOSSES
+from jittor import nn
 
 def smooth_l1_loss(pred,target,beta=1.,weight=None,avg_factor=None,reduction="mean"):
     diff = jt.abs(pred-target)
