@@ -1,6 +1,8 @@
 import jittor as jt 
 import time 
 import warnings
+import numpy as np 
+import random
 import os 
 from functools import partial
 from six.moves import map, zip
@@ -52,11 +54,16 @@ def parse_losses(losses):
         else:
             raise TypeError(
                 '{} is not a tensor or list of tensors'.format(loss_name))
-                
+
     total_loss = sum(_value for _key, _value in _losses.items() if 'loss' in _key)
     return total_loss, _losses
 
-    
+
+def set_random_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    jt.seed(seed)
+
 def current_time():
     return time.asctime( time.localtime(time.time()))
 

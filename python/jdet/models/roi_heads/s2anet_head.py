@@ -529,9 +529,9 @@ class S2ANetHead(nn.Module):
             if nms_pre > 0 and scores.shape[0] > nms_pre:
                 # Get maximum scores for foreground classes.
                 if self.use_sigmoid_cls:
-                    max_scores, _ = scores.max(dim=1)
+                    max_scores = scores.max(dim=1)
                 else:
-                    max_scores, _ = scores[:, 1:].max(dim=1)
+                    max_scores = scores[:, 1:].max(dim=1)
                 _, topk_inds = max_scores.topk(nms_pre)
                 anchors = anchors[topk_inds, :]
                 bbox_pred = bbox_pred[topk_inds, :]
@@ -546,7 +546,7 @@ class S2ANetHead(nn.Module):
         mlvl_scores = jt.contrib.concat(mlvl_scores)
         if self.use_sigmoid_cls:
             # Add a dummy background class to the front when using sigmoid
-            padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
+            padding = jt.zeros((mlvl_scores.shape[0], 1),dtype=mlvl_scores.dtype)
             mlvl_scores = jt.contrib.concat([padding, mlvl_scores], dim=1)
         det_bboxes, det_labels = multiclass_nms_rotated(mlvl_bboxes,
                                                         mlvl_scores,
