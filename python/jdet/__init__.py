@@ -1,10 +1,10 @@
-from .models import *
-from .runner import *
-from .config import *
-from .data import *
-from .ops import *
-from .utils import *
-from .optims import *
-__all__ = []
+from . import models
+from . import runner
+from . import config
+from . import data
+from . import ops
+from . import utils
+from . import optims
+
 __version__ = "0.0.1"
 

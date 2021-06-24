@@ -1,4 +1,3 @@
-
 import jittor as jt 
 import numpy as np 
 import math 
@@ -245,3 +244,122 @@ def delta2bbox(rois,
         y2 = y2.clamp(min_v=0, max_v=max_shape[0] - 1)
     bboxes = jt.stack([x1, y1, x2, y2], dim=-1).view_as(deltas)
     return bboxes
+
+
+def poly_to_rotated_box_single(poly):
+    """
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    to
+    rotated_box:[x_ctr,y_ctr,w,h,angle]
+    """
+    poly = np.array(poly[:8], dtype=np.float32)
+
+    pt1 = (poly[0], poly[1])
+    pt2 = (poly[2], poly[3])
+    pt3 = (poly[4], poly[5])
+    pt4 = (poly[6], poly[7])
+
+    edge1 = np.sqrt((pt1[0] - pt2[0]) * (pt1[0] - pt2[0]) +
+                    (pt1[1] - pt2[1]) * (pt1[1] - pt2[1]))
+    edge2 = np.sqrt((pt2[0] - pt3[0]) * (pt2[0] - pt3[0]) +
+                    (pt2[1] - pt3[1]) * (pt2[1] - pt3[1]))
+
+    width = max(edge1, edge2)
+    height = min(edge1, edge2)
+
+    angle = 0
+    if edge1 > edge2:
+        angle = np.arctan2(
+            np.float(pt2[1] - pt1[1]), np.float(pt2[0] - pt1[0]))
+    elif edge2 >= edge1:
+        angle = np.arctan2(
+            np.float(pt4[1] - pt1[1]), np.float(pt4[0] - pt1[0]))
+
+    angle = norm_angle(angle)
+
+    x_ctr = np.float(pt1[0] + pt3[0]) / 2
+    y_ctr = np.float(pt1[1] + pt3[1]) / 2
+    rotated_box = np.array([x_ctr, y_ctr, width, height, angle])
+    return rotated_box
+
+def poly_to_rotated_box_np(polys):
+    """
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    to
+    rotated_boxes:[x_ctr,y_ctr,w,h,angle]
+    """
+    rotated_boxes = []
+    for poly in polys:
+        rotated_box = poly_to_rotated_box_single(poly)
+        rotated_boxes.append(rotated_box)
+    return np.array(rotated_boxes)
+
+
+def poly_to_rotated_box(polys):
+    """
+    polys:n*8
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    to
+    rrect:[x_ctr,y_ctr,w,h,angle]
+    """
+    pt1, pt2, pt3, pt4 = polys[..., :8].chunk(4, 1)
+
+    edge1 = jt.sqrt(
+        jt.pow(pt1[..., 0] - pt2[..., 0], 2) + jt.pow(pt1[..., 1] - pt2[..., 1], 2))
+    edge2 = jt.sqrt(
+        jt.pow(pt2[..., 0] - pt3[..., 0], 2) + jt.pow(pt2[..., 1] - pt3[..., 1], 2))
+
+    angles1 = jt.atan2((pt2[..., 1] - pt1[..., 1]), (pt2[..., 0] - pt1[..., 0]))
+    angles2 = jt.atan2((pt4[..., 1] - pt1[..., 1]), (pt4[..., 0] - pt1[..., 0]))
+    angles = polys.new_zeros(polys.shape[0])
+    angles[edge1 > edge2] = angles1[edge1 > edge2]
+    angles[edge1 <= edge2] = angles2[edge1 <= edge2]
+
+    angles = norm_angle(angles)
+
+    x_ctr = (pt1[..., 0] + pt3[..., 0]) / 2.0
+    y_ctr = (pt1[..., 1] + pt3[..., 1]) / 2.0
+
+    edges = jt.stack([edge1, edge2], dim=1)
+    width = jt.max(edges, 1)
+    height = jt.min(edges, 1)
+
+    return jt.stack([x_ctr, y_ctr, width, height, angles], 1)
+
+def rotated_box_to_poly_np(rrects):
+    """
+    rrect:[x_ctr,y_ctr,w,h,angle]
+    to
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    """
+    polys = []
+    for rrect in rrects:
+        x_ctr, y_ctr, width, height, angle = rrect[:5]
+        tl_x, tl_y, br_x, br_y = -width / 2, -height / 2, width / 2, height / 2
+        rect = np.array([[tl_x, br_x, br_x, tl_x], [tl_y, tl_y, br_y, br_y]])
+        R = np.array([[np.cos(angle), -np.sin(angle)],
+                      [np.sin(angle), np.cos(angle)]])
+        poly = R.dot(rect)
+        x0, x1, x2, x3 = poly[0, :4] + x_ctr
+        y0, y1, y2, y3 = poly[1, :4] + y_ctr
+        poly = np.array([x0, y0, x1, y1, x2, y2, x3, y3], dtype=np.float32)
+        polys.append(poly)
+    polys = np.array(polys)
+    polys = get_best_begin_point(polys)
+    return polys
+    
+def rotated_box_to_bbox_np(rotatex_boxes):
+    polys = rotated_box_to_poly_np(rotatex_boxes)
+    xmin = polys[:, ::2].min(1, keepdims=True)
+    ymin = polys[:, 1::2].min(1, keepdims=True)
+    xmax = polys[:, ::2].max(1, keepdims=True)
+    ymax = polys[:, 1::2].max(1, keepdims=True)
+    return np.concatenate([xmin, ymin, xmax, ymax], axis=1)
+
+def rotated_box_to_bbox(rotatex_boxes):
+    polys = rotated_box_to_poly(rotatex_boxes)
+    xmin, _ = polys[:, ::2].min(1)
+    ymin, _ = polys[:, 1::2].min(1)
+    xmax, _ = polys[:, ::2].max(1)
+    ymax, _ = polys[:, 1::2].max(1)
+    return jt.stack([xmin, ymin, xmax, ymax], dim=1)

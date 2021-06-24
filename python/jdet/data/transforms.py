@@ -5,11 +5,14 @@ import numpy as np
 import math
 from PIL import Image
 from jdet.utils.registry import build_from_cfg,TRANSFORMS
+from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box_np,norm_angle
 
 @TRANSFORMS.register_module()
 class Compose:
-    def __init__(self, transforms):
+    def __init__(self, transforms=None):
         self.transforms = []
+        if transforms is None:
+            transforms = []
         for transform in transforms:
             if isinstance(transform,dict):
                 transform = build_from_cfg(transform,TRANSFORMS)
@@ -93,6 +96,11 @@ class Resize:
             new_w,new_h = size
             bboxes[:,0::2] = bboxes[:,0::2]*float(new_w/width)
             bboxes[:,1::2] = bboxes[:,1::2]*float(new_h/height)
+
+            # clip to border
+            bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, new_w - 1)
+            bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, new_h - 1)
+
             target[key]=bboxes
     
     def _resize_mask(self,target,size):
@@ -105,6 +113,29 @@ class Resize:
             self._resize_boxes(target,image.size)
             target["img_size"]=image.size
         return image, target
+
+@TRANSFORMS.register_module()
+class RotatedResize(Resize):
+
+    def _resize_boxes(self, target,size):
+        for key in ["bboxes","rboxes","polygons"]:
+            if key not in target:
+                continue
+            bboxes = target[key]
+            bboxes = rotated_box_to_poly_np(bboxes)
+
+            width,height = target["img_size"]
+            new_w,new_h = size
+
+            bboxes[:,0::2] = bboxes[:,0::2]*float(new_w/width)
+            bboxes[:,1::2] = bboxes[:,1::2]*float(new_h/height)
+
+            # clip to border
+            bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, new_w - 1)
+            bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, new_h - 1)
+
+            bboxes = poly_to_rotated_box_np(bboxes)
+            target[key]=bboxes
 
 # The image must be a square as we do not expand the image
 class RandomSquareRotate( object ):
@@ -194,6 +225,23 @@ class RandomFlip:
                 self._flip_boxes(target,image.size)
         return image, target
 
+@TRANSFORMS.register_module()
+class RotatedRandomFlip(RandomFlip):
+    def _flip_boxes(self,target,size):
+        w,h = target["img_size"] 
+        for key in ["bboxes","rboxes"]:
+            if key not in target:
+                continue
+            bboxes = target[key]
+            flipped = bboxes.copy()
+            if self.direction == 'horizontal':
+                flipped[..., 0::5] = w - flipped[..., 0::5] - 1
+                flipped[..., 4::5] = norm_angle(np.pi - flipped[..., 4::5])
+            elif self.direction == 'vertical':
+                assert False
+            elif self.direction == 'diagonal':
+                assert False
+            target[key] = flipped
 
 @TRANSFORMS.register_module()
 class Pad:
