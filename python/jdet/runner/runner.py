@@ -69,12 +69,6 @@ class Runner:
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
-            print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-            for p in self.model.parameters()[::-1]:
-                print(p.name())
-                if p.is_stop_grad():
-                    continue
-                print(jt.grad(all_loss,p))
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
 
@@ -101,6 +95,9 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
+            
+            exit(0)
+
         self.epoch +=1
 
 

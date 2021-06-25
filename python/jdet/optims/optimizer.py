@@ -22,7 +22,14 @@ class Optimizer(object):
     
 @OPTIMS.register_module()
 class SGD(optim.SGD,Optimizer):
-    pass 
+    def __init__(self,params, lr, momentum=0, weight_decay=0, dampening=0, nesterov=False,grad_clip=None):
+        super(SGD,self).__init__(params, lr, momentum, weight_decay, dampening, nesterov)
+        self.grad_clip = grad_clip
+
+    def pre_step(self, loss):
+        super(SGD,self).pre_step(loss)
+        if self.grad_clip is not None:
+            self.clip_grad_norm(**self.grad_clip)
 
 @OPTIMS.register_module()
 class Adam(optim.Adam,Optimizer):

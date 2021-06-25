@@ -567,8 +567,8 @@ class _RotationInvariantEncoding(jt.Function):
         return grad_input, None
 
 
-rotation_invariant_encoding = _RotationInvariantEncoding()
-active_rotating_filter = _ActiveRotatingFilter()
+rotation_invariant_encoding = _RotationInvariantEncoding.apply
+active_rotating_filter = _ActiveRotatingFilter.apply
 
 
 class ActiveRotatingFilter(nn.Module):

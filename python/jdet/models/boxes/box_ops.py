@@ -292,7 +292,7 @@ def poly_to_rotated_box_np(polys):
     for poly in polys:
         rotated_box = poly_to_rotated_box_single(poly)
         rotated_boxes.append(rotated_box)
-    return np.array(rotated_boxes)
+    return np.array(rotated_boxes).astype(np.float32)
 
 
 def poly_to_rotated_box(polys):
@@ -380,7 +380,7 @@ def rotated_box_to_poly_np(rrects):
         polys.append(poly)
     polys = np.array(polys)
     polys = get_best_begin_point(polys)
-    return polys
+    return polys.astype(np.float32)
 
 def rotated_box_to_bbox_np(rotatex_boxes):
     polys = rotated_box_to_poly_np(rotatex_boxes)

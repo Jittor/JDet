@@ -801,7 +801,7 @@ class DCN_V2_CONV(jt.Function):
         input_grad,offset_grad,mask_grad,weight_grad,bias_grad = dcn_v2_conv_backward(self.input,self.offset,self.mask,self.weight,self.bias,grad_output,self.stride,self.padding,self.dilation,self.deformable_groups)
         return input_grad,offset_grad,mask_grad,weight_grad,bias_grad,None, None, None, None
 
-dcn_v2_conv = DCN_V2_CONV()
+dcn_v2_conv = DCN_V2_CONV.apply
 
 
 def dcn_v2_pooling_forward(input, bbox, trans, spatial_scale,pooled_size,output_dim,no_trans,group_size,part_size,sample_per_part,trans_std):
@@ -1207,7 +1207,7 @@ class DCN_V2_POOLING(jt.Function):
                                                           self.trans_std)
         return grad_input, None, grad_offset, None, None, None, None, None, None, None, None
 
-dcn_v2_pooling = DCN_V2_POOLING()
+dcn_v2_pooling = DCN_V2_POOLING.apply
 
 
 class DeformConv(nn.Module):

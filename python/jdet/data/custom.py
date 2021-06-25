@@ -56,9 +56,9 @@ class CustomDataset(Dataset):
         assert width == img_info['width'] and height == img_info["height"],"image size is different from annotations"
 
         ann = dict(
-            bboxes=anno['bboxes'],
-            labels=anno['labels'],
-            bboxes_ignore=anno['bboxes_ignore'],
+            bboxes=anno['bboxes'].astype(np.float32),
+            labels=anno['labels'].astype(np.int32),
+            bboxes_ignore=anno['bboxes_ignore'].astype(np.float32),
             classes=self.CLASSES,
             ori_img_size=(width,height),
             img_size=(width,height))
