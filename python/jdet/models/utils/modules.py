@@ -30,7 +30,7 @@ BRICKS.register_module('IN1d', module=nn.InstanceNorm1d)
 BRICKS.register_module('IN2d', module=nn.InstanceNorm2d)
 BRICKS.register_module('IN3d', module=nn.InstanceNorm3d)
 
-BRICKS.register_module(module=nn.ReLU)
+BRICKS.register_module("ReLU",module=nn.ReLU)
 BRICKS.register_module(module=nn.LeakyReLU)
 BRICKS.register_module(module=nn.PReLU)
 # BRICKS.register_module(module=nn.RReLU)

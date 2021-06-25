@@ -598,11 +598,11 @@ class RotationInvariantPooling(nn.Module):
         self.nInputPlane = nInputPlane
         self.nOrientation = nOrientation
         
-        hiddent_dim = int(nInputPlane / nOrientation)
-        self.conv = nn.Sequential(
-            nn.Conv2d(hiddent_dim, nInputPlane, 1, 1),
-            nn.BatchNorm2d(nInputPlane),
-        )
+        # hiddent_dim = int(nInputPlane / nOrientation)
+        # self.conv = nn.Sequential(
+        #     nn.Conv2d(hiddent_dim, nInputPlane, 1, 1),
+        #     nn.BatchNorm2d(nInputPlane),
+        # )
 
     def execute(self, x):
         # x: [N, c, 1, w]
@@ -625,7 +625,7 @@ class ORConv2d(nn.Conv2d):
         super(ORConv2d, self).__init__(
         in_channels, out_channels, kernel_size, 
         stride, padding, dilation, groups, bias)
-        self.indices = self.get_indices()
+        self.indices = self.get_indices().stop_grad()
 
         self.weight = jt.zeros((out_channels, in_channels, self.nOrientation, *self.kernel_size))
         if bias:

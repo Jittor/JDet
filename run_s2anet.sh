@@ -1,0 +1,1 @@
+python3.7 tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --use_cuda --task=train

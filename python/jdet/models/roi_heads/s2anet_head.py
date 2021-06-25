@@ -11,7 +11,7 @@ from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 from jdet.ops.dcn_v2 import DeformConv
 from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 from jdet.ops.nms_rotated import multiclass_nms_rotated
-from jdet.models.boxes.box_converter import delta2bbox_rotated
+from jdet.models.boxes.box_ops import delta2bbox_rotated
 from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
 from jdet.models.boxes.anchor_generator import AnchorGeneratorRotated
 
@@ -46,7 +46,44 @@ class S2ANetHead(nn.Module):
                      alpha=0.25,
                      loss_weight=1.0),
                  loss_odm_bbox=dict(
-                     type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)):
+                     type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
+                 test_cfg=dict(
+                    nms_pre=2000,
+                    min_bbox_size=0,
+                    score_thr=0.05,
+                    nms=dict(type='nms_rotated', iou_thr=0.1),
+                    max_per_img=2000),
+                train_cfg=dict(
+                    fam_cfg=dict(
+                        assigner=dict(
+                            type='MaxIoUAssigner',
+                            pos_iou_thr=0.5,
+                            neg_iou_thr=0.4,
+                            min_pos_iou=0,
+                            ignore_iof_thr=-1,
+                            iou_calculator=dict(type='BboxOverlaps2D_rotated')),
+                        bbox_coder=dict(type='DeltaXYWHABBoxCoder',
+                                        target_means=(0., 0., 0., 0., 0.),
+                                        target_stds=(1., 1., 1., 1., 1.),
+                                        clip_border=True),
+                        allowed_border=-1,
+                        pos_weight=-1,
+                        debug=False),
+                    odm_cfg=dict(
+                        assigner=dict(
+                            type='MaxIoUAssigner',
+                            pos_iou_thr=0.5,
+                            neg_iou_thr=0.4,
+                            min_pos_iou=0,
+                            ignore_iof_thr=-1,
+                            iou_calculator=dict(type='BboxOverlaps2D_rotated')),
+                        bbox_coder=dict(type='DeltaXYWHABBoxCoder',
+                                        target_means=(0., 0., 0., 0., 0.),
+                                        target_stds=(1., 1., 1., 1., 1.),
+                                        clip_border=True),
+                        allowed_border=-1,
+                        pos_weight=-1,
+                        debug=False))):
         super(S2ANetHead, self).__init__()
         self.num_classes = num_classes
         self.in_channels = in_channels
@@ -74,6 +111,9 @@ class S2ANetHead(nn.Module):
         self.loss_fam_bbox = build_from_cfg(loss_fam_bbox,LOSSES)
         self.loss_odm_cls = build_from_cfg(loss_odm_cls,LOSSES)
         self.loss_odm_bbox = build_from_cfg(loss_odm_bbox,LOSSES)
+
+        self.train_cfg = train_cfg
+        self.test_cfg = test_cfg
 
         self.anchor_generators = []
         for anchor_base in self.anchor_base_sizes:
@@ -179,7 +219,7 @@ class S2ANetHead(nn.Module):
             fam_cls_score = None
 
         num_level = self.anchor_strides.index(stride)
-        featmap_size = fam_bbox_pred.shape[-2:]
+        featmap_size = tuple(fam_bbox_pred.shape[-2:])
         if (num_level, featmap_size) in self.base_anchors:
             init_anchors = self.base_anchors[(num_level, featmap_size)]
         else:
@@ -287,8 +327,9 @@ class S2ANetHead(nn.Module):
              gt_bboxes,
              gt_labels,
              img_metas,
-             cfg,
              gt_bboxes_ignore=None):
+        
+        cfg = self.train_cfg.copy()
         featmap_sizes = [featmap.size()[-2:] for featmap in odm_cls_scores]
         assert len(featmap_sizes) == len(self.anchor_generators)
 
@@ -475,6 +516,7 @@ class S2ANetHead(nn.Module):
                    cfg,
                    rescale=False):
         assert len(odm_cls_scores) == len(odm_bbox_preds)
+        cfg = self.test_cfg.copy()
 
         featmap_sizes = [featmap.size()[-2:] for featmap in odm_cls_scores]
         num_levels = len(odm_cls_scores)
@@ -509,6 +551,7 @@ class S2ANetHead(nn.Module):
         """
         Transform outputs for a single batch item into labeled boxes.
         """
+        
         assert len(cls_score_list) == len(bbox_pred_list) == len(mlvl_anchors)
         mlvl_bboxes = []
         mlvl_scores = []
@@ -554,10 +597,28 @@ class S2ANetHead(nn.Module):
                                                         cfg.max_per_img)
         return det_bboxes, det_labels
 
+    
+    def parse_targets(self,targets):
+        img_metas = []
+        gt_bboxes = []
+        gt_bboxes_ignore = []
+        gt_labels = []
+
+        for target in targets:
+            gt_bboxes.append(target["bboxes"])
+            gt_labels.append(target["labels"])
+            gt_bboxes_ignore.append(target["bboxes_ignore"])
+            img_metas.append(dict(
+                img_shape=target["img_size"][::-1],
+                scale_factor=target["scale_factor"],
+                pad_shape = target["pad_shape"]
+            ))
+        return gt_bboxes,gt_labels,img_metas,gt_bboxes_ignore
+
     def execute(self, feats,targets):
         outs = multi_apply(self.forward_single, feats, self.anchor_strides)
         if self.is_training():
-            return self.loss(*outs,targets)
+            return self.loss(*outs,*self.parse_targets(targets))
         else:
             return self.build_results(*outs,targets)
 

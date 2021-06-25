@@ -1,6 +1,8 @@
 import jittor as jt 
 from jdet.ops import box_iou_rotated
+from jdet.utils.registry import BOXES
 
+@BOXES.register_module()
 class BboxOverlaps2D:
     """2D Overlaps (e.g. IoUs, GIoUs) Calculator."""
 
@@ -36,7 +38,8 @@ class BboxOverlaps2D:
         repr_str = self.__class__.__name__ + '()'
         return repr_str
 
-class OrientedBboxOverlaps2D:
+@BOXES.register_module()
+class BboxOverlaps2D_rotated:
     """2D Overlaps (e.g. IoUs, GIoUs) Calculator."""
 
     def __call__(self, bboxes1, bboxes2, mode='iou', is_aligned=False):
@@ -67,7 +70,7 @@ class OrientedBboxOverlaps2D:
         
         assert mode=="iou" and is_aligned==False
         # TODO: add giou....
-        return oriented_bbox_overlaps(bboxes1, bboxes2)
+        return bbox_overlaps_rotated(bboxes1, bboxes2)
 
     def __repr__(self):
         """str: a string describing the module"""
@@ -75,7 +78,7 @@ class OrientedBboxOverlaps2D:
         return repr_str
 
 
-def oriented_bbox_overlaps(rboxes1, rboxes2):
+def bbox_overlaps_rotated(rboxes1, rboxes2):
     ious = box_iou_rotated(rboxes1.float(), rboxes2.float())
     return ious
 

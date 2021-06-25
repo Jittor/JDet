@@ -6,6 +6,7 @@ from PIL import Image
 import numpy as np 
 
 from jdet.utils.registry import DATASETS
+from .transforms import Compose
 
 
 @DATASETS.register_module()
@@ -29,14 +30,14 @@ class CustomDataset(Dataset):
     '''
     CLASSES = None
     def __init__(self,image_dir,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
-        super(COCODataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
+        super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
 
         self.image_dir = os.path.abspath(image_dir) 
         self.anno_file = os.path.abspath(anno_file)
 
         self.transforms = Compose(transforms)
         
-        self.img_infos = jt.load(self.ann_file)
+        self.img_infos = jt.load(self.anno_file)
         if filter_empty_gt:
             self.img_infos = self._filter_imgs()
         self.total_len = len(self.img_infos)
@@ -55,9 +56,9 @@ class CustomDataset(Dataset):
         assert width == img_info['width'] and height == img_info["height"],"image size is different from annotations"
 
         ann = dict(
-            bboxes=ann['bboxes'],
-            labels=ann['labels'],
-            bboxes_ignore=ann['bboxes_ignore'],
+            bboxes=anno['bboxes'],
+            labels=anno['labels'],
+            bboxes_ignore=anno['bboxes_ignore'],
             classes=self.CLASSES,
             ori_img_size=(width,height),
             img_size=(width,height))

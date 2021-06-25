@@ -3,6 +3,7 @@ from jittor import nn
 from jdet.utils.registry import LOSSES
 
 def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=None, reduction="none"):
+    
     max_val = jt.clamp(-output,min_v=0)
     if pos_weight is not None:
         log_weight = (pos_weight-1)*target + 1
@@ -10,7 +11,7 @@ def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=Non
     else:
         loss = (1-target)*output+max_val+jt.log(jt.maximum((-max_val).exp()+(-output -max_val).exp(),1e-10))
     if weight is not None:
-        loss *=weight
+        loss *=weight.broadcast(loss,[1])
 
     if reduction=="mean":
         return loss.mean()
@@ -20,6 +21,9 @@ def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=Non
         return loss
 
 def sigmoid_focal_loss(inputs,targets,weight=None, alpha = -1,gamma = 2,reduction = "none",avg_factor=None):
+    
+    targets = targets.broadcast(inputs,[1])
+    targets = (targets.index(1)+1)==targets
     p = inputs.sigmoid()
     ce_loss = binary_cross_entropy_with_logits(inputs, targets,weight, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)

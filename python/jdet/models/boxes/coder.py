@@ -1,5 +1,7 @@
 from .box_ops import delta2bbox,bbox2delta,delta2bbox_rotated,bbox2delta_rotated
+from jdet.utils.registry import BOXES
 
+@BOXES.register_module()
 class DeltaXYWHBBoxCoder:
     """Delta XYWH BBox coder used in MMDet V1.x.
 
@@ -65,6 +67,7 @@ class DeltaXYWHBBoxCoder:
 
         return decoded_bboxes
 
+@BOXES.register_module()
 class DeltaXYWHABBoxCoder:
     """Delta XYWHA BBox coder.
 

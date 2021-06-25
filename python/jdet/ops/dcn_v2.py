@@ -1248,7 +1248,7 @@ class DeformConv(nn.Module):
 
     def execute(self, x, offset):
         assert x.size(2) > self.kernel_size[0] and x.size(3) > self.kernel_size[1]
-        mask_shape = offset.size()
+        mask_shape = list(offset.size())
         mask_shape[1] //= 2
         mask = jt.ones(mask_shape,x.dtype)
         return dcn_v2_conv(x, offset, mask,

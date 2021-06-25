@@ -26,7 +26,7 @@ class Runner:
         self.resume_path = cfg.resume_path
     
         self.model = build_from_cfg(cfg.model,MODELS)
-        self.optimizer = build_from_cfg(cfg.optim,OPTIMS,params=self.model.parameters())
+        self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=self.model.parameters())
         self.scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=self.optimizer)
         self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
         self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
@@ -69,7 +69,12 @@ class Runner:
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
-            
+            print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            for p in self.model.parameters()[::-1]:
+                print(p.name())
+                if p.is_stop_grad():
+                    continue
+                print(jt.grad(all_loss,p))
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
 

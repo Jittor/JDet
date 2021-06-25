@@ -76,7 +76,7 @@ class Resize:
                 size = int(round(max_size * min_original_size / max_original_size))
 
         if (w <= h and w == size) or (h <= w and h == size):
-            return (h, w)
+            return (h, w),1.
 
         if w < h:
             ow = size
@@ -84,8 +84,9 @@ class Resize:
         else:
             oh = size
             ow = int(size * w / h)
-
-        return (oh, ow)
+        
+        assert oh/h == ow/w
+        return (oh, ow),oh/h
 
     def _resize_boxes(self,target,size):
         for key in ["bboxes","rboxes","polygons"]:
@@ -107,11 +108,12 @@ class Resize:
         pass
 
     def __call__(self, image, target=None):
-        size = self.get_size(image.size)
+        size,scale_factor = self.get_size(image.size)
         image = image.resize(size[::-1],Image.BILINEAR)
         if target is not None:
             self._resize_boxes(target,image.size)
             target["img_size"]=image.size
+            target["scale_factor"]=scale_factor
         return image, target
 
 @TRANSFORMS.register_module()
@@ -262,6 +264,7 @@ class Pad:
         
         new_image = Image.new(image.mode,(pad_w,pad_h),(self.pad_val,)*len(image.split()))
         new_image.paste(image,(0,0,image.size[0],image.size[1]))
+        target["pad_shape"] = (pad_h,pad_w,3)
         
         return new_image,target
     

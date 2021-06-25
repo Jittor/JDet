@@ -15,7 +15,7 @@ class AssignResult:
         if self.labels is not None:
             self.labels = jt.contrib.concat([gt_labels, self.labels])
 
-
+@BOXES.register_module()
 class MaxIoUAssigner:
     """Assign a corresponding gt bbox or background to each bbox.
 
@@ -151,8 +151,8 @@ class MaxIoUAssigner:
                     assigned_gt_inds[gt_argmax_overlaps[i]] = i + 1
 
         if gt_labels is not None:
-            assigned_labels = assigned_gt_inds.new_zeros((num_bboxes,))
-            pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze()
+            assigned_labels = jt.zeros((num_bboxes,),dtype=assigned_gt_inds.dtype)
+            pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(1)
             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[
                     assigned_gt_inds[pos_inds] - 1]

@@ -97,7 +97,7 @@ def images_to_levels(target, num_level_anchors):
     start = 0
     for n in num_level_anchors:
         end = start + n
-        level_targets.append(target[:, start:end].squeeze(0))
+        level_targets.append(target[:, start:end])
         start = end
     return level_targets
 
@@ -124,7 +124,7 @@ def anchor_target_single(flat_anchors,
     inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
                                        img_meta['img_shape'][:2],
                                        cfg.allowed_border)
-    if not inside_flags.any():
+    if not inside_flags.any(0):
         return (None,) * 6
     # assign gt and sample anchors
     anchors = flat_anchors[inside_flags, :]
@@ -143,8 +143,8 @@ def anchor_target_single(flat_anchors,
     num_valid_anchors = anchors.shape[0]
     bbox_targets = jt.zeros_like(anchors)
     bbox_weights = jt.zeros_like(anchors)
-    labels = anchors.new_zeros(num_valid_anchors, dtype=jt.long)
-    label_weights = anchors.new_zeros(num_valid_anchors, dtype=jt.float)
+    labels = jt.zeros(num_valid_anchors).int()
+    label_weights = jt.zeros(num_valid_anchors).float()
 
     pos_inds = sampling_result.pos_inds
     neg_inds = sampling_result.neg_inds
@@ -154,7 +154,7 @@ def anchor_target_single(flat_anchors,
                                                 sampling_result.pos_gt_bboxes)
         else:
             pos_bbox_targets = sampling_result.pos_gt_bboxes
-        bbox_targets[pos_inds, :] = pos_bbox_targets.to(bbox_targets)
+        bbox_targets[pos_inds, :] = pos_bbox_targets.cast(bbox_targets.dtype)
         bbox_weights[pos_inds, :] = 1.0
         if gt_labels is None:
             labels[pos_inds] = 1
