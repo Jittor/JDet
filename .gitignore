@@ -21,3 +21,4 @@ eggs/
 dist
 develop-eggs/
 build/
+.idea
