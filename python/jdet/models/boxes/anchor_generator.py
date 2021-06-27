@@ -85,8 +85,8 @@ class AnchorGeneratorRotated:
         # featmap_size*stride project it to original area
 
         feat_h, feat_w = featmap_size
-        shift_x = jt.arange(0, feat_w) * stride
-        shift_y = jt.arange(0, feat_h) * stride
+        shift_x = jt.arange(0, feat_w) * stride[0]
+        shift_y = jt.arange(0, feat_h) * stride[1]
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
         shift_others = jt.zeros_like(shift_xx)
         shifts = jt.stack(
@@ -214,8 +214,8 @@ class AnchorGenerator:
         # featmap_size*stride project it to original area
 
         feat_h, feat_w = featmap_size
-        shift_x = jt.arange(0, feat_w) * stride
-        shift_y = jt.arange(0, feat_h) * stride
+        shift_x = jt.arange(0, feat_w) * stride[0]
+        shift_y = jt.arange(0, feat_h) * stride[1]
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
         shifts = jt.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
         shifts = shifts.cast(base_anchor.dtype)
@@ -255,7 +255,7 @@ class SSDAnchorGenerator(AnchorGenerator):
 
         self.strides = [(stride, stride) for stride in strides]
         self.input_size = input_size
-        self.centers = [(stride[0] / 2., stride[1] / 2.)
+        self.ctrs = [(stride[0] / 2., stride[1] / 2.)
                         for stride in self.strides]
         self.basesize_ratio_range = basesize_ratio_range
 
@@ -310,7 +310,7 @@ class SSDAnchorGenerator(AnchorGenerator):
         self.scales = anchor_scales
         self.ratios = anchor_ratios
         self.scale_major = scale_major
-        self.center_offset = 0
+        self.ctr_offset = 0
         self.base_anchors = self.gen_base_anchors()
 
     def gen_base_anchors(self):
@@ -320,7 +320,7 @@ class SSDAnchorGenerator(AnchorGenerator):
                 base_size,
                 scales=self.scales[i],
                 ratios=self.ratios[i],
-                ctr=self.centers[i])
+                ctr=self.ctrs[i])
             indices = list(range(len(self.ratios[i])))
             indices.insert(1, len(indices))
             base_anchors = base_anchors[indices]
