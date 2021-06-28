@@ -1233,9 +1233,9 @@ class DeformConv(nn.Module):
 
         self.weight = jt.zeros((out_channels, in_channels,*self.kernel_size))
         if bias:
-          self.bias = jt.zeros((out_channels,))
+            self.bias = jt.zeros((out_channels,))
         else:
-          self.bias = jt.zeros((out_channels,)).stop_grad()
+            self.bias = jt.zeros((out_channels,)).stop_grad()
 
         self.reset_parameters()
 
