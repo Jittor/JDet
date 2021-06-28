@@ -17,9 +17,9 @@ def smooth_l1_loss(pred,target,weight=None,beta=1.,avg_factor=None,reduction="me
         avg_factor = max(loss.shape[0],1)
 
     if reduction == "mean":
-        return loss.sum()/avg_factor
+        loss = loss.sum()/avg_factor
     elif reduction == "sum":
-        return loss.sum()
+        loss = loss.sum()
 
     return loss 
 

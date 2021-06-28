@@ -156,7 +156,7 @@ class ResNet(nn.Module):
             x = self.fc(x)
             if "fc" in self.return_stages:
                 outputs.append(x)
-        return outputs
+        return tuple(outputs)
 
 def _resnet(block, layers, **kwargs):
     model = ResNet(block, layers, **kwargs)
