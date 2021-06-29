@@ -89,3 +89,7 @@ class CustomDataset(Dataset):
             image, anno = self.transforms(image, anno)
 
         return image, anno 
+
+
+    def evaluate(self,results,work_dir,epoch,logger=None):
+        raise NotImplementedError 
