@@ -1,4 +1,5 @@
-import jittor as jt 
+from calendar import c
+import jittor as jt
 import numpy as np
 from jdet.utils.registry import MODELS
 
@@ -6,10 +7,11 @@ from jdet.utils.registry import MODELS
 @MODELS.register_module()
 class AnchorGeneratorRotated:
     def __init__(self, strides, ratios, scales, base_sizes=None, angles=[0,],scale_major=True, centers=None, center_offset=0.5, mode='H'):
-        self.strides = jt.array(strides) #TODO support [h, w] stride
         self.ratios = jt.array(ratios)
         self.scales = jt.array(scales)
-        self.base_sizes = [stride for stride in self.strides] if base_sizes is None else base_sizes
+        self.strides = [(stride, stride) for stride in strides]
+        self.base_sizes = [min(stride) for stride in self.strides
+                           ] if base_sizes is None else base_sizes
         assert(mode in ['H', 'R'])
         self.mode = mode
         self.angles = jt.array(angles) if self.mode == 'R' else jt.array([0.])
@@ -45,8 +47,8 @@ class AnchorGeneratorRotated:
         w = base_size
         h = base_size
         if centers is None:
-            x_ctr = self.center_offset * (w - 1)
-            y_ctr = self.center_offset * (h - 1)
+            x_ctr = self.center_offset * w
+            y_ctr = self.center_offset * h
         else:
             x_ctr, y_ctr = centers
 
@@ -93,12 +95,12 @@ class AnchorGeneratorRotated:
             multi_level_anchors.append(anchors)
         return multi_level_anchors
 
-    def single_level_grid_anchors(self, base_anchor, featmap_size, stride=16):
+    def single_level_grid_anchors(self, base_anchor, featmap_size, stride=(16, 16)):
         # featmap_size*stride project it to original area
 
         feat_h, feat_w = featmap_size
-        shift_x = jt.arange(0, feat_w) * stride
-        shift_y = jt.arange(0, feat_h) * stride
+        shift_x = jt.arange(0, feat_w) * stride[0]
+        shift_y = jt.arange(0, feat_h) * stride[1]
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
         shift_others = jt.zeros_like(shift_xx)
         if (self.mode == 'H'):
@@ -121,7 +123,23 @@ class AnchorGeneratorRotated:
         # then (0, 1), (0, 2), ...
         return all_anchors
 
-    def valid_flags(self, featmap_size, valid_size):
+    def valid_flags(self, featmap_sizes, pad_shape):
+
+        assert self.num_levels == len(featmap_sizes)
+        multi_level_flags = []
+        for i in range(self.num_levels):
+            anchor_stride = self.strides[i]
+            feat_h, feat_w = featmap_sizes[i]
+            h, w = pad_shape[:2]
+            valid_feat_h = min(int(np.ceil(h / anchor_stride[1])), feat_h)
+            valid_feat_w = min(int(np.ceil(w / anchor_stride[0])), feat_w)
+            flags = self.single_level_valid_flags((feat_h, feat_w),
+                                                  (valid_feat_h, valid_feat_w),
+                                                  self.num_base_anchors[i])
+            multi_level_flags.append(flags)
+        return multi_level_flags
+
+    def single_level_valid_flags(self, featmap_size, valid_size, num_base_anchors):
         feat_h, feat_w = featmap_size
         valid_h, valid_w = valid_size
         assert valid_h <= feat_h and valid_w <= feat_w
@@ -131,7 +149,8 @@ class AnchorGeneratorRotated:
         valid_y[:valid_h] = 1
         valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)
         valid = valid_xx & valid_yy
-        valid = valid[:, None].expand((valid.size(0), self.num_base_anchors)).view(-1)
+        valid = valid[:, None].expand(
+            valid.size(0), num_base_anchors).view(-1)
         return valid
 
 @MODELS.register_module()
@@ -188,8 +207,8 @@ class SSDAnchorGenerator(AnchorGeneratorRotated):
 
         self.strides = [(stride, stride) for stride in strides]
         self.input_size = input_size
-        self.centers = [(stride[0] / 2., stride[1] / 2.)
-                        for stride in self.strides]
+        self.ctrs = [(stride[0] / 2., stride[1] / 2.)
+                     for stride in self.strides]
         self.basesize_ratio_range = basesize_ratio_range
 
         # calculate anchor ratios and sizes
@@ -243,7 +262,7 @@ class SSDAnchorGenerator(AnchorGeneratorRotated):
         self.scales = anchor_scales
         self.ratios = anchor_ratios
         self.scale_major = scale_major
-        self.center_offset = 0
+        self.ctr_offset = 0
         self.base_anchors = self.gen_base_anchors()
 
     def gen_base_anchors(self):
@@ -253,7 +272,7 @@ class SSDAnchorGenerator(AnchorGeneratorRotated):
                 base_size,
                 scales=self.scales[i],
                 ratios=self.ratios[i],
-                ctr=self.centers[i])
+                ctr=self.ctrs[i])
             indices = list(range(len(self.ratios[i])))
             indices.insert(1, len(indices))
             base_anchors = base_anchors[indices]
@@ -277,18 +296,25 @@ class SSDAnchorGenerator(AnchorGeneratorRotated):
 
 
 if __name__ == '__main__':
-    anchor_generator = dict(
-        scale_major=False,
-        input_size=300,
-        strides=[8, 16, 32, 64, 100, 300],
-        ratios=([2], [2, 3], [2, 3], [2, 3], [2], [2]),
-        basesize_ratio_range=(0.15, 0.9)),
-    anchor_generator = SSDAnchorGenerator(scale_major=False,
-                                          input_size=300,
-                                          strides=[8, 16, 32, 64, 100, 300],
-                                          ratios=([2], [2, 3], [2, 3],
-                                                  [2, 3], [2], [2]),
-                                          basesize_ratio_range=(0.15, 0.9))
-    anchor_bases = anchor_generator.base_anchors
-    # feat_strides = anchor_generator['strides']
+    anchor_generator_rotated = AnchorGeneratorRotated(strides=[16], base_sizes=[
+        9], scales=[1], ratios=[1])
+    anchor_bases = anchor_generator_rotated.base_anchors
     print(anchor_bases)
+    print(anchor_generator_rotated.grid_anchors([(2, 2)]))
+    print('anchor_generator_rotated')
+    # anchor_generator = AnchorGenerator(strides=[16], base_sizes=[
+    #                                    9], scales=[1], ratios=[1])
+    # anchor_bases = anchor_generator.base_anchors
+    # print(anchor_bases)
+    # print(anchor_generator.grid_anchors([(2, 2)]))
+    # print('anchor_generator')
+
+    ssd_anchor_generator = SSDAnchorGenerator(scale_major=False,
+                                              input_size=300,
+                                              strides=[8],
+                                              ratios=([2],),
+                                              basesize_ratio_range=(0.15, 0.9))
+    anchor_bases = ssd_anchor_generator.base_anchors
+    print(anchor_bases)
+    print(ssd_anchor_generator.grid_anchors([(2, 2)]))
+    print('ssd_anchor_generator')
