@@ -6,7 +6,7 @@ from jdet.utils.registry import MODELS
 
 @MODELS.register_module()
 class AnchorGeneratorRotated:
-    def __init__(self, strides, ratios, scales, base_sizes=None, angles=[0,],scale_major=True, centers=None, center_offset=0.5, mode='H'):
+    def __init__(self, strides, ratios, scales, base_sizes=None, angles=[0, ], scale_major=True, centers=None, center_offset=0.5, mode='H'):
         self.ratios = jt.array(ratios)
         self.scales = jt.array(scales)
         self.strides = [(stride, stride) for stride in strides]
@@ -54,12 +54,18 @@ class AnchorGeneratorRotated:
 
         h_ratios = jt.sqrt(ratios)
         w_ratios = 1 / h_ratios
-        assert self.scale_major, "AnchorGeneratorRotated only support scale-major anchors!"
+        # assert self.scale_major, "AnchorGeneratorRotated only support scale-major anchors!"
 
-        ws = (w * w_ratios[:, None, None] * scales[None, :, None] *
-              jt.ones_like(angles)[None, None, :]).view(-1)
-        hs = (h * h_ratios[:, None, None] * scales[None, :, None] *
-              jt.ones_like(angles)[None, None, :]).view(-1)
+        if self.scale_major and self.mode == 'R':
+            ws = (w * w_ratios[:, None, None] * scales[None, :, None] *
+                  jt.ones_like(angles)[None, None, :]).view(-1)
+            hs = (h * h_ratios[:, None, None] * scales[None, :, None] *
+                  jt.ones_like(angles)[None, None, :]).view(-1)
+        else:
+            ws = (w * scales[:, None, None] * w_ratios[None, :, None] *
+                  jt.ones_like(angles)[None, None, :]).view(-1)
+            hs = (h * scales[:, None, None] * h_ratios[None, :, None] *
+                  jt.ones_like(angles)[None, None, :]).view(-1)
         angles = angles.repeat(len(scales) * len(ratios))
 
         # use float anchor and the anchor's center is aligned with the
@@ -68,11 +74,11 @@ class AnchorGeneratorRotated:
         y_ctr += jt.zeros_like(ws)
         if (self.mode == 'H'):
             base_anchors = jt.stack(
-                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs, 
+                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs,
                  x_ctr + 0.5 * ws, y_ctr + 0.5 * hs], dim=-1)
         else:
             base_anchors = jt.stack(
-                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs, 
+                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs,
                  x_ctr + 0.5 * ws, y_ctr + 0.5 * hs, angles], dim=-1)
         return base_anchors
 
@@ -153,6 +159,7 @@ class AnchorGeneratorRotated:
             valid.size(0), num_base_anchors).view(-1)
         return valid
 
+
 @MODELS.register_module()
 class AnchorGeneratorYangXue(AnchorGeneratorRotated):
     def __init__(self, yx_base_size, **kwargs):
@@ -173,13 +180,14 @@ class AnchorGeneratorYangXue(AnchorGeneratorRotated):
         w_ratios = 1 / h_ratios
         assert self.scale_major, "AnchorGeneratorRotated only support scale-major anchors!"
 
-        ws = np.round(w * w_ratios[:, None, None] / base_size * self.yx_base_size)
+        ws = np.round(w * w_ratios[:, None, None] /
+                      base_size * self.yx_base_size)
         hs = np.round(ws * ratios[:, None, None])
         ws = (ws / self.yx_base_size * base_size * scales[None, :, None] *
-            jt.ones_like(angles)[None, None, :]).view(-1)
+              jt.ones_like(angles)[None, None, :]).view(-1)
         # hs = np.round(h * h_ratios[:, None, None])
         hs = (hs / self.yx_base_size * base_size * scales[None, :, None] *
-            jt.ones_like(angles)[None, None, :]).view(-1)
+              jt.ones_like(angles)[None, None, :]).view(-1)
         angles = angles.repeat(len(scales) * len(ratios))
 
         # use float anchor and the anchor's center is aligned with the
@@ -188,13 +196,14 @@ class AnchorGeneratorYangXue(AnchorGeneratorRotated):
         y_ctr += jt.zeros_like(ws)
         if (self.mode == 'H'):
             base_anchors = jt.stack(
-                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs, 
+                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs,
                  x_ctr + 0.5 * ws, y_ctr + 0.5 * hs], dim=-1)
         else:
             base_anchors = jt.stack(
-                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs, 
+                [x_ctr - 0.5 * ws, y_ctr - 0.5 * hs,
                  x_ctr + 0.5 * ws, y_ctr + 0.5 * hs, angles], dim=-1)
         return base_anchors
+
 
 class SSDAnchorGenerator(AnchorGeneratorRotated):
     def __init__(self,
@@ -202,14 +211,16 @@ class SSDAnchorGenerator(AnchorGeneratorRotated):
                  ratios,
                  basesize_ratio_range,
                  input_size=300,
-                 scale_major=True):
+                 scale_major=True,
+                 mode='H'):
         assert len(strides) == len(ratios)
 
         self.strides = [(stride, stride) for stride in strides]
         self.input_size = input_size
-        self.ctrs = [(stride[0] / 2., stride[1] / 2.)
-                     for stride in self.strides]
+        self.centers = [(stride[0] / 2., stride[1] / 2.)
+                        for stride in self.strides]
         self.basesize_ratio_range = basesize_ratio_range
+        self.mode = mode
 
         # calculate anchor ratios and sizes
         min_ratio, max_ratio = basesize_ratio_range
@@ -272,7 +283,8 @@ class SSDAnchorGenerator(AnchorGeneratorRotated):
                 base_size,
                 scales=self.scales[i],
                 ratios=self.ratios[i],
-                ctr=self.ctrs[i])
+                angles=jt.array([0, ]),
+                centers=self.centers[i])
             indices = list(range(len(self.ratios[i])))
             indices.insert(1, len(indices))
             base_anchors = base_anchors[indices]
@@ -309,11 +321,12 @@ if __name__ == '__main__':
     # print(anchor_generator.grid_anchors([(2, 2)]))
     # print('anchor_generator')
 
-    ssd_anchor_generator = SSDAnchorGenerator(scale_major=False,
-                                              input_size=300,
-                                              strides=[8],
-                                              ratios=([2],),
-                                              basesize_ratio_range=(0.15, 0.9))
+    ssd_anchor_generator = SSDAnchorGenerator(
+        scale_major=False,
+        input_size=300,
+        strides=[8],
+        ratios=([2],),
+        basesize_ratio_range=(0.15, 0.9))
     anchor_bases = ssd_anchor_generator.base_anchors
     print(anchor_bases)
     print(ssd_anchor_generator.grid_anchors([(2, 2)]))
