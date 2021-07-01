@@ -26,7 +26,7 @@ dataset:
         type: COCODataset
         root: /mnt/disk/lxl/dataset/coco/images/train2017
         anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json
-        batch_size: 16
+        batch_size: 8
         num_workers: 4
         shuffle: True
         filter_empty_gt: True
@@ -55,9 +55,9 @@ dataset:
               mean: [123.675, 116.28, 103.53]
               std: [58.395, 57.12, 57.375]
 
-optim:
+optimizer:
     type: "SGD"
-    lr: 0.01
+    lr: 0.005
     momentum: 0.9
     weight_decay: 0.0001
 

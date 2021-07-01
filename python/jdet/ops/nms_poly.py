@@ -1,4 +1,5 @@
 import jittor as jt 
+from shapely.geometry import Polygon
 
 NMS_POLY_HEADER1 = r'''
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved

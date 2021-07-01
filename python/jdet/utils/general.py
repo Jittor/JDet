@@ -12,7 +12,7 @@ def sync(data,reduce_mode="mean",to_numpy=True):
         sync data and convert data to numpy
     """
     def _sync(data):
-        if isinstance(data,list):
+        if isinstance(data,(list,tuple)):
             data =  [_sync(d) for d in data]
         elif isinstance(data,dict):
             data = {k:_sync(d) if isinstance(d,jt.Var) else d for k,d in data.items()}

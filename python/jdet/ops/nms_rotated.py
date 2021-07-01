@@ -442,7 +442,6 @@ ML_NMS_ROTATED_CPU_SRC=r'''
     for (int _j = _i + 1; _j < ndets; _j++) {
       auto j = order[_j];
       if (suppressed[j] == 1) {
-          printf("fuxk\n");
         continue;
       }
 
@@ -550,7 +549,7 @@ def multiclass_nms_rotated(multi_bboxes,
     if multi_bboxes.shape[1] > 5:
         bboxes = multi_bboxes.view(multi_scores.size(0), -1, 5)[:, 1:]
     else:
-        bboxes = multi_bboxes[:, None].expand(-1, num_classes, 5)
+        bboxes = multi_bboxes[:, None].expand((multi_bboxes.shape[0], num_classes, 5))
     scores = multi_scores[:, 1:]
 
     # filter out boxes with low scores

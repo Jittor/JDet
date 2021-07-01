@@ -124,7 +124,7 @@ class S2ANetHead(nn.Module):
         self._init_layers()
 
     def _init_layers(self):
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.fam_reg_convs = nn.ModuleList()
         self.fam_cls_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
@@ -513,7 +513,6 @@ class S2ANetHead(nn.Module):
                    odm_cls_scores,
                    odm_bbox_preds,
                    img_metas,
-                   cfg,
                    rescale=False):
         assert len(odm_cls_scores) == len(odm_bbox_preds)
         cfg = self.test_cfg.copy()
@@ -595,24 +594,28 @@ class S2ANetHead(nn.Module):
                                                         mlvl_scores,
                                                         cfg.score_thr, cfg.nms,
                                                         cfg.max_per_img)
+        # [x,y,w,h,a,score],
         return det_bboxes, det_labels
 
     
-    def parse_targets(self,targets):
+    def parse_targets(self,targets,is_train=True):
         img_metas = []
         gt_bboxes = []
         gt_bboxes_ignore = []
         gt_labels = []
 
         for target in targets:
-            gt_bboxes.append(target["bboxes"])
-            gt_labels.append(target["labels"])
-            gt_bboxes_ignore.append(target["bboxes_ignore"])
+            if is_train:
+                gt_bboxes.append(target["bboxes"])
+                gt_labels.append(target["labels"])
+                gt_bboxes_ignore.append(target["bboxes_ignore"])
             img_metas.append(dict(
                 img_shape=target["img_size"][::-1],
                 scale_factor=target["scale_factor"],
                 pad_shape = target["pad_shape"]
             ))
+        if not is_train:
+            return img_metas
         return gt_bboxes,gt_labels,img_metas,gt_bboxes_ignore
 
     def execute(self, feats,targets):
@@ -620,7 +623,7 @@ class S2ANetHead(nn.Module):
         if self.is_training():
             return self.loss(*outs,*self.parse_targets(targets))
         else:
-            return self.build_results(*outs,targets)
+            return self.get_bboxes(*outs,self.parse_targets(targets,is_train=False))
 
 def bbox_decode(
         bbox_preds,

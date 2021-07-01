@@ -13,6 +13,7 @@ coco128
 *.zip
 .vscode
 exp*
+python/jdet/data/devkits/polyiou
 
 eggs/
 .eggs/
@@ -21,3 +22,6 @@ eggs/
 dist
 develop-eggs/
 build/
+
+*.pth
+*.jpg
