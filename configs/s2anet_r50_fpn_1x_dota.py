@@ -100,7 +100,7 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375]),
             
         ],
-        batch_size=4,
+        batch_size=2,
         num_workers=4,
         shuffle=True
     ),
@@ -146,7 +146,7 @@ dataset = dict(
 
 optimizer = dict(
     type='SGD', 
-    lr=0.01, 
+    lr=0.01*(1/8.), 
     momentum=0.9, 
     weight_decay=0.0001,
     grad_clip=dict(
