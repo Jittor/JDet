@@ -2,7 +2,7 @@
 model:
     type: RetinaNet
     backbone:
-        type: Resnet50
+        type: Resnet50_v1d
         return_stages:  [layer1,layer2,layer3,layer4]
         pretrained: True
     neck:
@@ -10,26 +10,40 @@ model:
         in_channels: [256,512,1024,2048]
         out_channels: 256
         start_level: 1
-        add_extra_convs: on_input
+        add_extra_convs: on_output
         num_outs: 5
+        upsample_cfg:
+            mode: bilinear
+            tf_mode: True
+        upsample_div_factor: 2
+        relu_before_extra_convs: True
     rpn_net:
         type: RetinaHead
-        n_class: 80
+        n_class: 15
         in_channels: 256
         stacked_convs: 4
-        feat_strides: [8, 16, 32, 64, 128]
-        octave_base_scale: 4
-        scales_per_octave: 3
-        ratios: [0.5, 1.0, 2.0]
+        mode: R
+        score_threshold: 0.05
+        nms_iou_threshold: 0.3
 
+        anchor_generator:
+          type: AnchorGeneratorYangXue
+          strides: [8, 16, 32, 64, 128]
+          ratios: [1, 0.5, 2.0, 0.3333333333333333, 3.0, 5.0, 0.2]
+          scales: [1, 1.2599210498948732, 1.5874010519681994]
+          base_sizes: [32, 64, 128, 256, 512]
+          angles: [-90, -75, -60, -45, -30, -15]
+          mode: H
+          yx_base_size: 4.
 dataset:
     train:
         type: COCODataset
-        root: /home/lxl/workspace/JDet/coco128/images/train2017
-        anno_file: /home/lxl/workspace/JDet/coco128/detections_train2017.json
-        batch_size: 2
+        root: /mnt/disk/lxl/dataset/coco/images/train2017
+        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json
+        batch_size: 16
         num_workers: 4
         shuffle: True
+        filter_empty_gt: True
         transforms:
             - type: "Resize"
               min_size: [800]
@@ -43,38 +57,37 @@ dataset:
               std: [58.395, 57.12, 57.375]
     val:
         type: COCODataset
-        root: /home/lxl/workspace/JDet/coco128/images/train2017
-        anno_file: /home/lxl/workspace/JDet/coco128/detections_train2017.json
+        root: /mnt/disk/lxl/dataset/coco/images/val2017
+        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json
         batch_size: 2
         num_workers: 4
-        shuffle: False
+        filter_empty_gt: False
         transforms:
-            - type: "Resize"
-              min_size: [800]
-              max_size: 1333
             - type: Pad
               size_divisor: 32
             - type: "Normalize"
               mean: [123.675, 116.28, 103.53]
               std: [58.395, 57.12, 57.375]
+
 optim:
     type: "SGD"
-    lr: 0.00125
+    lr: 0.01
     momentum: 0.9
     weight_decay: 0.0001
 
 scheduler:
-    type: WarmUpLR
+    type: StepLR
     warmup: linear
     warmup_iters: 500
     warmup_ratio: 0.001
+    milestones: [8, 11]
 
 logger:
     type: "RunLogger"
 
-work_dir: "./exp"
-max_epoch: 300
-eval_interval: 10
-log_interval: 20
-checkpoint_interval: 100
+work_dir: "./exp/retinanet"
+max_epoch: 12
+eval_interval: 1
+log_interval: 50
+checkpoint_interval: 1
 

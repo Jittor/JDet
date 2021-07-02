@@ -12,7 +12,7 @@ model:
         start_level: 1
         add_extra_convs: on_input
         num_outs: 5
-    roi_head:
+    rpn_net:
         type: RetinaHead
         n_class: 80
         in_channels: 256
