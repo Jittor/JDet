@@ -1,5 +1,4 @@
 import jittor as jt 
-
 ML_NMS_ROTATED_HEADER1 = r'''
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 #undef out
@@ -283,13 +282,10 @@ HOST_DEVICE_INLINE T
 single_box_iou_rotated(T const* const box1_raw, T const* const box2_raw) {
   // we dont calculate IoU if two bboxes belong to two classes and set it to zero
   // box: [x,y,w,h,a,l]
-  if (box1_raw[5] != box2_raw[5])
-  {
+  if (BOX_LENGTH==6 && box1_raw[5] != box2_raw[5])
     return 0.0;
-  }
   // shift center to the middle point to achieve higher precision in result
   RotatedBox<T> box1, box2;
-
 
   auto center_shift_x = (box1_raw[0] + box2_raw[0]) / 2.0;
   auto center_shift_y = (box1_raw[1] + box2_raw[1]) / 2.0;
@@ -374,26 +370,27 @@ __global__ void nms_rotated_cuda_kernel(
   // Compared to nms_cuda_kernel, where each box is represented with 4 values
   // (x1, y1, x2, y2), each rotated box is represented with 5 values
   // (x_center, y_center, width, height, angle_degrees) here.
-  __shared__ T block_boxes[threadsPerBlock * 6];
+  __shared__ T block_boxes[threadsPerBlock * BOX_LENGTH];
   if (threadIdx.x < col_size) {
-    block_boxes[threadIdx.x * 6 + 0] =
-        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * 6 + 0];
-    block_boxes[threadIdx.x * 6 + 1] =
-        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * 6 + 1];
-    block_boxes[threadIdx.x * 6 + 2] =
-        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * 6 + 2];
-    block_boxes[threadIdx.x * 6 + 3] =
-        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * 6 + 3];
-    block_boxes[threadIdx.x * 6 + 4] =
-        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * 6 + 4];
-    block_boxes[threadIdx.x * 6 + 5] =
-        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * 6 + 5];
+    block_boxes[threadIdx.x * BOX_LENGTH + 0] =
+        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 0];
+    block_boxes[threadIdx.x * BOX_LENGTH + 1] =
+        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 1];
+    block_boxes[threadIdx.x * BOX_LENGTH + 2] =
+        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 2];
+    block_boxes[threadIdx.x * BOX_LENGTH + 3] =
+        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 3];
+    block_boxes[threadIdx.x * BOX_LENGTH + 4] =
+        dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 4];
+    if (BOX_LENGTH >= 6)
+      block_boxes[threadIdx.x * BOX_LENGTH + 5] =
+          dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 5];
   }
   __syncthreads();
 
   if (threadIdx.x < row_size) {
     const int cur_box_idx = threadsPerBlock * row_start + threadIdx.x;
-    const T* cur_box = dev_boxes + cur_box_idx * 6;
+    const T* cur_box = dev_boxes + cur_box_idx * BOX_LENGTH;
     int i = 0;
     unsigned long long t = 0;
     int start = 0;
@@ -403,7 +400,7 @@ __global__ void nms_rotated_cuda_kernel(
     for (i = start; i < col_size; i++) {
       // Instead of devIoU used by original horizontal nms, here
       // we use the single_box_iou_rotated function from box_iou_rotated_utils.h
-      if (single_box_iou_rotated<T>(cur_box, block_boxes + i * 6) >
+      if (single_box_iou_rotated<T>(cur_box, block_boxes + i * BOX_LENGTH) >
           iou_threshold) {
         t |= 1ULL << i;
       }
@@ -421,8 +418,6 @@ ML_NMS_ROTATED_CPU_SRC=r'''
   @alias(keep_t,out0)
 
   const int ndets = dets_shape0;
-  const int nps = dets_shape1;
-
   auto suppressed = suppressed_t_p;
   auto keep = keep_t_p;
   auto order = order_t_p;
@@ -442,11 +437,10 @@ ML_NMS_ROTATED_CPU_SRC=r'''
     for (int _j = _i + 1; _j < ndets; _j++) {
       auto j = order[_j];
       if (suppressed[j] == 1) {
-          printf("fuxk\n");
         continue;
       }
 
-      auto ovr = single_box_iou_rotated(dets_p+i*nps, dets_p+j*nps);
+      auto ovr = single_box_iou_rotated(dets_p+i*BOX_LENGTH, dets_p+j*BOX_LENGTH);
       if (ovr >= iou_threshold) {
         suppressed[j] = 1;
       }
@@ -498,16 +492,23 @@ ML_NMS_ROTATED_CUDA_SRC=r'''
 exe.allocator->free(mask_p, matrices_size, mask_allocation);
 '''
 
-def ml_nms_rotated_cpu(dets,order_t,iou_threshold):
+def nms_rotated_cpu(dets,order_t,iou_threshold,box_length=6):
     suppressed_t = jt.zeros((dets.shape[0],)).uint8()
 
-    keep = jt.code((dets.shape[0],),"bool",[dets,order_t,suppressed_t],cpu_header=ML_NMS_ROTATED_CPU_HEADER,
-        cpu_src=f"const float iou_threshold = {iou_threshold};"+ML_NMS_ROTATED_CPU_SRC)
+    keep = jt.code((dets.shape[0],),"bool",[dets,order_t,suppressed_t],
+        cpu_header=f'''
+        #define BOX_LENGTH {box_length}
+        '''+ML_NMS_ROTATED_CPU_HEADER,
+        cpu_src=f"const float iou_threshold = {iou_threshold};"
+           +ML_NMS_ROTATED_CPU_SRC)
     return keep
 
-def ml_nms_rotated_cuda(dets,order_t,iou_threshold) :
+def nms_rotated_cuda(dets,order_t,iou_threshold,box_length=6) :
     dets_sorted = dets[order_t,:]
-    keep = jt.code((dets.shape[0],),"bool",[order_t,dets_sorted],cuda_header=ML_NMS_ROTATED_CUDA_HEADER,
+    keep = jt.code((dets.shape[0],),"bool",[order_t,dets_sorted],
+        cuda_header=f'''
+        #define BOX_LENGTH {box_length}
+        '''+ML_NMS_ROTATED_CUDA_HEADER,
         cuda_src=f"const float iou_threshold = {iou_threshold};"+ML_NMS_ROTATED_CUDA_SRC)
     return keep 
 
@@ -518,10 +519,24 @@ def ml_nms_rotated(dets,scores,labels,iou_threshold):
     order_t,_ = scores.argsort(0,descending=True)
 
     if jt.flags.use_cuda:
-        keep =  ml_nms_rotated_cuda(dets,order_t,iou_threshold)
+        keep =  nms_rotated_cuda(dets,order_t,iou_threshold)
     else:
-        keep =  ml_nms_rotated_cpu(dets,order_t,iou_threshold)
+        keep =  nms_rotated_cpu(dets,order_t,iou_threshold)
     return jt.where(keep)[0]
+
+def nms_rotated(dets,scores,iou_threshold):
+    if dets.numel()==0:
+      return jt.array([])
+    assert dets.numel()>0 and dets.ndim==2
+    assert dets.dtype==scores.dtype
+    order_t,_ = scores.argsort(0,descending=True)
+
+    if jt.flags.use_cuda:
+        keep =  nms_rotated_cuda(dets,order_t,iou_threshold,box_length=5)
+    else:
+        keep =  nms_rotated_cpu(dets,order_t,iou_threshold,box_length=5)
+    # return jt.where(keep)[0]
+    return order_t[keep]
 
 def multiclass_nms_rotated(multi_bboxes,
                            multi_scores,
@@ -550,7 +565,7 @@ def multiclass_nms_rotated(multi_bboxes,
     if multi_bboxes.shape[1] > 5:
         bboxes = multi_bboxes.view(multi_scores.size(0), -1, 5)[:, 1:]
     else:
-        bboxes = multi_bboxes[:, None].expand(-1, num_classes, 5)
+        bboxes = multi_bboxes[:, None].expand((multi_bboxes.shape[0], num_classes, 5))
     scores = multi_scores[:, 1:]
 
     # filter out boxes with low scores
@@ -585,6 +600,7 @@ def test_ml_nms_rotated():
     scores = jt.array([0.1,0.2,0.3])
     labels = jt.array([1,1,1])
     print(ml_nms_rotated(dets,scores,labels,0.3))
+    print(nms_rotated(dets,scores,0.3))
 
 if __name__ == "__main__":
     test_ml_nms_rotated()
