@@ -3,6 +3,7 @@ model = dict(
     type='S2ANet',
     backbone=dict(
         type='Resnet50',
+        frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
     neck=dict(
@@ -90,19 +91,20 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5),
+            dict(type='RotatedRandomFlip', prob=0.0),
             dict(
                 type = "Pad",
                 size_divisor=32),
             dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375]),
+                std = [58.395, 57.12, 57.375],
+                to_bgr=False,)
             
         ],
-        batch_size=2,
+        batch_size=1,
         num_workers=4,
-        shuffle=True
+        shuffle=False
     ),
     # val=dict(
     #     type="DOTADataset",
@@ -137,7 +139,8 @@ dataset = dict(
             dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375]),
+                std = [58.395, 57.12, 57.375],
+                to_bgr=False,),
         ],
         num_workers=4,
         batch_size=1,
@@ -146,7 +149,7 @@ dataset = dict(
 
 optimizer = dict(
     type='SGD', 
-    lr=0.01*(1/8.), 
+    lr=0.0,#0.01*(1/8.), 
     momentum=0.9, 
     weight_decay=0.0001,
     grad_clip=dict(

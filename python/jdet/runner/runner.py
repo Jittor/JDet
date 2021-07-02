@@ -65,6 +65,10 @@ class Runner:
 
     def train(self):
         self.model.train()
+        # import torch
+        # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
+        # TODO : remove thiss
+        self.model.backbone.train()
         start_time = time.time()
         img_num = 0
         for batch_idx,(images,targets) in enumerate(self.train_dataset):

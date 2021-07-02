@@ -95,10 +95,12 @@ class Bottleneck(nn.Module):
 @BACKBONES.register_module()
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, return_stages=["layer4"],num_classes=None, groups=1, width_per_group=64, replace_stride_with_dilation=None, norm_layer=None):
+    def __init__(self, block, layers, return_stages=["layer4"],frozen_stages=-1,norm_eval=True,num_classes=None, groups=1, width_per_group=64, replace_stride_with_dilation=None, norm_layer=None):
         super(ResNet, self).__init__()
         if (norm_layer is None):
             norm_layer = nn.BatchNorm
+        self.frozen_stages = frozen_stages
+        self.norm_eval = norm_eval
         self._norm_layer = norm_layer
         self.inplanes = 64
         self.dilation = 1
@@ -122,6 +124,7 @@ class ResNet(nn.Module):
         if num_classes is not None:
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
             self.fc = nn.Linear((512 * block.expansion), num_classes)
+        self._freeze_stages()
 
     def _make_layer(self, block, planes, blocks, stride=1, dilate=False):
         norm_layer = self._norm_layer
@@ -137,7 +140,20 @@ class ResNet(nn.Module):
         self.inplanes = (planes * block.expansion)
         for _ in range(1, blocks):
             layers.append(block(self.inplanes, planes, groups=self.groups, base_width=self.base_width, dilation=self.dilation, norm_layer=norm_layer))
-        return nn.Sequential(*layers)        
+        return nn.Sequential(*layers)      
+
+    def _freeze_stages(self):
+        if self.frozen_stages >= 0:
+            self.bn1.eval()
+            for m in [self.conv1, self.bn1]:
+                for param in m.parameters():
+                    param.stop_grad()  
+
+        for i in range(1, self.frozen_stages + 1):
+            m = getattr(self, 'layer{}'.format(i))
+            m.eval()
+            for param in m.parameters():
+                param.stop_grad()  
 
     def execute(self, x):
         outputs = []
@@ -157,6 +173,16 @@ class ResNet(nn.Module):
             if "fc" in self.return_stages:
                 outputs.append(x)
         return tuple(outputs)
+
+    def train(self):
+        super(ResNet, self).train()
+        self._freeze_stages()
+        if self.norm_eval:
+            for m in self.modules():
+                # trick: eval have effect on BatchNorm only
+                if isinstance(m, nn.BatchNorm):
+                    m.eval()
+
 
 def _resnet(block, layers, **kwargs):
     model = ResNet(block, layers, **kwargs)
