@@ -2,11 +2,13 @@ import math
 
 from jdet.models.losses.focal_loss import sigmoid_focal_loss
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
-from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, generate_anchor_base, grid_anchors, loc2bbox
+from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r
 from jdet.utils.registry import HEADS
 from jittor import nn,init 
 import jittor as jt
-
+from jdet.utils.registry import build_from_cfg,MODELS
+import numpy as np
+import jdet
 
 @HEADS.register_module()
 class RetinaHead(nn.Module):
@@ -27,40 +29,34 @@ class RetinaHead(nn.Module):
         >>> assert box_per_anchor == 4
     """
 
+    #TODO: check 'H' mode
     def __init__(self,
                  n_class,
                  in_channels,
                  feat_channels=256,
                  stacked_convs=4,
-                 octave_base_scale=4,
-                 scales_per_octave=3,
-                 ratios=[0.5, 1.0, 2.0],
-                 feat_strides=[8, 16, 32, 64, 128],
                  pos_iou_thresh=0.5,
                  neg_iou_thresh_hi=0.4,
                  neg_iou_thresh_lo=0.,
                  nms_pre = 1000,
                  max_dets = 100,
+                 anchor_generator=None,
+                 mode='H',
+                 score_threshold = 0.05,
+                 nms_iou_threshold = 0.5
                  ):
         super(RetinaHead, self).__init__()
 
-        self.feat_strides = feat_strides
         self.pos_iou_thresh = pos_iou_thresh
         self.neg_iou_thresh_hi = neg_iou_thresh_hi
         self.neg_iou_thresh_lo = neg_iou_thresh_lo
         self.stacked_convs = stacked_convs
         self.nms_pre = nms_pre
         self.max_dets = max_dets
-
+        self.mode = mode
         
-        self.anchor_bases = [generate_anchor_base(base_size,
-                                                  ratios=ratios,
-                                                  scales=None,
-                                                  octave_base_scale=octave_base_scale,
-                                                  scales_per_octave=scales_per_octave
-                                                  ) 
-                                                  for base_size in feat_strides]
-        n_anchor = self.anchor_bases[0].shape[0]
+        self.anchor_generator = build_from_cfg(anchor_generator, MODELS)
+        n_anchor = self.anchor_generator.num_base_anchors[0]
 
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
@@ -71,11 +67,14 @@ class RetinaHead(nn.Module):
         
         self.n_class = n_class
         self.retina_cls = nn.Conv(feat_channels,n_anchor * n_class,3,padding=1)
-        self.retina_reg = nn.Conv(feat_channels, n_anchor * 4, 3, padding=1)
+        if (self.mode == 'H'):
+            self.retina_reg = nn.Conv(feat_channels, n_anchor * 4, 3, padding=1)
+        else:
+            self.retina_reg = nn.Conv(feat_channels, n_anchor * 5, 3, padding=1)
 
         self.roi_beta = 0.
-        self.nms_thresh = 0.5
-        self.score_thresh = 0.05
+        self.nms_thresh = nms_iou_threshold
+        self.score_thresh = score_threshold
 
         self.init_weights()
 
@@ -96,7 +95,7 @@ class RetinaHead(nn.Module):
         init.constant_(self.retina_cls.bias, bias_value)
         init.gauss_(self.retina_cls.weight,0,0.01)
 
-    def execute_single(self, x,anchor_base,feat_stride):
+    def execute_single(self, x):
         """Forward feature of a single scale level.
 
         Args:
@@ -111,9 +110,6 @@ class RetinaHead(nn.Module):
         """
         n, _, hh, ww = x.shape
         
-        anchor = grid_anchors(anchor_base,feat_stride, (hh, ww))
-        anchor = jt.array(anchor)
-        
         cls_feat = x
         reg_feat = x
         for cls_conv in self.cls_convs:
@@ -123,10 +119,10 @@ class RetinaHead(nn.Module):
         cls_score = self.retina_cls(cls_feat)
         bbox_pred = self.retina_reg(reg_feat)
 
-        bbox_pred = bbox_pred.permute(0,2,3,1).reshape(-1,4)
+        bbox_pred = bbox_pred.permute(0,2,3,1).reshape(-1,5)
         cls_score = cls_score.permute(0,2,3,1).reshape(-1,self.n_class)
 
-        return bbox_pred, cls_score, anchor
+        return bbox_pred, cls_score
     
     def assign_labels(self,roi, bbox, label):
         iou = bbox_iou(roi, bbox)
@@ -148,40 +144,86 @@ class RetinaHead(nn.Module):
         return gt_roi_loc, gt_roi_label
 
     def get_bboxes(self,indexes,proposals,bbox_pred,score,targets):
-        cls_bbox = loc2bbox(proposals,bbox_pred)
+        if (self.mode == "H"):
+            cls_bbox = loc2bbox(proposals,bbox_pred)
+        else:
+            h = proposals[:, 2:3] - proposals[:, 0:1]
+            w = proposals[:, 3:4] - proposals[:, 1:2]
+            cx = proposals[:, 0:1] + 0.5 * h
+            cy = proposals[:, 1:2] + 0.5 * w
+            a = proposals[:, 4:5]
+            
+            proposals = jt.concat([cx, cy, w, h, a], 1)
+            
+            remain_mask = w > h
+            convert_mask = 1 - remain_mask
+            remain_coords = proposals * remain_mask.reshape([-1, 1])
+
+            proposals[:, [2, 3]] = proposals[:, [3, 2]]
+            proposals[:, 4] += 90
+
+            convert_coords = proposals * convert_mask.reshape([-1, 1])
+            proposals = remain_coords + convert_coords
+            cx, cy, w, h, a = proposals[:, 0:1], proposals[:, 1:2], proposals[:, 2:3], proposals[:, 3:4], proposals[:, 4:5]
+            proposals = jt.concat([cx - 0.5 * w, cy - 0.5 * h, cx + 0.5 * w, cy + 0.5 * h, a], 1)
+            cls_bbox = loc2bbox_r(proposals,bbox_pred)
+
         probs = score.sigmoid()
         results = []
 
         for i,target in enumerate(targets):
             img_size = target["img_size"]
             ori_img_size = target["ori_img_size"]
+            assert(ori_img_size[0]/ori_img_size[1] == img_size[0]/img_size[1]) # too keep the angle
 
             index = jt.where(indexes==i)[0]
             score = probs[index,:]
             bbox = cls_bbox[index,:]
-            bbox[:,0::2] = jt.clamp(bbox[:,0::2],min_v=0,max_v=img_size[0])*(ori_img_size[0]/img_size[0])
-            bbox[:,1::2] = jt.clamp(bbox[:,1::2],min_v=0,max_v=img_size[1])*(ori_img_size[1]/img_size[1])
+            # bbox[:,[0,2]] = jt.clamp(bbox[:,[0,2]],min_v=0,max_v=img_size[0])*(ori_img_size[0]/img_size[0])
+            # bbox[:,[1,3]] = jt.clamp(bbox[:,[1,3]],min_v=0,max_v=img_size[1])*(ori_img_size[1]/img_size[1])
+            
+            bbox[:,[0,2]] = bbox[:,[0,2]]*(ori_img_size[0]/img_size[0])
+            bbox[:,[1,3]] = bbox[:,[1,3]]*(ori_img_size[1]/img_size[1])
+            
             boxes = []
             scores = []
             labels = []
             for j in range(self.n_class):
                 score_j = score[:,j]
                 bbox_j = bbox
-                mask = jt.where(score_j>self.score_thresh)[0]
+                # #Err
+                # mask = ((score_j>self.score_thresh)+(bbox_j[:, 4] < 90) + (bbox_j[:, 4] > -90))==3
+                # bbox_j = bbox_j[mask,:]
+                # score_j = score_j[mask]
+                #Correct
+                mask = score_j>self.score_thresh
                 bbox_j = bbox_j[mask,:]
                 score_j = score_j[mask]
+                jt.sync([bbox_j, score_j])
+                mask = bbox_j[:, 4] < 0.5 * np.pi
+                bbox_j = bbox_j[mask,:]
+                score_j = score_j[mask]
+                jt.sync([bbox_j, score_j])
+                mask = bbox_j[:, 4] > -0.5 * np.pi
+                bbox_j = bbox_j[mask,:]
+                score_j = score_j[mask]
+                jt.sync([bbox_j, score_j])
 
-                if score_j.numel()>self.nms_pre:
+                if score_j.numel()>self.nms_pre: #TODO check nms_pre
                     order,_ = jt.argsort(score_j, descending=True)
                     order = order[:self.nms_pre]
                     score_j = score_j[order]
                     bbox_j = bbox_j[order]
 
                 dets = jt.contrib.concat([bbox_j,score_j.unsqueeze(1)],dim=1)
-                keep = jt.nms(dets,self.nms_thresh)
-                bbox_j = bbox_j[keep]
+                if (self.mode == 'H'):
+                    keep = jt.nms(dets,self.nms_thresh) #TODO check
+                else:
+                    keep = jdet.ops.nms_rotated.nms_rotated(bbox_j,score_j,self.nms_thresh)
+                bbox_j = bbox_j[keep] #x0,y0,x1,y1,a(degree)
                 score_j = score_j[keep]
-                label_j = jt.ones_like(score_j).int32()*(j+1)
+                yx2dota = [11, 7, 13, 9, 10, 4, 6, 0, 5, 14, 12, 3, 2, 8, 1]
+                label_j = jt.ones_like(score_j).int32()*yx2dota[j]
                 boxes.append(bbox_j)
                 scores.append(score_j)
                 labels.append(label_j)
@@ -196,12 +238,7 @@ class RetinaHead(nn.Module):
                 scores = scores[order]
                 labels = labels[order]
             
-            results.append(dict(
-                boxes=boxes,
-                scores=scores,
-                labels=labels,
-                img_id=target["img_id"]))
-        
+            results.append((jt.concat([boxes, scores.unsqueeze(1)], 1), labels))
         return results
 
     def losses(self,all_bbox_pred,all_cls_score,all_gt_roi_locs,all_gt_roi_labels):
@@ -231,8 +268,17 @@ class RetinaHead(nn.Module):
         all_gt_roi_labels = []
         all_gt_roi_locs = []
         all_indexes = []
-        for x,anchor_base,feat_stride in zip(xs,self.anchor_bases,self.feat_strides):
-            bbox_pred, cls_score, anchor = self.execute_single(x,anchor_base,feat_stride)
+
+        sizes = []
+        for x in xs:
+            sizes.append([x.shape[2], x.shape[3]])
+        anchors = self.anchor_generator.grid_anchors(sizes)
+
+        id = -1
+        for x in xs:
+            id += 1
+            bbox_pred, cls_score = self.execute_single(x)
+            anchor = anchors[id]
             gt_roi_locs = []
             gt_roi_labels = []
             proposals = []
@@ -268,6 +314,7 @@ class RetinaHead(nn.Module):
         all_bbox_pred = jt.contrib.concat(all_bbox_pred,dim=0)
         all_cls_score = jt.contrib.concat(all_cls_score,dim=0)
         all_proposals = jt.contrib.concat(all_proposals,dim=0)
+        all_proposals = jt.contrib.concat([all_proposals, -90 * jt.ones([all_proposals.shape[0], 1])], 1)
         all_indexes = jt.contrib.concat(all_indexes,dim=0)
     
         if self.is_training():

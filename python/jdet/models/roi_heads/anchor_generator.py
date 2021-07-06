@@ -111,6 +111,36 @@ def loc2bbox(src_bbox,loc,mean=[0.,0.,0.,0.],std=[1.,1.,1.,1.]):
     dst_bbox = jt.contrib.concat([x1,y1,x2,y2],dim=1)
 
     return dst_bbox
+
+def loc2bbox_r(src_bbox,loc,mean=[0.,0.,0.,0.,0.],std=[1.,1.,1.,1.,1.]):
+    if src_bbox.shape[0] == 0:
+        return jt.zeros((0, 4), dtype=loc.dtype)
+    
+
+    mean = jt.array(mean)
+    std = jt.array(std)
+    loc = loc*std+mean 
+
+    src_width = src_bbox[:, 2:3] - src_bbox[:, 0:1]
+    src_height = src_bbox[:, 3:4] - src_bbox[:, 1:2]
+    src_center_x = src_bbox[:, 0:1] + 0.5 * src_width
+    src_center_y = src_bbox[:, 1:2] + 0.5 * src_height
+
+    dx = loc[:, 0:1]
+    dy = loc[:, 1:2]
+    dw = loc[:, 2:3]
+    dh = loc[:, 3:4]
+
+    center_x = dx*src_width+src_center_x
+    center_y = dy*src_height+src_center_y
+        
+    w = jt.exp(dw) * src_width
+    h = jt.exp(dh) * src_height
+        
+    x1,y1,x2,y2 = center_x-0.5*w, center_y-0.5*h, center_x+0.5*w, center_y+0.5*h
+    theta = loc[:, 4:5] * 180 / np.pi + src_bbox[:, 4:5]
+    dst_bbox = jt.contrib.concat([(x1+x2)/2,(y1+y2)/2,x2-x1,y2-y1,theta / 180 * np.pi],dim=1)
+    return dst_bbox
     
 def bbox2loc(src_bbox,dst_bbox,mean=[0.,0.,0.,0.],std=[1.,1.,1.,1.]):        
     width = src_bbox[:, 2:3] - src_bbox[:, 0:1]

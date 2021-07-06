@@ -9,9 +9,11 @@ def prepare(result_pkl,save_path):
     check_dir(save_path)
     results = jt.load(result_pkl)
     data = {}
+    cnt = 0
     for result,target in results:
+        cnt += 1
+        print(cnt, len(results))
         dets,labels = result
-        print(dets.shape)
         img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
         for det,label in zip(dets,labels):
             bbox = det[:5]
@@ -30,9 +32,9 @@ def prepare(result_pkl,save_path):
         f_out.close()
 
 def test():
-    result_pkl = "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota/test/test_12.pkl"
-    save_path = "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota/submit/before_nms"
-    final_path = "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota/submit/after_nms"
+    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet/test/test_0.pkl"
+    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet/test/submit/before_nms"
+    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet/test/submit/after_nms"
     prepare(result_pkl,save_path)
     check_dir(final_path)
     mergebypoly(save_path,final_path)
