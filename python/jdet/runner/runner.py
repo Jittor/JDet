@@ -10,8 +10,6 @@ from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses
-from my_utils import get_var
-import numpy as np
 
 class Runner:
     def __init__(self):
@@ -29,21 +27,11 @@ class Runner:
         self.resume_path = cfg.resume_path
     
         self.model = build_from_cfg(cfg.model,MODELS)
-        self.model.eval()
-        self.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
-
-        x = get_var('input_img_batch')
-        results = self.model(x,[{"bboxes":[0,1,2,3,4], "labels":1}]*x.shape[0])
-        img = x[0].data
-        img = np.transpose(((img + 2.117904) / 5 * 255), [1,2,0]).astype(np.uint8)
-        jdet.utils.visualization.visualize_r_result(img.copy(), results[0])
-
-        exit(0)
         self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=self.model.parameters())
         self.scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=self.optimizer)
-        self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
-        self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
-        self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
+        self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
+        self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS) if cfg.dataset.val else None
+        self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS) if cfg.dataset.test else None
         
         self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
