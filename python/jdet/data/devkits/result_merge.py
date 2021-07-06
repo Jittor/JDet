@@ -18,7 +18,13 @@ from multiprocessing import Pool
 from functools import partial
 
 ## the thresh for nms when merge image
-nms_thresh = 0.1
+nms_threshold_type = 1
+nms_threshold_0 = 0.1
+nms_threshold_1 = {'roundabout': 0.1, 'tennis-court': 0.3, 'swimming-pool': 0.1, 'storage-tank': 0.2,
+                'soccer-ball-field': 0.3, 'small-vehicle': 0.2, 'ship': 0.2, 'plane': 0.3,
+                'large-vehicle': 0.1, 'helicopter': 0.2, 'harbor': 0.0001, 'ground-track-field': 0.3,
+                'bridge': 0.0001, 'basketball-court': 0.3, 'baseball-diamond': 0.3,
+                'container-crane': 0.05, 'airport': 0.1, 'helipad': 0.1}
 
 
 def py_cpu_nms_poly(dets, thresh):
@@ -185,9 +191,9 @@ def poly2origpoly(poly, x, y, rate):
 
 def mergesingle(dstpath, nms, fullname):
     name = util.custombasename(fullname)
-    # print('name:', name)
     dstname = os.path.join(dstpath, name + '.txt')
     print(dstname)
+    name_ = dstname.split("/")[-1][:-4]
     with open(fullname, 'r') as f_in:
         nameboxdict = {}
         lines = f_in.readlines()
@@ -215,7 +221,10 @@ def mergesingle(dstpath, nms, fullname):
             if (oriname not in nameboxdict):
                 nameboxdict[oriname] = []
             nameboxdict[oriname].append(det)
-        nameboxnmsdict = nmsbynamedict(nameboxdict, nms, nms_thresh)
+        if (nms_threshold_type == 0):
+            nameboxnmsdict = nmsbynamedict(nameboxdict, nms, nms_threshold_0)
+        else:
+            nameboxnmsdict = nmsbynamedict(nameboxdict, nms, nms_threshold_1[name_])
         with open(dstname, 'w') as f_out:
             for imgname in nameboxnmsdict:
                 for det in nameboxnmsdict[imgname]:
