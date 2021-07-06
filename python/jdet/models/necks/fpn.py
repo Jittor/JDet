@@ -71,7 +71,8 @@ class FPN(nn.Module):
                  act_cfg=None,
                  upsample_cfg=dict(mode='nearest'),
                  init_cfg=dict(
-                     type='Xavier', layer='Conv2d', distribution='uniform')):
+                     type='Xavier', layer='Conv2d', distribution='uniform'),
+                 upsample_div_factor=1):
         super(FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
@@ -81,7 +82,7 @@ class FPN(nn.Module):
         self.relu_before_extra_convs = relu_before_extra_convs
         self.no_norm_on_lateral = no_norm_on_lateral
         self.upsample_cfg = upsample_cfg.copy()
-
+        self.upsample_div_factor = upsample_div_factor
         if end_level == -1:
             self.backbone_end_level = self.num_ins
             assert num_outs >= self.num_ins - start_level
@@ -160,7 +161,7 @@ class FPN(nn.Module):
                 prev_shape = laterals[i - 1].shape[2:]
                 laterals[i - 1] += nn.interpolate(
                     laterals[i], size=prev_shape, **self.upsample_cfg)
-
+            laterals[i - 1] /= self.upsample_div_factor
         # build outputs
         # part 1: from original levels
         outs = [
