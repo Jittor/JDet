@@ -36,39 +36,57 @@ model:
           mode: H
           yx_base_size: 4.
 dataset:
-    train:
-        type: COCODataset
-        root: /mnt/disk/lxl/dataset/coco/images/train2017
-        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json
-        batch_size: 16
-        num_workers: 4
-        shuffle: True
-        filter_empty_gt: True
-        transforms:
-            - type: "Resize"
-              min_size: [800]
-              max_size: 1333
-            - type: "RandomFlip"
-              prob: 0.5
-            - type: Pad
-              size_divisor: 32
-            - type: "Normalize"
-              mean: [123.675, 116.28, 103.53]
-              std: [58.395, 57.12, 57.375]
-    val:
-        type: COCODataset
-        root: /mnt/disk/lxl/dataset/coco/images/val2017
-        anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json
-        batch_size: 2
-        num_workers: 4
-        filter_empty_gt: False
-        transforms:
-            - type: Pad
-              size_divisor: 32
-            - type: "Normalize"
-              mean: [123.675, 116.28, 103.53]
-              std: [58.395, 57.12, 57.375]
-
+    # train:
+    #     type: COCODataset
+    #     root: /mnt/disk/lxl/dataset/coco/images/train2017
+    #     anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json
+    #     batch_size: 16
+    #     num_workers: 4
+    #     shuffle: True
+    #     filter_empty_gt: True
+    #     transforms:
+    #         - type: "Resize"
+    #           min_size: [800]
+    #           max_size: 1333
+    #         - type: "RandomFlip"
+    #           prob: 0.5
+    #         - type: Pad
+    #           size_divisor: 32
+    #         - type: "Normalize"
+    #           mean: [123.675, 116.28, 103.53]
+    #           std: [58.395, 57.12, 57.375]
+    # val:
+    #     type: COCODataset
+    #     root: /mnt/disk/lxl/dataset/coco/images/val2017
+    #     anno_file: /mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json
+    #     batch_size: 2
+    #     num_workers: 4
+    #     filter_empty_gt: False
+    #     transforms:
+    #         - type: Pad
+    #           size_divisor: 32
+    #         - type: "Normalize"
+    #           mean: [123.675, 116.28, 103.53]
+    #           std: [58.395, 57.12, 57.375]
+    test:
+      type: ImageDataset
+      img_files: /mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/test_600_150/image_names.pkl
+      img_prefix: /mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/test_600_150/images/
+      transforms: [
+        {
+          type: "RotatedResize",
+          min_size: 800,
+          max_size: 800
+        },
+        {
+          type: "Normalize",
+          mean:  [123.675, 116.28, 103.53],
+          std: [58.395, 57.12, 57.375],
+          to_bgr: False
+        }
+      ]
+      num_workers: 4
+      batch_size: 1
 optim:
     type: "SGD"
     lr: 0.01

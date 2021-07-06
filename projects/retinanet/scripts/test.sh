@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=2 python run_net.py --config-file=configs/retinanet.py --use_cuda --task=test
