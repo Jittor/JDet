@@ -535,8 +535,7 @@ def nms_rotated(dets,scores,iou_threshold):
         keep =  nms_rotated_cuda(dets,order_t,iou_threshold,box_length=5)
     else:
         keep =  nms_rotated_cpu(dets,order_t,iou_threshold,box_length=5)
-    # return jt.where(keep)[0]
-    return order_t[keep]
+    return jt.where(keep)[0]
 
 def multiclass_nms_rotated(multi_bboxes,
                            multi_scores,
