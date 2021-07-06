@@ -61,7 +61,8 @@ class CustomDataset(Dataset):
             bboxes_ignore=anno['bboxes_ignore'].astype(np.float32),
             classes=self.CLASSES,
             ori_img_size=(width,height),
-            img_size=(width,height))
+            img_size=(width,height),
+            img_file = img_path)
         return image,ann
 
     def collate_batch(self,batch):
@@ -89,3 +90,7 @@ class CustomDataset(Dataset):
             image, anno = self.transforms(image, anno)
 
         return image, anno 
+
+
+    def evaluate(self,results,work_dir,epoch,logger=None):
+        raise NotImplementedError 

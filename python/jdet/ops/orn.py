@@ -597,14 +597,16 @@ class RotationInvariantPooling(nn.Module):
         super(RotationInvariantPooling, self).__init__()
         self.nInputPlane = nInputPlane
         self.nOrientation = nOrientation
-        
-        # hiddent_dim = int(nInputPlane / nOrientation)
-        # self.conv = nn.Sequential(
-        #     nn.Conv2d(hiddent_dim, nInputPlane, 1, 1),
-        #     nn.BatchNorm2d(nInputPlane),
-        # )
+        #TODO remove this
+        hiddent_dim = int(nInputPlane / nOrientation)
+        self.conv = nn.Sequential(
+            nn.Conv2d(hiddent_dim, nInputPlane, 1, 1),
+            nn.BatchNorm2d(nInputPlane),
+        )
 
     def execute(self, x):
+        # TODO remove it
+        self.conv.eval()
         # x: [N, c, 1, w]
         ## first, max_pooling along orientation.
         N, c, h, w = x.size()

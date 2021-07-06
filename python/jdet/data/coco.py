@@ -1,3 +1,4 @@
+from jdet.utils.general import build_file
 from jittor.dataset import Dataset 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -176,7 +177,7 @@ class COCODataset(Dataset):
         return batch_imgs,anns 
 
     
-    def save_results2json(self,results,save_file):
+    def save_results(self,results,save_file):
         """Convert detection results to COCO json style."""
         def xyxy2xywh(box):
             x1,y1,x2,y2 = box.tolist()
@@ -193,9 +194,12 @@ class COCODataset(Dataset):
                 data['category_id'] = self.cat_ids[int(label)-1]
                 json_results.append(data)
         json.dump(json_results,open(save_file,"w"))
+
     
     def evaluate(self,
-                 results_file,
+                 results,
+                 work_dir,
+                 epoch,
                  metric='bbox',
                  logger=None,
                  classwise=False,
@@ -232,6 +236,8 @@ class COCODataset(Dataset):
         Returns:
             dict[str, float]: COCO style evaluation metric.
         """
+        save_file = build_file(work_dir,prefix=f"detections/val_{epoch}.json")
+        self.save_results(results,save_file)
         metrics = metric if isinstance(metric, list) else [metric]
         allowed_metrics = ['bbox', 'segm', 'proposal', 'proposal_fast']
         for metric in metrics:

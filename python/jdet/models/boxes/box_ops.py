@@ -366,23 +366,7 @@ def rotated_box_to_poly_single(rrect):
     to
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     """
-
-    x0,y0,x1,y1,angle=rrect[:5]
-
-    x_ctr = (x0+x1) / 2
-    y_ctr = (y0+y1) / 2
-    width = x1-x0
-    height = y1 - y0
-    angle = (angle) / 180 * np.pi
-
-    # x_ctr=x0
-    # y_ctr=y0
-    # width=x1
-    # height=y1
-    # angle = (angle) / 180 * np.pi
-
-    # x_ctr, y_ctr, width, height, angle = rrect[:5]
-
+    x_ctr, y_ctr, width, height, angle = rrect[:5]
     tl_x, tl_y, br_x, br_y = -width / 2, -height / 2, width / 2, height / 2
     rect = np.array([[tl_x, br_x, br_x, tl_x], [tl_y, tl_y, br_y, br_y]])
     R = np.array([[np.cos(angle), -np.sin(angle)],

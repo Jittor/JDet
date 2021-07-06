@@ -339,15 +339,14 @@ class Normalize:
         self.to_bgr = to_bgr
 
     def __call__(self, image, target=None):
-        if isinstance(image, Image.Image):
-            image = (np.array(image).transpose((2,0,1)) - self.mean)/self.std
-            image /=255.
-        else:
-            image = (image - self.mean) / self.std
+        if isinstance(image,Image.Image):
+            image = np.array(image).transpose((2,0,1))
 
         if self.to_bgr:
             image = image[::-1]
         
+        image = (image - self.mean) / self.std
+
         target["mean"] = self.mean 
         target["std"] = self.std
         target["to_bgr"] = self.to_bgr

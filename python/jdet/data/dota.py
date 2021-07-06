@@ -1,3 +1,4 @@
+from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.utils.registry import DATASETS
 from jdet.config.constant import DOTA1_CLASSES
 

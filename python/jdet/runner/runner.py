@@ -2,12 +2,13 @@ from genericpath import isfile
 import time
 import jittor as jt
 from tqdm import tqdm
+import numpy as np
 import jdet
 import pickle
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
-from jdet.utils.visualization import visualize_results,visual_gts
+from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses
 from my_utils import get_var
 import numpy as np
@@ -76,6 +77,10 @@ class Runner:
 
     def train(self):
         self.model.train()
+        # import torch
+        # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
+        # TODO : remove thiss
+        self.model.backbone.train()
         start_time = time.time()
         img_num = 0
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
@@ -108,8 +113,6 @@ class Runner:
             if self.finish:
                 break
             
-            exit(0)
-
         self.epoch +=1
 
 
@@ -140,9 +143,8 @@ class Runner:
                 result = self.model(images,targets)
                 results.extend(sync(result))
 
-            save_file = build_file(self.work_dir,prefix=f"detections/val_{self.epoch}.json")
-            self.val_dataset.save_results2json(results,save_file)
-            eval_results = self.val_dataset.evaluate(save_file,logger=self.logger)
+            
+            eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
             self.logger.log(eval_results,iter=self.iter)
 
@@ -158,7 +160,7 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
-                results.extend(sync(result))
+                results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
             
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
@@ -196,6 +198,6 @@ class Runner:
 
         self.scheduler.load_parameters(resume_data.get("scheduler",dict()))
         self.optimizer.load_parameters(resume_data.get("optimizer",dict()))
-        self.model.load_parameters(resume_data.get("model",dict()))
+        self.model.load_parameters(resume_data.get("model",dict()) if "model" in resume_data else resume_data.get("state_dict",dict()))
 
         self.logger.print_log(f"Loading model parameters from {self.resume_path}")

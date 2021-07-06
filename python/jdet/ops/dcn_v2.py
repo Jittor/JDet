@@ -2,6 +2,7 @@
 import jittor as jt 
 from jittor import nn
 from jittor.misc import _pair 
+import numpy as np
 import math
 from jdet.utils.registry import HEADS
 
@@ -1233,9 +1234,9 @@ class DeformConv(nn.Module):
 
         self.weight = jt.zeros((out_channels, in_channels,*self.kernel_size))
         if bias:
-          self.bias = jt.zeros((out_channels,))
+            self.bias = jt.zeros((out_channels,))
         else:
-          self.bias = jt.zeros((out_channels,)).stop_grad()
+            self.bias = np.zeros((out_channels,))
 
         self.reset_parameters()
 
@@ -1253,7 +1254,7 @@ class DeformConv(nn.Module):
         mask = jt.ones(mask_shape,x.dtype)
         return dcn_v2_conv(x, offset, mask,
                            self.weight,
-                           self.bias,
+                           jt.array(self.bias),
                            self.stride,
                            self.padding,
                            self.dilation,

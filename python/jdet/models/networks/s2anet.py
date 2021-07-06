@@ -9,11 +9,11 @@ class S2ANet(nn.Module):
     """
     """
 
-    def __init__(self,backbone,neck=None,roi_head=None):
+    def __init__(self,backbone,neck=None,bbox_head=None):
         super(S2ANet,self).__init__()
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
-        self.roi_heads = build_from_cfg(roi_head,HEADS)
+        self.bbox_head = build_from_cfg(bbox_head,HEADS)
 
     def execute(self,images,targets):
         '''
@@ -28,6 +28,6 @@ class S2ANet(nn.Module):
         if self.neck:
             features = self.neck(features)
         
-        outputs = self.roi_heads(features, targets)
+        outputs = self.bbox_head(features, targets)
         
         return outputs
