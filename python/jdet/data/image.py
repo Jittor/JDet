@@ -50,9 +50,15 @@ class ImageDataset(Dataset):
             pass 
         elif isinstance(img_files,str):
             if os.path.exists(img_files):
-                img_files = jt.load(img_files)
-                img_files = [i["filename"] for i in img_files]
-
+                img_files_ = jt.load(img_files)
+                img_files = []
+                for i in img_files_:
+                    if (isinstance(i, dict)):
+                        img_files.append(i["filename"])
+                    elif (isinstance(i, str)):
+                        img_files.append(i)
+                    else:
+                        raise NotImplementedError
             else:
                 assert False,f"{img_files} must be a file or list" 
         else:
