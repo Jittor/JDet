@@ -9,11 +9,11 @@ class RetinaNet(nn.Module):
     """
     """
 
-    def __init__(self,backbone,neck=None,roi_head=None):
+    def __init__(self,backbone,neck=None,rpn_net=None):
         super(RetinaNet,self).__init__()
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
-        self.roi_heads = build_from_cfg(roi_head,HEADS)
+        self.rpn_net = build_from_cfg(rpn_net,HEADS)
 
     def execute(self,images,targets):
         '''
@@ -29,8 +29,7 @@ class RetinaNet(nn.Module):
         if self.neck:
             features = self.neck(features)
         
-        results,losses = self.roi_heads(features, targets)
-        
+        results,losses = self.rpn_net(features, targets)
         if self.is_training():
             return losses 
         else:
