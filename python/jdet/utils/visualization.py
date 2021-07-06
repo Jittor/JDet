@@ -108,9 +108,9 @@ def draw_boxes(img,boxes,cats):
     cv2.imwrite("test.png",img)
 
 def visualize_r_result(img,detection,out_path='test.jpg'):
-    bboxes = detection["boxes"]
-    scores = detection["scores"]
-    labels = detection["labels"]
+    bboxes = detection[0][:, :5]
+    scores = detection[0][:, 5]
+    labels = detection[1]
     if hasattr(bboxes,"numpy"):
         bboxes = bboxes.numpy()
     if hasattr(scores,"numpy"):
