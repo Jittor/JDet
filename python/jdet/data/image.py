@@ -15,7 +15,7 @@ class ImageDataset(Dataset):
     Load image without groundtruth for visual or test
     """
     def __init__(self,img_files,
-                      img_prefix="",
+                      image_dir="",
                       transforms=[
                           dict(
                               type="Resize",
@@ -36,7 +36,7 @@ class ImageDataset(Dataset):
                       num_workers=0,
                       shuffle=False):
         super(ImageDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
-        self.img_files = self._load_images(img_files,img_prefix=img_prefix)
+        self.img_files = self._load_images(img_files,image_dir=image_dir)
         self.total_len = len(self.img_files)
 
         if isinstance(transforms,list):
@@ -45,7 +45,7 @@ class ImageDataset(Dataset):
             raise TypeError("transforms must be list or callable")
         self.transforms = transforms
     
-    def _load_images(self,img_files,img_prefix):
+    def _load_images(self,img_files,image_dir):
         if isinstance(img_files,list):
             pass 
         elif isinstance(img_files,str):
@@ -64,7 +64,7 @@ class ImageDataset(Dataset):
         else:
             raise NotImplementedError
         
-        img_files = [img_prefix+i for i in img_files]
+        img_files = [os.path.join(image_dir, i) for i in img_files]
         return img_files
 
     def __getitem__(self,index):
