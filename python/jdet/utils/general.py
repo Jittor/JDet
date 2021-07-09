@@ -121,7 +121,7 @@ def list_files(file_dir):
 
 
 def is_img(f):
-    ext = os.splitext(f)[1]
+    ext = os.path.splitext(f)[1]
     return ext.lower() in [".jpg",".bmp",".jpeg",".png","tiff"]
 
 def list_images(img_dir):
