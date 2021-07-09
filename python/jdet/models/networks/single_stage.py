@@ -21,17 +21,15 @@ class SingleStageDetector(nn.Module):
             self.neck = build_from_cfg(neck, NECKS)
         else:
             self.neck = None
-        self.ssd_heads = build_from_cfg(roi_heads, HEADS)
+        self.bbox_head = build_from_cfg(roi_heads, HEADS)
 
     def execute(self, images, targets):
-        features = self.backbone(images)
 
+        # import torch
+        # images = jt.array(torch.load(
+        #     'test_img', map_location=torch.device('cpu')).numpy())
+        feat = self.backbone(images)
         if self.neck:
-            features = self.neck(features)
+            feat = self.neck(feat)
 
-        results, losses = self.ssd_heads(features, targets)
-
-        if self.is_training():
-            return losses
-        else:
-            return results
+        return self.bbox_head(feat, targets)
