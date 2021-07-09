@@ -174,7 +174,7 @@ class RetinaHead(nn.Module):
         for i,target in enumerate(targets):
             img_size = target["img_size"]
             ori_img_size = target["ori_img_size"]
-            assert(ori_img_size[0]/ori_img_size[1] == img_size[0]/img_size[1]) # too keep the angle
+            assert(abs(ori_img_size[0]/ori_img_size[1] - img_size[0]/img_size[1]) < 1e-6) # too keep the angle
 
             index = jt.where(indexes==i)[0]
             score = probs[index,:]
