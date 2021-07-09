@@ -14,8 +14,8 @@ class ImageDataset(Dataset):
     """ ImageDataset
     Load image without groundtruth for visual or test
     """
-    def __init__(self,img_files,
-                      image_dir="",
+    def __init__(self,images_file,
+                      images_dir="",
                       transforms=[
                           dict(
                               type="Resize",
@@ -36,8 +36,8 @@ class ImageDataset(Dataset):
                       num_workers=0,
                       shuffle=False):
         super(ImageDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
-        self.img_files = self._load_images(img_files,image_dir=image_dir)
-        self.total_len = len(self.img_files)
+        self.images_file = self._load_images(images_file,images_dir=images_dir)
+        self.total_len = len(self.images_file)
 
         if isinstance(transforms,list):
             transforms = Compose(transforms)
@@ -45,35 +45,35 @@ class ImageDataset(Dataset):
             raise TypeError("transforms must be list or callable")
         self.transforms = transforms
     
-    def _load_images(self,img_files,image_dir):
-        if isinstance(img_files,list):
+    def _load_images(self,images_file,images_dir):
+        if isinstance(images_file,list):
             pass 
-        elif isinstance(img_files,str):
-            if os.path.exists(img_files):
-                img_files_ = jt.load(img_files)
-                img_files = []
-                for i in img_files_:
+        elif isinstance(images_file,str):
+            if os.path.exists(images_file):
+                images_file_ = jt.load(images_file)
+                images_file = []
+                for i in images_file_:
                     if (isinstance(i, dict)):
-                        img_files.append(i["filename"])
+                        images_file.append(i["filename"])
                     elif (isinstance(i, str)):
-                        img_files.append(i)
+                        images_file.append(i)
                     else:
                         raise NotImplementedError
             else:
-                assert False,f"{img_files} must be a file or list" 
+                assert False,f"{images_file} must be a file or list" 
         else:
             raise NotImplementedError
         
-        img_files = [os.path.join(image_dir, i) for i in img_files]
-        return img_files
+        images_file = [os.path.join(images_dir, i) for i in images_file]
+        return images_file
 
     def __getitem__(self,index):
-        img = Image.open(self.img_files[index]).convert("RGB")
+        img = Image.open(self.images_file[index]).convert("RGB")
         targets = dict(
             ori_img_size=img.size,
             img_size=img.size,
             scale_factor=1.,
-            img_file = self.img_files[index]
+            img_file = self.images_file[index]
         )
 
         if self.transforms:
