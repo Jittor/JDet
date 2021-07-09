@@ -8,13 +8,14 @@ from .transforms import Compose
 import jittor as jt 
 import os
 from jittor.dataset import Dataset 
+import jdet
 
 @DATASETS.register_module()
 class ImageDataset(Dataset):
     """ ImageDataset
     Load image without groundtruth for visual or test
     """
-    def __init__(self,images_file,
+    def __init__(self,images_file=None,
                       images_dir="",
                       transforms=[
                           dict(
@@ -46,17 +47,22 @@ class ImageDataset(Dataset):
         self.transforms = transforms
     
     def _load_images(self,images_file,images_dir):
-        if isinstance(images_file,list):
+        if (not images_file):
+            images = []
+            for name in os.listdir(images_dir):  
+                if (jdet.utils.general.is_img(name)):
+                    images.append(name)
+        elif isinstance(images_file,list):
             pass 
         elif isinstance(images_file,str):
             if os.path.exists(images_file):
                 images_file_ = jt.load(images_file)
-                images_file = []
+                images = []
                 for i in images_file_:
                     if (isinstance(i, dict)):
-                        images_file.append(i["filename"])
+                        images.append(i["filename"])
                     elif (isinstance(i, str)):
-                        images_file.append(i)
+                        images.append(i)
                     else:
                         raise NotImplementedError
             else:
@@ -64,8 +70,8 @@ class ImageDataset(Dataset):
         else:
             raise NotImplementedError
         
-        images_file = [os.path.join(images_dir, i) for i in images_file]
-        return images_file
+        images = [os.path.join(images_dir, i) for i in images]
+        return images
 
     def __getitem__(self,index):
         img = Image.open(self.images_file[index]).convert("RGB")
