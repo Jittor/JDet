@@ -85,7 +85,7 @@ class Resize:
             oh = size
             ow = int(size * w / h)
         
-        assert oh/h == ow/w
+        assert np.abs(oh/h - ow/w)<1e-2
         return (oh, ow),oh/h
 
     def _resize_boxes(self,target,size):

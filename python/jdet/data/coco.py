@@ -237,6 +237,7 @@ class COCODataset(Dataset):
             dict[str, float]: COCO style evaluation metric.
         """
         save_file = build_file(work_dir,prefix=f"detections/val_{epoch}.json")
+        
         self.save_results(results,save_file)
         metrics = metric if isinstance(metric, list) else [metric]
         allowed_metrics = ['bbox', 'segm', 'proposal', 'proposal_fast']
@@ -258,7 +259,7 @@ class COCODataset(Dataset):
                 logger.print_log(msg)
 
             iou_type = metric
-            predictions = json.load(open(results_file))
+            predictions = json.load(open(save_file))
             if iou_type == 'segm':
                 # Refer to https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/coco.py#L331  # noqa
                 # When evaluating mask AP, if the results contain bbox,

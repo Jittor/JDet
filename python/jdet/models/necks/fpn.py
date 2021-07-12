@@ -94,7 +94,7 @@ class FPN(nn.Module):
         self.end_level = end_level
         self.add_extra_convs = add_extra_convs
         assert isinstance(add_extra_convs, (str, bool))
-        assert add_extra_convs in ('on_input', 'on_lateral', 'on_output')
+        assert not add_extra_convs or add_extra_convs in ('on_input', 'on_lateral', 'on_output')
 
         self.lateral_convs = nn.ModuleList()
         self.fpn_convs = nn.ModuleList()

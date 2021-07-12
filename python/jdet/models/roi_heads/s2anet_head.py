@@ -13,7 +13,7 @@ from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import delta2bbox_rotated
 from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
-from jdet.models.boxes.anchor_generator import AnchorGeneratorRotated
+from jdet.models.boxes.anchor_generator import AnchorGeneratorRotatedS2ANet
 
 
 @HEADS.register_module()
@@ -117,7 +117,7 @@ class S2ANetHead(nn.Module):
 
         self.anchor_generators = []
         for anchor_base in self.anchor_base_sizes:
-            self.anchor_generators.append(AnchorGeneratorRotated(anchor_base, anchor_scales, anchor_ratios))
+            self.anchor_generators.append(AnchorGeneratorRotatedS2ANet(anchor_base, anchor_scales, anchor_ratios))
 
         # anchor cache
         self.base_anchors = dict()

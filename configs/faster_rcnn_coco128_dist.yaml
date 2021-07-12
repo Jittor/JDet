@@ -26,7 +26,7 @@ dataset:
         type: COCODataset
         root: /home/lxl/workspace/JDet/coco128/images/train2017
         anno_file: /home/lxl/workspace/JDet/coco128/detections_train2017.json
-        batch_size: 16
+        batch_size: 8
         num_workers: 4
         shuffle: True
         transforms:
@@ -56,7 +56,7 @@ dataset:
             - type: "Normalize"
               mean: [123.675, 116.28, 103.53]
               std: [58.395, 57.12, 57.375]
-optim:
+optimizer:
     type: "SGD"
     lr: 0.02
     momentum: 0.9
@@ -73,7 +73,7 @@ logger:
 
 work_dir: "./exp/fasterrcnn"
 max_epoch: 300
-eval_interval: 10
+eval_interval: 1
 log_interval: 20
 checkpoint_interval: 100
 
