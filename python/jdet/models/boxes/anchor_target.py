@@ -6,8 +6,8 @@ from jdet.utils.registry import build_from_cfg,BOXES
 
 
 def assign_and_sample(bboxes, gt_bboxes, gt_bboxes_ignore, gt_labels, cfg):
-    bbox_assigner = build_from_cfg(cfg.assigner,BOXES)
-    bbox_sampler = build_from_cfg(cfg.sampler,BOXES)
+    bbox_assigner = build_from_cfg(cfg.get('assigner', ''), BOXES)
+    bbox_sampler = build_from_cfg(cfg.get('sampler', ''), BOXES)
     assign_result = bbox_assigner.assign(bboxes, gt_bboxes, gt_bboxes_ignore,
                                          gt_labels)
     sampling_result = bbox_sampler.sample(assign_result, bboxes, gt_bboxes,
@@ -19,13 +19,11 @@ def anchor_target(anchor_list,
                   valid_flag_list,
                   gt_bboxes_list,
                   img_metas,
-                  target_means,
-                  target_stds,
-                  cfg,
+                  cfg=None,
                   gt_bboxes_ignore_list=None,
                   gt_labels_list=None,
                   label_channels=1,
-                  sampling=True,
+                  sampling=False,
                   unmap_outputs=True):
     """Compute regression and classification targets for anchors.
 
@@ -49,8 +47,8 @@ def anchor_target(anchor_list,
     # concat all level anchors and flags to a single tensor
     for i in range(num_imgs):
         assert len(anchor_list[i]) == len(valid_flag_list[i])
-        anchor_list[i] = jt.contrib.concat(anchor_list[i])
-        valid_flag_list[i] = jt.contrib.concat(valid_flag_list[i])
+        anchor_list[i] = jt.concat(anchor_list[i])
+        valid_flag_list[i] = jt.concat(valid_flag_list[i])
 
     # compute targets for each image
     if gt_bboxes_ignore_list is None:
@@ -66,8 +64,6 @@ def anchor_target(anchor_list,
         gt_bboxes_ignore_list,
         gt_labels_list,
         img_metas,
-        target_means=target_means,
-        target_stds=target_stds,
         cfg=cfg,
         label_channels=label_channels,
         sampling=sampling,
@@ -108,8 +104,6 @@ def anchor_target_single(flat_anchors,
                          gt_bboxes_ignore,
                          gt_labels,
                          img_meta,
-                         target_means,
-                         target_stds,
                          cfg=None,
                          label_channels=1,
                          sampling=True,
@@ -123,7 +117,7 @@ def anchor_target_single(flat_anchors,
 
     inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
                                        img_meta['img_shape'][:2],
-                                       cfg.allowed_border)
+                                       cfg.get('allowed_border', -1))
     if not inside_flags.any(0):
         return (None,) * 6
     # assign gt and sample anchors
@@ -133,7 +127,7 @@ def anchor_target_single(flat_anchors,
         assign_result, sampling_result = assign_and_sample(
             anchors, gt_bboxes, gt_bboxes_ignore, None, cfg)
     else:
-        bbox_assigner = build_from_cfg(cfg.assigner,BOXES)
+        bbox_assigner = build_from_cfg(cfg.get('assigner', ''),BOXES)
         assign_result = bbox_assigner.assign(anchors, gt_bboxes,
                                              gt_bboxes_ignore, gt_labels)
         bbox_sampler = PseudoSampler()
@@ -163,7 +157,7 @@ def anchor_target_single(flat_anchors,
         if cfg.pos_weight <= 0:
             label_weights[pos_inds] = 1.0
         else:
-            label_weights[pos_inds] = cfg.pos_weight
+            label_weights[pos_inds] = cfg.get('pos_weight', -1)
     if len(neg_inds) > 0:
         label_weights[neg_inds] = 1.0
 

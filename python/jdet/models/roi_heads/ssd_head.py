@@ -1,11 +1,13 @@
+from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
 from re import M
 import jittor as jt
 from jittor import nn, init
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import build_from_cfg, HEADS, BOXES, MODELS
-from jdet.models.losses.ssd_loss import ssd_loss
 from jdet.models.boxes.anchor_target import anchor_target
 from jdet.ops.nms import multiclass_nms
+from jdet.models.boxes.box_ops import bbox2result
+from jdet.models.losses.cross_entropy_loss import cross_entropy_loss
 
 
 @HEADS.register_module()
@@ -44,6 +46,7 @@ class SSDHead(nn.Module):
                      target_stds=(1, 1, 1, 1)),
                  train_cfg=None,
                  test_cfg=None,
+                 reg_decoded_bbox=False,
                  ):
         super(SSDHead, self).__init__()
         self.num_classes = num_classes
@@ -73,6 +76,7 @@ class SSDHead(nn.Module):
         self.bbox_coder = build_from_cfg(bbox_coder_cfg, BOXES)
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
+        self.reg_decoded_bbox = reg_decoded_bbox
 
     def init_weights(self):
         for i in self.reg_convs:
@@ -153,8 +157,7 @@ class SSDHead(nn.Module):
 
         batch_mlvl_bboxes = jt.concat(mlvl_bboxes, dim=1)
         if rescale:
-            batch_mlvl_bboxes /= jt.array([[0.46875,
-                                          0.625, 0.46875, 0.625]]).unsqueeze(1)
+            batch_mlvl_bboxes /= jt.array(scale_factors).unsqueeze(1)
         batch_mlvl_scores = jt.concat(mlvl_scores, dim=1)
 
         if use_sigmoid_cls:
@@ -167,17 +170,29 @@ class SSDHead(nn.Module):
             result_list = []
             for (mlvl_bboxes, mlvl_scores) in zip(batch_mlvl_bboxes,
                                                   batch_mlvl_scores):
+                # print(mlvl_bboxes[1000:1010, :], mlvl_scores[1000:1010, :4])
                 det_bbox, det_label = multiclass_nms(mlvl_bboxes, mlvl_scores, cfg.get(
                     'score_thr'), cfg.get('nms'), cfg.get('max_per_img'))
-
                 result_list.append(tuple([det_bbox, det_label]))
         else:
             result_list = [
                 tuple(mlvl_bs)
                 for mlvl_bs in zip(batch_mlvl_bboxes, batch_mlvl_scores)
             ]
+        # print(det_bbox, det_label)
+        bbox_results = [
+            bbox2result(det_bboxes, det_labels, self.num_classes)
+            for det_bboxes, det_labels in result_list
+        ]
+        results = []
 
-        return result_list
+        for i, (det_bboxes, det_labels) in enumerate(result_list):
+            results.append(dict(
+                boxes=det_bboxes[:, :4],
+                scores=det_bboxes[:, 4:],
+                labels=det_labels,
+                img_id=img_metas[i]["img_id"]))
+        return results
 
     def get_anchors(self, featmap_sizes, img_metas):
         """Get anchors according to feature map sizes.
@@ -208,8 +223,64 @@ class SSDHead(nn.Module):
 
         return anchor_list, valid_flag_list
 
-    def loss(self, cls_scores, bbox_preds, targets):
+    def loss_single(self, cls_score, bbox_pred, anchor, labels, label_weights,
+                    bbox_targets, bbox_weights, num_total_samples):
+        """Compute loss of a single image.
 
+        Args:
+            cls_score (Tensor): Box scores for eachimage
+                Has shape (num_total_anchors, num_classes).
+            bbox_pred (Tensor): Box energies / deltas for each image
+                level with shape (num_total_anchors, 4).
+            anchors (Tensor): Box reference for each scale level with shape
+                (num_total_anchors, 4).
+            labels (Tensor): Labels of each anchors with shape
+                (num_total_anchors,).
+            label_weights (Tensor): Label weights of each anchor with shape
+                (num_total_anchors,)
+            bbox_targets (Tensor): BBox regression targets of each anchor wight
+                shape (num_total_anchors, 4).
+            bbox_weights (Tensor): BBox regression loss weights of each anchor
+                with shape (num_total_anchors, 4).
+            num_total_samples (int): If sampling, num total samples equal to
+                the number of total anchors; Otherwise, it is the number of
+                positive anchors.
+
+        Returns:
+            dict[str, Tensor]: A dictionary of loss components.
+        """
+        loss_cls_all = cross_entropy_loss(
+            cls_score, labels)
+        # FG cat_id: [0, num_classes -1], BG cat_id: num_classes
+        pos_inds = ((labels >= 0) & (labels < self.num_classes)
+                    ).nonzero().reshape(-1)
+        neg_inds = (labels == self.num_classes).nonzero().view(-1)
+
+        num_pos_samples = pos_inds.size(0)
+        num_neg_samples = self.train_cfg['neg_pos_ratio'] * num_pos_samples
+        if num_neg_samples > neg_inds.size(0):
+            num_neg_samples = neg_inds.size(0)
+        topk_loss_cls_neg, _ = loss_cls_all[neg_inds].topk(num_neg_samples)
+        loss_cls_pos = loss_cls_all[pos_inds].sum()
+        loss_cls_neg = topk_loss_cls_neg.sum()
+        loss_cls = (loss_cls_pos + loss_cls_neg) / num_total_samples
+
+        if self.reg_decoded_bbox:
+            # When the regression loss (e.g. `IouLoss`, `GIouLoss`)
+            # is applied directly on the decoded bounding boxes, it
+            # decodes the already encoded coordinates to absolute format.
+            bbox_pred = self.bbox_coder.decode(anchor, bbox_pred)
+
+        loss_bbox = smooth_l1_loss(
+            bbox_pred,
+            bbox_targets,
+            bbox_weights,
+            beta=self.train_cfg['smoothl1_beta'],
+            avg_factor=num_total_samples)
+        # print(loss_cls[None], loss_bbox)
+        return loss_cls[None], loss_bbox
+
+    def loss(self, cls_scores, bbox_preds, targets):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
 
         gt_bboxes, gt_labels, img_metas, gt_bboxes_ignore = self.parse_targets(
@@ -224,6 +295,8 @@ class SSDHead(nn.Module):
             valid_flag_list,
             gt_bboxes,
             img_metas,
+            bbox_coder=self.bbox_coder,
+            cfg=self.train_cfg,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
             label_channels=1,
@@ -234,8 +307,7 @@ class SSDHead(nn.Module):
 
         (labels, label_weights, bbox_targets, bbox_weights,
          num_total_pos, num_total_neg) = cls_reg_targets
-
-        num_images = len(targets)
+        num_images = len(img_metas)
 
         all_cls_scores = jt.concat([
             s.permute(0, 2, 3, 1).reshape(
@@ -257,10 +329,10 @@ class SSDHead(nn.Module):
         # concat all level anchors to a single tensor
         all_anchors = []
         for i in range(num_images):
-            all_anchors.append(jt.concat(anchor_list[i]))
+            all_anchors.append(anchor_list[i])
 
         losses_cls, losses_bbox = multi_apply(
-            ssd_loss,
+            self.loss_single,
             all_cls_scores,
             all_bbox_preds,
             all_anchors,
@@ -268,9 +340,7 @@ class SSDHead(nn.Module):
             all_label_weights,
             all_bbox_targets,
             all_bbox_weights,
-            num_total_pos,
-            num_classes=self.n_class,
-            train_cfg=self.train_cfg)
+            num_total_samples=num_total_pos)
 
         return dict(loss_cls=losses_cls, loss_bbox=losses_bbox)
 
@@ -302,7 +372,8 @@ class SSDHead(nn.Module):
             img_metas.append(dict(
                 img_shape=target["img_size"][::-1],
                 scale_factor=target["scale_factor"],
-                pad_shape=target["pad_shape"]
+                pad_shape=target["pad_shape"],
+                img_id=target["img_id"],
             ))
         if not is_train:
             return img_metas

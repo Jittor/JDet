@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import jittor as jt 
-
+import numpy as np
 
 class SamplingResult:
 

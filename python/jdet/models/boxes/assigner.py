@@ -151,7 +151,7 @@ class MaxIoUAssigner:
                     assigned_gt_inds[gt_argmax_overlaps[i]] = i + 1
 
         if gt_labels is not None:
-            assigned_labels = jt.zeros((num_bboxes,),dtype=assigned_gt_inds.dtype)
+            assigned_labels = jt.zeros((num_bboxes,),dtype=assigned_gt_inds.dtype) - 1
             pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(1)
             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[

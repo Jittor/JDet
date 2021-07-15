@@ -140,13 +140,13 @@ def bbox2delta(proposals,
     gt = gt.float()
     px = (proposals[..., 0] + proposals[..., 2]) * 0.5
     py = (proposals[..., 1] + proposals[..., 3]) * 0.5
-    pw = proposals[..., 2] - proposals[..., 0] + 1.0
-    ph = proposals[..., 3] - proposals[..., 1] + 1.0
+    pw = proposals[..., 2] - proposals[..., 0]
+    ph = proposals[..., 3] - proposals[..., 1]
 
     gx = (gt[..., 0] + gt[..., 2]) * 0.5
     gy = (gt[..., 1] + gt[..., 3]) * 0.5
-    gw = gt[..., 2] - gt[..., 0] + 1.0
-    gh = gt[..., 3] - gt[..., 1] + 1.0
+    gw = gt[..., 2] - gt[..., 0]
+    gh = gt[..., 3] - gt[..., 1]
 
     dx = (gx - px) / pw
     dy = (gy - py) / ph
@@ -416,3 +416,19 @@ def rotated_box_to_bbox(rotatex_boxes):
     xmax, _ = polys[:, ::2].max(1)
     ymax, _ = polys[:, 1::2].max(1)
     return jt.stack([xmin, ymin, xmax, ymax], dim=1)
+
+def bbox2result(bboxes, labels, num_classes):
+    """Convert detection results to a list of numpy arrays.
+
+    Args:
+        bboxes (jt.Var | np.ndarray): shape (n, 5)
+        labels (jt.Var | np.ndarray): shape (n, )
+        num_classes (int): class number, including background class
+
+    Returns:
+        list(ndarray): bbox results of each class
+    """
+    if bboxes.shape[0] == 0:
+        return [np.zeros((0, 5), dtype=np.float32) for i in range(num_classes)]
+    else:
+        return [bboxes[labels == i, :] for i in range(num_classes)]
