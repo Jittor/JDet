@@ -38,11 +38,13 @@ def main():
     runner = Runner()
 
     if args.task == "train":
+        # runner.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
         runner.run()
     elif args.task == "val":
         runner.val()
     elif args.task == "test":
         runner.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
+        # runner.load("exps/jittor_train/retinanet/checkpoints/ckpt_26.pkl")
         runner.test()
 
 if __name__ == "__main__":
