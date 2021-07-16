@@ -2,6 +2,7 @@
 from jdet.utils.registry import OPTIMS 
 
 from jittor import optim 
+import jittor as jt
 
 class Optimizer(object):
     def parameters(self):
@@ -32,17 +33,36 @@ class SGD(optim.SGD,Optimizer):
             self.clip_grad_norm(**self.grad_clip)
     
 @OPTIMS.register_module()
-class GradMutilpySGD(SGD):
-    def __init__(self, **kwargs):
+class GradMutilpySGD(optim.SGD,Optimizer):
+    def __init__(self,grad_clip=None, **kwargs):
         super(GradMutilpySGD,self).__init__(**kwargs)
+        self.grad_clip = grad_clip
 
-    def pre_step(self, loss):
-        super(GradMutilpySGD,self).pre_step(loss)
+    def step(self, loss):
+        if loss is not None:
+            self.pre_step(loss)
+        if self.grad_clip is not None:
+            self.clip_grad_norm(**self.grad_clip)
         for pg in self.param_groups:
-            if ("grad_mutilpy" in pg):
-                m = pg["grad_mutilpy"]
-                for p, g in zip(pg["params"], pg["grads"]):
-                    g *= m
+            # get arguments from each param_groups
+            lr = pg.get("lr", self.lr)
+            momentum = pg.get("momentum", self.momentum)
+            weight_decay = pg.get("weight_decay", self.weight_decay)
+            dampening = pg.get("dampening", self.dampening)
+            nesterov = pg.get("nesterov", self.nesterov)
+
+            m = pg.get("grad_mutilpy", 1)
+            # optimize main body
+            for p, g, v in zip(pg["params"], pg["grads"], pg["values"]):
+                if p.is_stop_grad(): continue
+                dp = p * weight_decay + g * m
+                v.update(momentum * v + dp * (1 - dampening))
+                if nesterov:
+                    p.update(p - (dp + momentum * v) * lr)
+                else:
+                    p.update(p - v * lr)
+        self.zero_grad()
+
 
 @OPTIMS.register_module()
 class Adam(optim.Adam,Optimizer):
