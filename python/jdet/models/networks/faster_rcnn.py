@@ -2,8 +2,8 @@ from http.client import UnimplementedFileMode
 from jittor import nn
 from jdet.utils.registry import MODELS, build_from_cfg, BACKBONES, HEADS, NECKS, SHARED_HEADS, ROI_EXTRACTORS
 
-@MODELS.register_module
-class FasterRCNN(nn):
+@MODELS.register_module()
+class FasterRCNN(nn.Module):
 
     def __init__(self,
                  backbone,
@@ -32,7 +32,6 @@ class FasterRCNN(nn):
             images (jt.Var): image tensors, shape is [N,C,H,W]
             targets (list[dict]): targets for each image
         Rets:
-            results: detections
             losses (dict): losses
         '''
         losses = dict()
