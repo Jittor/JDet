@@ -4,7 +4,6 @@ import jittor as jt
 from jittor import nn, init
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import build_from_cfg, HEADS, BOXES, MODELS
-# from jdet.models.losses.ssd_loss import ssd_loss
 from jdet.models.boxes.anchor_target import anchor_target
 from jdet.ops.nms import multiclass_nms
 from jdet.models.boxes.box_ops import bbox2result
@@ -180,6 +179,7 @@ class SSDHead(nn.Module):
                 tuple(mlvl_bs)
                 for mlvl_bs in zip(batch_mlvl_bboxes, batch_mlvl_scores)
             ]
+        # print(det_bbox.shape, det_label.shape)
         # print(det_bbox, det_label)
         bbox_results = [
             bbox2result(det_bboxes, det_labels, self.num_classes)
@@ -278,7 +278,7 @@ class SSDHead(nn.Module):
             bbox_weights,
             beta=self.train_cfg['smoothl1_beta'],
             avg_factor=num_total_samples)
-        # print(loss_cls[None], loss_bbox)
+        print(loss_cls[None], loss_bbox)
         return loss_cls[None], loss_bbox
 
     def loss(self, cls_scores, bbox_preds, targets):
@@ -296,7 +296,6 @@ class SSDHead(nn.Module):
             valid_flag_list,
             gt_bboxes,
             img_metas,
-            bbox_coder=self.bbox_coder,
             cfg=self.train_cfg,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,

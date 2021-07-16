@@ -1,8 +1,8 @@
 import jittor as jt
 
 from .sampler import PseudoSampler
-from jdet.utils.general import multi_apply,unmap
-from jdet.utils.registry import build_from_cfg,BOXES
+from jdet.utils.general import multi_apply, unmap
+from jdet.utils.registry import build_from_cfg, BOXES
 
 
 def assign_and_sample(bboxes, gt_bboxes, gt_bboxes_ignore, gt_labels, cfg):
@@ -108,12 +108,13 @@ def anchor_target_single(flat_anchors,
                          label_channels=1,
                          sampling=True,
                          unmap_outputs=True):
-    bbox_coder_cfg = cfg.get('bbox_coder', '')
-    if bbox_coder_cfg == '':
-        bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
-    bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
     # Set True to use IoULoss
     reg_decoded_bbox = cfg.get('reg_decoded_bbox', False)
+    bbox_coder_cfg = dict(
+        type='DeltaXYWHBBoxCoder',
+        target_means=(0., 0., 0., 0.),
+        target_stds=(0.1, 0.1, 0.2, 0.2))
+    bbox_coder = build_from_cfg(bbox_coder_cfg, BOXES)
 
     inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
                                        img_meta['img_shape'][:2],
@@ -127,17 +128,18 @@ def anchor_target_single(flat_anchors,
         assign_result, sampling_result = assign_and_sample(
             anchors, gt_bboxes, gt_bboxes_ignore, None, cfg)
     else:
-        bbox_assigner = build_from_cfg(cfg.get('assigner', ''),BOXES)
+        bbox_assigner = build_from_cfg(cfg.get('assigner', ''), BOXES)
         assign_result = bbox_assigner.assign(anchors, gt_bboxes,
                                              gt_bboxes_ignore, gt_labels)
         bbox_sampler = PseudoSampler()
         sampling_result = bbox_sampler.sample(assign_result, anchors,
                                               gt_bboxes)
-
     num_valid_anchors = anchors.shape[0]
     bbox_targets = jt.zeros_like(anchors)
     bbox_weights = jt.zeros_like(anchors)
-    labels = jt.zeros(num_valid_anchors).int()
+    # labels = jt.zeros(num_valid_anchors).int()
+    num_classes = 80
+    labels = jt.full((num_valid_anchors,), num_classes)
     label_weights = jt.zeros(num_valid_anchors).float()
 
     pos_inds = sampling_result.pos_inds
@@ -145,7 +147,7 @@ def anchor_target_single(flat_anchors,
     if len(pos_inds) > 0:
         if not reg_decoded_bbox:
             pos_bbox_targets = bbox_coder.encode(sampling_result.pos_bboxes,
-                                                sampling_result.pos_gt_bboxes)
+                                                 sampling_result.pos_gt_bboxes)
         else:
             pos_bbox_targets = sampling_result.pos_gt_bboxes
         bbox_targets[pos_inds, :] = pos_bbox_targets.cast(bbox_targets.dtype)
@@ -179,13 +181,10 @@ def anchor_inside_flags(flat_anchors, valid_flags, img_shape,
     img_h, img_w = img_shape[:2]
     if allowed_border >= 0:
         inside_flags = valid_flags & \
-                       (flat_anchors[:, 0] >= -allowed_border) & \
-                       (flat_anchors[:, 1] >= -allowed_border) & \
-                       (flat_anchors[:, 2] < img_w + allowed_border) & \
-                       (flat_anchors[:, 3] < img_h + allowed_border)
+            (flat_anchors[:, 0] >= -allowed_border) & \
+            (flat_anchors[:, 1] >= -allowed_border) & \
+            (flat_anchors[:, 2] < img_w + allowed_border) & \
+            (flat_anchors[:, 3] < img_h + allowed_border)
     else:
         inside_flags = valid_flags
     return inside_flags
-
-
-

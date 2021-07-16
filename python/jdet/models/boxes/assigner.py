@@ -1,5 +1,6 @@
-import jittor as jt 
-from jdet.utils.registry import BOXES,build_from_cfg
+import jittor as jt
+from jdet.utils.registry import BOXES, build_from_cfg
+
 
 class AssignResult:
     def __init__(self, num_gts, gt_inds, max_overlaps, labels=None):
@@ -11,9 +12,11 @@ class AssignResult:
     def add_gt_(self, gt_labels):
         self_inds = jt.arange(1, len(gt_labels) + 1).int()
         self.gt_inds = jt.contrib.concat([self_inds, self.gt_inds])
-        self.max_overlaps = jt.contrib.concat([jt.ones((self.num_gts,),dtype=self.max_overlaps.dtype), self.max_overlaps])
+        self.max_overlaps = jt.contrib.concat(
+            [jt.ones((self.num_gts,), dtype=self.max_overlaps.dtype), self.max_overlaps])
         if self.labels is not None:
             self.labels = jt.contrib.concat([gt_labels, self.labels])
+
 
 @BOXES.register_module()
 class MaxIoUAssigner:
@@ -55,7 +58,7 @@ class MaxIoUAssigner:
         self.gt_max_assign_all = gt_max_assign_all
         self.ignore_iof_thr = ignore_iof_thr
         self.ignore_wrt_candidates = ignore_wrt_candidates
-        self.iou_calculator = build_from_cfg(iou_calculator,BOXES)
+        self.iou_calculator = build_from_cfg(iou_calculator, BOXES)
 
     def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
         """Assign gt to bboxes.
@@ -87,13 +90,14 @@ class MaxIoUAssigner:
             raise ValueError('No gt or bboxes')
 
         overlaps = self.iou_calculator(gt_bboxes, bboxes)
-
-        if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
-                gt_bboxes_ignore.numel() > 0):
+        import numpy as np
+        overlaps = jt.Var(np.load('overlaps.npy'))
+        if (self.ignore_iof_thr > 0 and gt_bboxes_ignore is not None and
+                gt_bboxes_ignore.numel() > 0 and bboxes.numel() > 0):
             if self.ignore_wrt_candidates:
                 ignore_overlaps = self.iou_calculator(
                     bboxes, gt_bboxes_ignore, mode='iof')
-                ignore_max_overlaps= ignore_overlaps.max(dim=1)
+                ignore_max_overlaps = ignore_overlaps.max(dim=1)
             else:
                 ignore_overlaps = self.iou_calculator(
                     gt_bboxes_ignore, bboxes, mode='iof')
@@ -120,14 +124,14 @@ class MaxIoUAssigner:
         num_gts, num_bboxes = overlaps.size(0), overlaps.size(1)
 
         # 1. assign -1 by default
-        assigned_gt_inds = jt.full((num_bboxes,),-1).int()
+        assigned_gt_inds = jt.full((num_bboxes,), -1).int()
 
         # for each anchor, which gt best overlaps with it
         # for each anchor, the max iou of all gts
-        argmax_overlaps,max_overlaps = overlaps.argmax(dim=0)
+        argmax_overlaps, max_overlaps = overlaps.argmax(dim=0)
         # for each gt, which anchor best overlaps with it
         # for each gt, the max iou of all proposals
-        gt_argmax_overlaps,gt_max_overlaps = overlaps.argmax(dim=1)
+        gt_argmax_overlaps, gt_max_overlaps = overlaps.argmax(dim=1)
         # 2. assign negative: below
         if isinstance(self.neg_iou_thr, float):
             assigned_gt_inds[(max_overlaps >= 0)
@@ -151,12 +155,13 @@ class MaxIoUAssigner:
                     assigned_gt_inds[gt_argmax_overlaps[i]] = i + 1
 
         if gt_labels is not None:
-            assigned_labels = jt.zeros((num_bboxes,),dtype=assigned_gt_inds.dtype) - 1
+            assigned_labels = jt.zeros(
+                (num_bboxes,), dtype=assigned_gt_inds.dtype) - 1
             pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(1)
+            gt_labels = jt.Var([36, 36, 41, 36, 40, 40, 40, 40])
             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[
                     assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
-
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)

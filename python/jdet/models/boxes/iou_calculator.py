@@ -1,6 +1,7 @@
-import jittor as jt 
+import jittor as jt
 from jdet.ops import box_iou_rotated
 from jdet.utils.registry import BOXES
+
 
 @BOXES.register_module()
 class BboxOverlaps2D:
@@ -38,6 +39,7 @@ class BboxOverlaps2D:
         repr_str = self.__class__.__name__ + '()'
         return repr_str
 
+
 @BOXES.register_module()
 class BboxOverlaps2D_rotated:
     """2D Overlaps (e.g. IoUs, GIoUs) Calculator."""
@@ -67,8 +69,8 @@ class BboxOverlaps2D_rotated:
             bboxes2 = bboxes2[..., :5]
         if bboxes1.size(-1) == 6:
             bboxes1 = bboxes1[..., :5]
-        
-        assert mode=="iou" and is_aligned==False
+
+        assert mode == "iou" and is_aligned == False
         # TODO: add giou....
         return bbox_overlaps_rotated(bboxes1, bboxes2)
 
@@ -135,9 +137,6 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
     assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
 
-    # to make sure the same type of tensor
-    bboxes2 = bboxes2.cast(bboxes1.dtype)
-
     # Batch dim must be the same
     # Batch dim: (B1, B2, ... Bn)
     assert bboxes1.shape[:-2] == bboxes2.shape[:-2]
@@ -150,14 +149,14 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
     if rows * cols == 0:
         if is_aligned:
-            return jt.zeros(batch_shape + (rows,),bboxes1.dtype)
+            return jt.zeros(batch_shape + (rows,), bboxes1.dtype)
         else:
-            return jt.zeros(batch_shape + (rows, cols),bboxes1.dtype)
+            return jt.zeros(batch_shape + (rows, cols), bboxes1.dtype)
 
     area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
-            bboxes1[..., 3] - bboxes1[..., 1])
+        bboxes1[..., 3] - bboxes1[..., 1])
     area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
-            bboxes2[..., 3] - bboxes2[..., 1])
+        bboxes2[..., 3] - bboxes2[..., 1])
 
     if is_aligned:
         lt = jt.maximum(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]

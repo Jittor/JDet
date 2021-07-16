@@ -72,6 +72,8 @@ class Runner:
         self.test()
 
     def train(self):
+        self.model.load_state_dict(
+            jt.load("ssd300_coco.pth"))
         self.model.train()
         # import torch
         # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
