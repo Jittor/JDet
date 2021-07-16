@@ -18,15 +18,22 @@ model = dict(
     rpn=dict(
         type='RPN',
         in_channels=256,
-        feat_channels=256,
-        anchor_scales=[8],
-        anchor_ratios=[0.5, 1.0, 2.0],
-        anchor_strides=[4, 8, 16, 32, 64],
-        target_means=[.0, .0, .0, .0],
-        target_stds=[1.0, 1.0, 1.0, 1.0],
-        loss_cls=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
+        #feat_channels=256,
+        mid_channels=256,
+        #anchor_scales=[8],
+        scales=[8],
+        #anchor_ratios=[0.5, 1.0, 2.0],
+        ratios=[0.5, 1.0, 2.0],
+        #anchor_strides=[4, 8, 16, 32, 64],
+        feat_strides=[4, 8, 16, 32, 64],
+
+        ### ignored configs: ###
+        #target_means=[.0, .0, .0, .0],
+        #target_stds=[1.0, 1.0, 1.0, 1.0],
+        #loss_cls=dict(
+        #    type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+        #loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)
+    ),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
         roi_layer=dict(type='RoIAlign', out_size=7, sample_num=2),

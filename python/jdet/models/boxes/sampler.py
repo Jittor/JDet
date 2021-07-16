@@ -1,5 +1,8 @@
 from abc import ABCMeta, abstractmethod
 import jittor as jt 
+import numpy as np
+
+from jdet.utils.registry import BOXES
 
 
 class SamplingResult:
@@ -120,6 +123,7 @@ class PseudoSampler(BaseSampler):
         return sampling_result
 
 
+@BOXES.register_module()
 class RandomSampler(BaseSampler):
 
     def __init__(self,
