@@ -3,7 +3,8 @@ model = dict(
     backbone = dict(
         type = "Resnet50_v1d",
         return_stages =  ["layer1","layer2","layer3","layer4"],
-        pretrained = True),
+        pretrained = True,
+        norm_layer="FrozenBatchNorm"),
     neck = dict(
         type= "FPN",
         in_channels= [256,512,1024,2048],
@@ -25,6 +26,9 @@ model = dict(
         score_threshold= 0.05,
         nms_iou_threshold= 0.3,
         max_dets= 10000,
+        roi_beta= 1 / 9.,
+        cls_loss_weight= 1.,
+        loc_loss_weight= 0.2,
 
         anchor_generator = dict(
           type= "AnchorGeneratorYangXue",
@@ -37,54 +41,61 @@ model = dict(
           yx_base_size= 4.)),
 )
 dataset = dict(
-    # train=
-    #     type= COCODataset
-    #     root= /mnt/disk/lxl/dataset/coco/images/train2017
-    #     anno_file= /mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json
-    #     batch_size= 16
-    #     num_workers= 4
-    #     shuffle= True
-    #     filter_empty_gt= True
-    #     transforms=
-    #         - type= "Resize"
-    #           min_size= [800]
-    #           max_size= 1333
-    #         - type= "RandomFlip"
-    #           prob= 0.5
-    #         - type= Pad
-    #           size_divisor= 32
-    #         - type= "Normalize"
-    #           mean= [123.675, 116.28, 103.53]
-    #           std= [58.395, 57.12, 57.375]
-    # val=
-    #     type= COCODataset
-    #     root= /mnt/disk/lxl/dataset/coco/images/val2017
-    #     anno_file= /mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json
-    #     batch_size= 2
-    #     num_workers= 4
-    #     filter_empty_gt= False
-    #     transforms=
-    #         - type= Pad
-    #           size_divisor= 32
-    #         - type= "Normalize"
-    #           mean= [123.675, 116.28, 103.53]
-    #           std= [58.395, 57.12, 57.375]
+    val=dict(
+        type="DOTADataset",
+        annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
+        images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/images/',
+        transforms=[
+            dict(
+                type="RotatedResize",
+                min_size=800,
+                max_size=800
+            ),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=False,)
+        ],
+        batch_size=4,
+        num_workers=4,
+        shuffle=False
+    ),
+    train=dict(
+        type="DOTADataset",
+        annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
+        images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/images/',
+        # annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/trainval.pkl',
+        # images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/images/',
+        transforms=[
+            dict(
+                type="RotatedResize",
+                min_size=800,
+                max_size=800
+            ),
+            dict(
+                type='RotatedRandomFlip', 
+                prob=0.5,
+                direction='horizontal'),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=False,)
+            
+        ],
+        batch_size=3, 
+        num_workers=4,
+        shuffle= True
+    ),
     test = dict(
       type= "ImageDataset",
-      img_files= "/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/test_600_150/image_names.pkl",
-      img_prefix= "/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/test_600_150/images/",
-      # img_files= "/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/test_600_150/image_names.pkl",
-      # img_prefix= "/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/test_600_150/images/",
+      images_dir= "/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/test_600_150/images/",
       transforms= [
         dict(
           type= "RotatedResize",
           min_size= 800,
           max_size= 800),
-        # dict(
-        #   type= "Normalize",
-        #   mean=  [0, 0, 0],
-        #   std= [1, 1, 1],
-        #   to_bgr= False)
         dict(
           type= "Normalize",
           mean=  [123.675, 116.28, 103.53],
@@ -93,25 +104,35 @@ dataset = dict(
       ],
       num_workers= 4,
       batch_size= 32))
-optim = dict(
-    type= "SGD",
-    lr= 0.01,
-    momentum= 0.9,
-    weight_decay= 0.0001)
+optimizer = dict(
+    type='GradMutilpySGD', 
+    lr=5e-4,
+    momentum=0.9, 
+    weight_decay=1e-4,
+    grad_clip=dict(
+        max_norm=10., 
+        norm_type=2))
 
 scheduler = dict(
     type= "StepLR",
     warmup= "linear",
-    warmup_iters= 500,
-    warmup_ratio= 0.001,
-    milestones= [8, 11])
+    warmup_iters= 14000,
+    warmup_ratio= 0.1,
+    milestones= [24])
 
 logger = dict(
     type= "RunLogger")
 
 work_dir = "./exp/retinanet"
-max_epoch = 12
+max_epoch = 26
 eval_interval = 1
 log_interval = 50
 checkpoint_interval = 1
+pretrained_weights="weights/pretrained.pk_jt.pk"
 
+parameter_groups_generator = dict(
+    type = "YangXuePrameterGroupsGenerator",
+    conv_bias_grad_muyilpy = 2.0,
+    conv_bias_weight_decay = 0.,
+    freeze_prefix=['backbone.C1']
+)
