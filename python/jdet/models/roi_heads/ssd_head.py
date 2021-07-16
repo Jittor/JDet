@@ -3,7 +3,7 @@ import jittor as jt
 from jittor import nn, init
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import build_from_cfg, HEADS, BOXES, MODELS
-from jdet.models.losses.ssd_loss import ssd_loss
+# from jdet.models.losses.ssd_loss import ssd_loss
 from jdet.models.boxes.anchor_target import anchor_target
 from jdet.ops.nms import multiclass_nms
 
