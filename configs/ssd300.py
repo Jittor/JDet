@@ -138,4 +138,4 @@ eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
 log_interval = 50
-resume_path = "ssd300_coco.pth"
+resume_path = "ssd300_coco_model.pth"
