@@ -252,10 +252,6 @@ def YangXuePrameterGroupsGenerator(named_params, conv_bias_grad_muyilpy=1., conv
     }
     if (conv_bias_weight_decay >= 0):
         conv_bias_group["weight_decay"] = conv_bias_weight_decay
-    freeze_group = {
-        "params":[],
-        "grad_mutilpy":0
-    }
     for p in named_params:
         name, param = p
         freeze = False
@@ -264,7 +260,6 @@ def YangXuePrameterGroupsGenerator(named_params, conv_bias_grad_muyilpy=1., conv
                 freeze = True
                 break
         if (freeze):
-            freeze_group['params'].append(param)
             continue
 
         names = name.split(".")
@@ -273,4 +268,4 @@ def YangXuePrameterGroupsGenerator(named_params, conv_bias_grad_muyilpy=1., conv
             conv_bias_group['params'].append(param)
             continue
         normal_group['params'].append(param)
-    return [normal_group, conv_bias_group, freeze_group]
+    return [normal_group, conv_bias_group]
