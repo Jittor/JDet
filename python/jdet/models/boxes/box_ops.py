@@ -400,6 +400,15 @@ def rotated_box_to_poly_np(rrects):
     polys = np.array(polys)
     polys = get_best_begin_point(polys)
     return polys.astype(np.float32)
+    
+def rotated_box_to_poly(rrects):
+    """
+    rrect:[x_ctr,y_ctr,w,h,angle]
+    to
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    """
+    #TODO: implement jt version
+    return jt.array(rotated_box_to_poly_np(rrects.data))
 
 def rotated_box_to_bbox_np(rotatex_boxes):
     polys = rotated_box_to_poly_np(rotatex_boxes)
@@ -411,8 +420,27 @@ def rotated_box_to_bbox_np(rotatex_boxes):
 
 def rotated_box_to_bbox(rotatex_boxes):
     polys = rotated_box_to_poly(rotatex_boxes)
-    xmin, _ = polys[:, ::2].min(1)
-    ymin, _ = polys[:, 1::2].min(1)
-    xmax, _ = polys[:, ::2].max(1)
-    ymax, _ = polys[:, 1::2].max(1)
+    xmin = polys[:, ::2].min(1)
+    ymin = polys[:, 1::2].min(1)
+    xmax = polys[:, ::2].max(1)
+    ymax = polys[:, 1::2].max(1)
     return jt.stack([xmin, ymin, xmax, ymax], dim=1)
+    # return jt.stack([(xmin+xmax)/2, (ymin+ymax)/2, xmax-xmin, ymax-ymin], dim=1)
+
+def boxes_xywh_to_x0y0x1y1(boxes):
+    assert(boxes.shape[1] >= 4)
+    x = boxes[:, 0]
+    y = boxes[:, 1]
+    w = boxes[:, 2]
+    h = boxes[:, 3]
+    others = boxes[:, 4:]
+    return jt.concat([jt.stack([x - 0.5 * w, y - 0.5 * h, x + 0.5 * w, y + 0.5 * h], dim=1), others], dim=1)
+
+def boxes_x0y0x1y1_to_xywh(boxes):
+    assert(boxes.shape[1] >= 4)
+    x0 = boxes[:, 0]
+    y0 = boxes[:, 1]
+    x1 = boxes[:, 2]
+    y1 = boxes[:, 3]
+    others = boxes[:, 4:]
+    return jt.concat([jt.stack([(x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0], dim=1), others], dim=1)
