@@ -23,6 +23,8 @@ class WarmUpLR(object):
         self.warmup_ratio = warmup_ratio
         self.warmup_iters = warmup_iters
         self.warmup = warmup
+        self.base_lr = optimizer.lr
+        self.base_lr_pg = [pg.get("lr", optimizer.lr) for pg in optimizer.param_groups]
     
     def get_warmup_lr(self,lr,cur_iters):
         if self.warmup == 'constant':
@@ -37,8 +39,9 @@ class WarmUpLR(object):
         return lr 
     
     def _update_lr(self,steps,get_lr_func):
+        self.optimizer.lr = get_lr_func(self.base_lr,steps)
         for i, param_group in enumerate(self.optimizer.param_groups):
-            param_group["lr"] = get_lr_func(param_group.get("initial_lr",self.optimizer.lr),steps)
+            param_group["lr"] = get_lr_func(self.base_lr_pg[i],steps)
 
     def step(self,iters,epochs,by_epoch=True):
         if self.warmup is not None:
