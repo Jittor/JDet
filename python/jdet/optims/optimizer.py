@@ -30,6 +30,19 @@ class SGD(optim.SGD,Optimizer):
         super(SGD,self).pre_step(loss)
         if self.grad_clip is not None:
             self.clip_grad_norm(**self.grad_clip)
+    
+@OPTIMS.register_module()
+class GradMutilpySGD(SGD):
+    def __init__(self, **kwargs):
+        super(GradMutilpySGD,self).__init__(**kwargs)
+
+    def pre_step(self, loss):
+        super(GradMutilpySGD,self).pre_step(loss)
+        for pg in self.param_groups:
+            if ("grad_mutilpy" in pg):
+                m = pg["grad_mutilpy"]
+                for p, g in zip(pg["params"], pg["grads"]):
+                    g *= m
 
 @OPTIMS.register_module()
 class Adam(optim.Adam,Optimizer):
