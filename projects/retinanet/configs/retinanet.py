@@ -110,7 +110,7 @@ optimizer = dict(
     momentum=0.9, 
     weight_decay=1e-4,
     grad_clip=dict(
-        max_norm=10., 
+        max_norm=30.,  # 10*batch_size
         norm_type=2))
 
 scheduler = dict(
