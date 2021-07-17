@@ -44,7 +44,21 @@ class RunLogger:
             logger.log(data)
         self.print_log(data)
     
+    def get_time(self, s):
+        s = int(s)
+        days = s // 60 // 60 // 24
+        hours = s // 60 // 60 % 24
+        minutes = s // 60 % 60
+        seconds = s % 60
+        return f' [{days}D:{hours}H:{minutes}M:{seconds}S] '
+
     def print_log(self,msg):
         if isinstance(msg,dict):
-            msg = ",".join([f" {k}:{d:.4f}" if isinstance(d,float) else f" {k}:{d}"  for k,d in msg.items()])
+            msgs = []
+            for k,d in msg.items():
+                if (k == "remain_time"):
+                    msgs.append(f" {k}:{self.get_time(d)}")
+                else:
+                    msgs.append(f" {k}:{d:.7f}" if isinstance(d,float) else f" {k}:{d}")
+            msg = ",".join(msgs)
         print(current_time(),msg)
