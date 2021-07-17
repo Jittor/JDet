@@ -36,7 +36,7 @@ model = dict(
     ),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
-        roi_layer=dict(type='RoIAlign', out_size=7, sample_num=2),
+        roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2),
         out_channels=256,
         featmap_strides=[4, 8, 16, 32]),
     bbox_head=dict(
@@ -112,35 +112,59 @@ dataset_type = 'DOTADataset'
 data_root = '/mnt/disk/xzk/remote/data/dota1_1024/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-data = dict(
+dataset = dict(
     imgs_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        img_prefix=data_root + 'trainval1024/images/',
-        img_scale=(1024, 1024),
-        img_norm_cfg=img_norm_cfg,
-        size_divisor=32,
-        flip_ratio=0.5,
-        with_mask=False,
-        with_crowd=True,
-        with_label=True),
+        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
+        image_dir=data_root + 'trainval1024/images/',
+        transforms=[
+            dict(
+                type="RotatedResize",
+                min_size=1024,
+                max_size=1024),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=True),
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(type='RotatedRandomFlip', prob=0.5)
+        ]
+#        with_mask=False,
+#        with_crowd=True,
+#        with_label=True
+        ),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        img_prefix=data_root + 'trainval1024/images',
-        img_scale=(1024, 1024),
-        img_norm_cfg=img_norm_cfg,
-        size_divisor=32,
-        flip_ratio=0,
-        with_mask=False,
-        with_crowd=True,
-        with_label=True),
+        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
+        image_dir=data_root + 'trainval1024/images/',
+        transforms=[
+            dict(
+                type="RotatedResize",
+                min_size=1024,
+                max_size=1024),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=True),
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(type='RotatedRandomFlip', prob=0)
+        ]
+#        with_mask=False,
+#        with_crowd=True,
+#        with_label=True
+        ),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'test1024/DOTA_test1024.json',
-        img_prefix=data_root + 'test1024/images',
+        anno_file=data_root + 'test1024/DOTA_test1024.json',
+        image_dir=data_root + 'test1024/images',
         img_scale=(1024, 1024),
         img_norm_cfg=img_norm_cfg,
         size_divisor=32,

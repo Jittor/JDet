@@ -1,5 +1,33 @@
 import jittor as jt
 
+
+def bbox2delta(proposals, gt, means=[0, 0, 0, 0], stds=[1, 1, 1, 1]):
+    assert proposals.size() == gt.size()
+
+    proposals = proposals.float()
+    gt = gt.float()
+    px = (proposals[..., 0] + proposals[..., 2]) * 0.5
+    py = (proposals[..., 1] + proposals[..., 3]) * 0.5
+    pw = proposals[..., 2] - proposals[..., 0] + 1.0
+    ph = proposals[..., 3] - proposals[..., 1] + 1.0
+
+    gx = (gt[..., 0] + gt[..., 2]) * 0.5
+    gy = (gt[..., 1] + gt[..., 3]) * 0.5
+    gw = gt[..., 2] - gt[..., 0] + 1.0
+    gh = gt[..., 3] - gt[..., 1] + 1.0
+
+    dx = (gx - px) / pw
+    dy = (gy - py) / ph
+    dw = jt.log(gw / pw)
+    dh = jt.log(gh / ph)
+    deltas = jt.stack([dx, dy, dw, dh], dim=-1)
+
+    means = jt.float32(means).unsqueeze(0)
+    stds = jt.float32(stds).unsqueeze(0)
+    deltas = deltas.sub_(means).div_(stds)
+
+    return deltas
+
 def bbox2roi(bbox_list):
     """Convert a list of bboxes to roi format.
 
