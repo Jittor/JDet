@@ -2,13 +2,15 @@ import math
 
 from jdet.models.losses.focal_loss import sigmoid_focal_loss
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
-from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r
+from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r, bbox2loc_r
+from jdet.ops import box_iou_rotated
 from jdet.utils.registry import HEADS
 from jittor import nn,init 
 import jittor as jt
 from jdet.utils.registry import build_from_cfg,MODELS
 import numpy as np
 import jdet
+from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh
 
 @HEADS.register_module()
 class RetinaHead(nn.Module):
@@ -43,7 +45,10 @@ class RetinaHead(nn.Module):
                  anchor_generator=None,
                  mode='H',
                  score_threshold = 0.05,
-                 nms_iou_threshold = 0.5
+                 nms_iou_threshold = 0.5,
+                 roi_beta = 0.,
+                 cls_loss_weight=1.,
+                 loc_loss_weight=0.2,
                  ):
         super(RetinaHead, self).__init__()
 
@@ -56,6 +61,7 @@ class RetinaHead(nn.Module):
         self.mode = mode
         
         self.anchor_generator = build_from_cfg(anchor_generator, MODELS)
+        self.anchor_mode = anchor_generator.mode
         n_anchor = self.anchor_generator.num_base_anchors[0]
 
         self.cls_convs = nn.ModuleList()
@@ -72,9 +78,11 @@ class RetinaHead(nn.Module):
         else:
             self.retina_reg = nn.Conv(feat_channels, n_anchor * 5, 3, padding=1)
 
-        self.roi_beta = 0.
+        self.roi_beta = roi_beta
         self.nms_thresh = nms_iou_threshold
         self.score_thresh = score_threshold
+        self.cls_loss_weight = cls_loss_weight
+        self.loc_loss_weight = loc_loss_weight
 
         self.init_weights()
 
@@ -119,13 +127,22 @@ class RetinaHead(nn.Module):
         cls_score = self.retina_cls(cls_feat)
         bbox_pred = self.retina_reg(reg_feat)
 
-        bbox_pred = bbox_pred.permute(0,2,3,1).reshape(-1,5)
-        cls_score = cls_score.permute(0,2,3,1).reshape(-1,self.n_class)
+        bbox_pred = bbox_pred.permute(0,2,3,1).reshape(n,-1,5)
+        cls_score = cls_score.permute(0,2,3,1).reshape(n,-1,self.n_class)
 
         return bbox_pred, cls_score
     
     def assign_labels(self,roi, bbox, label):
-        iou = bbox_iou(roi, bbox)
+        #roi:x0y0x1y1a
+        #bbox:xywha
+        if (self.mode == 'H'):
+            iou = bbox_iou(roi, bbox)
+        else:
+            if (self.anchor_mode == 'H'):
+                bbox_ = rotated_box_to_bbox(bbox) #TODO move to outside/dataloader
+                iou = bbox_iou(roi[:, :4], bbox_)
+            else:
+                iou = box_iou_rotated(roi, bbox) #TODO check
         gt_assignment,max_iou = iou.argmax(dim=1)
 
         gt_roi_label = -jt.ones((gt_assignment.shape[0],))
@@ -139,46 +156,57 @@ class RetinaHead(nn.Module):
 
         # Compute offsets and scales to match sampled RoIs to the GTs.
         gt_roi_loc = jt.zeros(roi.shape)
-        gt_roi_loc[pos_index] = bbox2loc(roi[pos_index], bbox[gt_assignment[pos_index]])
+        if (self.mode == 'H'):
+            gt_roi_loc[pos_index] = bbox2loc(roi[pos_index], bbox[gt_assignment[pos_index]])
+        else:
+            bbox_ = bbox
+            roi_ = self.cvt2_w_greater_than_h(boxes_x0y0x1y1_to_xywh(roi))
+            gt_roi_loc[pos_index] = bbox2loc_r(roi_[pos_index], bbox_[gt_assignment[pos_index]])
 
         return gt_roi_loc, gt_roi_label
 
-    def get_bboxes(self,indexes,proposals,bbox_pred,score,targets):
-        if (self.mode == "H"):
-            cls_bbox = loc2bbox(proposals,bbox_pred)
-        else:
-            h = proposals[:, 2:3] - proposals[:, 0:1]
-            w = proposals[:, 3:4] - proposals[:, 1:2]
-            cx = proposals[:, 0:1] + 0.5 * h
-            cy = proposals[:, 1:2] + 0.5 * w
-            a = proposals[:, 4:5]
-            
-            proposals = jt.concat([cx, cy, w, h, a], 1)
-            
-            remain_mask = w > h
-            convert_mask = 1 - remain_mask
-            remain_coords = proposals * remain_mask.reshape([-1, 1])
+    # input xywha(pi)
+    # output xywha(pi)
+    def cvt2_w_greater_than_h(self, boxes, reverse_hw=True):
+        if (reverse_hw): #TODO: yangxue?
+            x, y, w, h, a = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3], boxes[:, 4]
+            boxes = jt.stack([x, y, h, w, a], dim=1)
 
-            proposals[:, [2, 3]] = proposals[:, [3, 2]]
-            proposals[:, 4] += 90
+        h = boxes[:, 3:4]
+        w = boxes[:, 2:3]
+        
+        remain_mask = w > h
+        convert_mask = 1 - remain_mask
+        remain_coords = boxes * remain_mask.reshape([-1, 1])
 
-            convert_coords = proposals * convert_mask.reshape([-1, 1])
-            proposals = remain_coords + convert_coords
-            cx, cy, w, h, a = proposals[:, 0:1], proposals[:, 1:2], proposals[:, 2:3], proposals[:, 3:4], proposals[:, 4:5]
-            proposals = jt.concat([cx - 0.5 * w, cy - 0.5 * h, cx + 0.5 * w, cy + 0.5 * h, a], 1)
-            cls_bbox = loc2bbox_r(proposals,bbox_pred)
+        boxes[:, [2, 3]] = boxes[:, [3, 2]]
+        boxes[:, 4] += 0.5 * np.pi
 
-        probs = score.sigmoid()
+        convert_coords = boxes * convert_mask.reshape([-1, 1])
+        boxes = remain_coords + convert_coords
+
+        boxes[:, 4] -= 0.5 * np.pi
+        return boxes
+
+    def get_bboxes(self,proposals_,bbox_pred_,score_,targets):
         results = []
-
         for i,target in enumerate(targets):
+            if (self.mode == "H"):
+                cls_bbox = loc2bbox(proposals_[i],bbox_pred_[i])
+            else:
+                proposals = boxes_x0y0x1y1_to_xywh(proposals_[i])
+                proposals = self.cvt2_w_greater_than_h(proposals)
+                proposals[:, 4] += 0.5 * np.pi#TODO: yangxue?
+                cls_bbox = loc2bbox_r(proposals,bbox_pred_[i])
+
+            probs = score_[i].sigmoid()
+
             img_size = target["img_size"]
             ori_img_size = target["ori_img_size"]
             assert(abs(ori_img_size[0]/ori_img_size[1] - img_size[0]/img_size[1]) < 1e-6) # too keep the angle
 
-            index = jt.where(indexes==i)[0]
-            score = probs[index,:]
-            bbox = cls_bbox[index,:]
+            score = probs
+            bbox = cls_bbox
             # bbox[:,[0,2]] = jt.clamp(bbox[:,[0,2]],min_v=0,max_v=img_size[0])*(ori_img_size[0]/img_size[0])
             # bbox[:,[1,3]] = jt.clamp(bbox[:,[1,3]],min_v=0,max_v=img_size[1])*(ori_img_size[1]/img_size[1])
             
@@ -191,7 +219,7 @@ class RetinaHead(nn.Module):
             for j in range(self.n_class):
                 score_j = score[:,j]
                 bbox_j = bbox
-                # #Err
+                # #TODO Err
                 # mask = ((score_j>self.score_thresh)+(bbox_j[:, 4] < 90) + (bbox_j[:, 4] > -90))==3
                 # bbox_j = bbox_j[mask,:]
                 # score_j = score_j[mask]
@@ -241,33 +269,44 @@ class RetinaHead(nn.Module):
             results.append((jt.concat([boxes, scores.unsqueeze(1)], 1), labels))
         return results
 
-    def losses(self,all_bbox_pred,all_cls_score,all_gt_roi_locs,all_gt_roi_labels):
-        normalizer = max((all_gt_roi_labels>0).sum().item(),1)
-        
-        # only calculate the positive box,if beta==0. means L1 loss
-        roi_loc_loss = smooth_l1_loss(all_bbox_pred[all_gt_roi_labels>0],all_gt_roi_locs[all_gt_roi_labels>0],beta=self.roi_beta,reduction="sum")
-
-        # build one hot with background
-        inputs = all_cls_score[all_gt_roi_labels>=0]
-        cates = all_gt_roi_labels[all_gt_roi_labels>=0].unsqueeze(1)
-        class_range = jt.index((self.n_class,),dim=0)+1
-        cates = (cates==class_range)
-        roi_cls_loss = sigmoid_focal_loss(inputs,cates,reduction="sum")
-
+    def losses(self,all_bbox_pred_,all_cls_score_,all_gt_roi_locs_,all_gt_roi_labels_):
+        batch_size = len(all_bbox_pred_)
         losses = dict(
-            roi_cls_loss=roi_cls_loss/normalizer,
-            roi_loc_loss=roi_loc_loss/normalizer
+            roi_cls_loss=0,
+            roi_loc_loss=0
         ) 
+        for i in range(batch_size):
+            all_gt_roi_labels = all_gt_roi_labels_[i]
+            normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
+            # only calculate the positive box,if beta==0. means L1 loss
+            roi_loc_loss = smooth_l1_loss(all_bbox_pred_[i][all_gt_roi_labels>0],all_gt_roi_locs_[i][all_gt_roi_labels>0],beta=self.roi_beta,reduction="sum")
+
+            # build one hot with background
+            inputs = all_cls_score_[i][all_gt_roi_labels>=0]
+            cates = all_gt_roi_labels[all_gt_roi_labels>=0]#.unsqueeze(1)
+
+            roi_cls_loss = sigmoid_focal_loss(inputs,cates,reduction="sum",alpha=0.25)
+            losses['roi_cls_loss'] += roi_cls_loss/normalizer
+            losses['roi_loc_loss'] += roi_loc_loss/normalizer
+        losses['roi_cls_loss'] *= self.cls_loss_weight / batch_size
+        losses['roi_loc_loss'] *= self.loc_loss_weight / batch_size
         return losses
 
     def execute(self,xs,targets):
+        n = len(targets)
         all_bbox_pred = []
         all_cls_score = []
         all_proposals = []
         all_gt_roi_labels = []
         all_gt_roi_locs = []
-        all_indexes = []
+        for i in range(n):
+            all_bbox_pred.append([])
+            all_cls_score.append([])
+            all_proposals.append([])
+            all_gt_roi_labels.append([])
+            all_gt_roi_locs.append([])
+
 
         sizes = []
         for x in xs:
@@ -278,55 +317,38 @@ class RetinaHead(nn.Module):
         for x in xs:
             id += 1
             bbox_pred, cls_score = self.execute_single(x)
-            anchor = anchors[id]
-            gt_roi_locs = []
-            gt_roi_labels = []
-            proposals = []
-            indexes = []
+            anchor = anchors[id] #x0,y0,x1,y1
+
+            anchor = jt.contrib.concat([anchor, -0.5 * np.pi * jt.ones([anchor.shape[0], 1])], 1)
+
             for i,target in enumerate(targets):
                 if self.is_training():
-                    gt_bbox = target["bboxes"]
+                    gt_bbox = target["bboxes"]#xywha
                     gt_label = target["labels"]
+                    gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yangxue?
+
                     gt_roi_loc,gt_roi_label= self.assign_labels(anchor,gt_bbox,gt_label)
-                    gt_roi_locs.append(gt_roi_loc)
-                    gt_roi_labels.append(gt_roi_label)
+                    all_gt_roi_locs[i].append(gt_roi_loc)
+                    all_gt_roi_labels[i].append(gt_roi_label)
 
-                index = i*jt.ones((anchor.shape[0],))
-                indexes.append(index)
-                proposals.append(anchor)
+                all_proposals[i].append(anchor)
+                all_bbox_pred[i].append(bbox_pred[i])
+                all_cls_score[i].append(cls_score[i])
 
-
-            proposals = jt.contrib.concat(proposals,dim=0)
-            indexes = jt.contrib.concat(indexes,dim=0)
-
-            all_bbox_pred.append(bbox_pred)
-            all_cls_score.append(cls_score)
-            all_proposals.append(proposals)
-            all_indexes.append(indexes)
-
+        for i in range(n):
+            all_bbox_pred[i] = jt.concat(all_bbox_pred[i], 0)
+            all_cls_score[i] = jt.concat(all_cls_score[i], 0)
+            all_proposals[i] = jt.concat(all_proposals[i], 0)
             if self.is_training():
-                gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
-                gt_roi_labels = jt.contrib.concat(gt_roi_labels,dim=0)
-                all_gt_roi_locs.append(gt_roi_locs)
-                all_gt_roi_labels.append(gt_roi_labels)
-        
+                all_gt_roi_locs[i] = jt.concat(all_gt_roi_locs[i],0)
+                all_gt_roi_labels[i] = jt.concat(all_gt_roi_labels[i],0)
 
-        all_bbox_pred = jt.contrib.concat(all_bbox_pred,dim=0)
-        all_cls_score = jt.contrib.concat(all_cls_score,dim=0)
-        all_proposals = jt.contrib.concat(all_proposals,dim=0)
-        all_proposals = jt.contrib.concat([all_proposals, -90 * jt.ones([all_proposals.shape[0], 1])], 1)
-        all_indexes = jt.contrib.concat(all_indexes,dim=0)
-    
-        if self.is_training():
-            all_gt_roi_locs = jt.contrib.concat(all_gt_roi_locs,dim=0)
-            all_gt_roi_labels = jt.contrib.concat(all_gt_roi_labels,dim=0)
-        
         losses = dict()
         results = []
         if self.is_training():
             losses = self.losses(all_bbox_pred,all_cls_score,all_gt_roi_locs,all_gt_roi_labels)
         else:
-            results = self.get_bboxes(all_indexes,all_proposals,all_bbox_pred,all_cls_score,targets)
+            results = self.get_bboxes(all_proposals,all_bbox_pred,all_cls_score,targets)
 
         return results,losses 
         
