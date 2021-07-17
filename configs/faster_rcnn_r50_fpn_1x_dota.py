@@ -108,7 +108,7 @@ model = dict(
     )
 )
 # dataset settings
-dataset_type = 'DOTADataset'
+dataset_type = 'DOTADataset_vCOCO'
 data_root = '/mnt/disk/xzk/remote/data/dota1_1024/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
@@ -118,7 +118,7 @@ dataset = dict(
     train=dict(
         type=dataset_type,
         anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        image_dir=data_root + 'trainval1024/images/',
+        root=data_root + 'trainval1024/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -141,7 +141,7 @@ dataset = dict(
     val=dict(
         type=dataset_type,
         anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        image_dir=data_root + 'trainval1024/images/',
+        root=data_root + 'trainval1024/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -164,7 +164,7 @@ dataset = dict(
     test=dict(
         type=dataset_type,
         anno_file=data_root + 'test1024/DOTA_test1024.json',
-        image_dir=data_root + 'test1024/images',
+        root=data_root + 'test1024/images',
         img_scale=(1024, 1024),
         img_norm_cfg=img_norm_cfg,
         size_divisor=32,
