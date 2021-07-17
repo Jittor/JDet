@@ -1,11 +1,11 @@
 from jdet.utils.general import build_file
-from jittor.dataset import Dataset 
+from jittor.dataset import Dataset
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-import os 
+import os
 from PIL import Image
-import numpy as np 
-import json 
+import numpy as np
+import json
 import warnings
 import itertools
 from collections import OrderedDict
@@ -15,6 +15,7 @@ from terminaltables import AsciiTable
 from jdet.utils.registry import DATASETS
 from jdet.config import COCO_CLASSES
 from .transforms import Compose
+
 
 @DATASETS.register_module()
 class COCODataset(Dataset):
@@ -32,19 +33,20 @@ class COCODataset(Dataset):
     """
 
     CLASSES = COCO_CLASSES
-    
-    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,use_anno_cats=False):
-        super(COCODataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
-        self.root = root 
+
+    def __init__(self, root, anno_file, transforms=None, batch_size=1, num_workers=0, shuffle=False, drop_last=False, filter_empty_gt=True, use_anno_cats=False):
+        super(COCODataset, self).__init__(batch_size=batch_size,
+                                          num_workers=num_workers, shuffle=shuffle, drop_last=drop_last)
+        self.root = root
         self.coco = COCO(anno_file)
-        
-        if isinstance(transforms,list):
+
+        if isinstance(transforms, list):
             transforms = Compose(transforms)
         if transforms is not None and not callable(transforms):
             raise TypeError("transforms must be list or callable")
 
         self.transforms = transforms
-        
+
         if use_anno_cats:
             self.CLASSES = [cat['name'] for cat in self.coco.cats.values()]
 
@@ -69,7 +71,8 @@ class COCODataset(Dataset):
         # merge the image id sets of the two conditions and use the merged set
         ids_in_cat &= ids_with_ann
 
-        tmp_img_ids = [img_id for img_id in self.img_ids if img_id in ids_in_cat]
+        tmp_img_ids = [
+            img_id for img_id in self.img_ids if img_id in ids_in_cat]
 
         img_ids = []
         for img_id in tmp_img_ids:
@@ -77,7 +80,8 @@ class COCODataset(Dataset):
             anno = self.coco.loadAnns(ann_ids)
 
             # remove ignored or crowd box
-            anno = [obj for obj in anno if ("is_crowd" not in obj or obj["iscrowd"] == 0) and ("ignore" not in obj or obj["ignore"] == 0) ]
+            anno = [obj for obj in anno if ("is_crowd" not in obj or obj["iscrowd"] == 0) and (
+                "ignore" not in obj or obj["ignore"] == 0)]
             # if it's empty, there is no annotation
             if len(anno) == 0:
                 continue
@@ -97,8 +101,8 @@ class COCODataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         ann_info = self.coco.loadAnns(self.coco.getAnnIds(img_id))
 
-        width,height = image.size 
-        assert width == img_info['width'] and height == img_info["height"],"image size is different from annotations"
+        width, height = image.size
+        assert width == img_info['width'] and height == img_info["height"], "image size is different from annotations"
 
         gt_bboxes = []
         gt_labels = []
@@ -137,65 +141,62 @@ class COCODataset(Dataset):
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
 
         ann = dict(
-            img_id = img_id,
+            img_id=img_id,
             bboxes=gt_bboxes,
             labels=gt_labels,
             bboxes_ignore=gt_bboxes_ignore,
             masks=gt_masks_ann,
             classes=self.CLASSES,
-            ori_img_size=(width,height),
-            img_size=(width,height))
+            ori_img_size=(width, height),
+            img_size=(width, height))
 
-        return image,ann
-    
+        return image, ann
 
     def __getitem__(self, idx):
         img_id = self.img_ids[idx]
-        image,anno = self._read_ann_info(img_id)
+        image, anno = self._read_ann_info(img_id)
 
         if self.transforms is not None:
             image, anno = self.transforms(image, anno)
 
-        return image, anno 
+        return image, anno
 
-    def collate_batch(self,batch):
+    def collate_batch(self, batch):
         imgs = []
         anns = []
         max_width = 0
         max_height = 0
-        for image,ann in batch:
-            height,width = image.shape[-2],image.shape[-1]
-            max_width = max(max_width,width)
-            max_height = max(max_height,height)
+        for image, ann in batch:
+            height, width = image.shape[-2], image.shape[-1]
+            max_width = max(max_width, width)
+            max_height = max(max_height, height)
             imgs.append(image)
             anns.append(ann)
         N = len(imgs)
-        batch_imgs = np.zeros((N,3,max_height,max_width),dtype=np.float32)
-        for i,image in enumerate(imgs):
-            batch_imgs[i,:,:image.shape[-2],:image.shape[-1]] = image
-        
-        return batch_imgs,anns 
+        batch_imgs = np.zeros((N, 3, max_height, max_width), dtype=np.float32)
+        for i, image in enumerate(imgs):
+            batch_imgs[i, :, :image.shape[-2], :image.shape[-1]] = image
 
-    
-    def save_results(self,results,save_file):
+        return batch_imgs, anns
+
+    def save_results(self, results, save_file):
         """Convert detection results to COCO json style."""
         def xyxy2xywh(box):
-            x1,y1,x2,y2 = box.tolist()
-            return [x1,y1,x2-x1,y2-y1]
-        
+            x1, y1, x2, y2 = box.tolist()
+            return [x1, y1, x2-x1, y2-y1]
+
         json_results = []
         for result in results:
             img_id = result["img_id"]
-            for box,score,label in zip(result["boxes"],result["scores"],result["labels"]):
+            for box, score, label in zip(result["boxes"], result["scores"], result["labels"]):
                 data = dict()
                 data['image_id'] = img_id
                 data['bbox'] = xyxy2xywh(box)
                 data['score'] = float(score)
                 data['category_id'] = self.cat_ids[int(label)-1]
                 json_results.append(data)
-        json.dump(json_results,open(save_file,"w"))
+        json.dump(json_results, open(save_file, "w"))
 
-    
     def evaluate(self,
                  results,
                  work_dir,
@@ -236,8 +237,8 @@ class COCODataset(Dataset):
         Returns:
             dict[str, float]: COCO style evaluation metric.
         """
-        save_file = build_file(work_dir,prefix=f"detections/val_{epoch}.json")
-        self.save_results(results,save_file)
+        save_file = build_file(work_dir, prefix=f"detections/val_{epoch}.json")
+        self.save_results(results, save_file)
         metrics = metric if isinstance(metric, list) else [metric]
         allowed_metrics = ['bbox', 'segm', 'proposal', 'proposal_fast']
         for metric in metrics:
@@ -258,7 +259,7 @@ class COCODataset(Dataset):
                 logger.print_log(msg)
 
             iou_type = metric
-            predictions = json.load(open(results_file))
+            predictions = json.load(open(save_file))
             if iou_type == 'segm':
                 # Refer to https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/coco.py#L331  # noqa
                 # When evaluating mask AP, if the results contain bbox,
@@ -274,8 +275,9 @@ class COCODataset(Dataset):
                     'of small/medium/large instances since v2.12.0. This '
                     'does not change the overall mAP calculation.',
                     UserWarning)
-            if len(predictions)==0:
-                warnings.warn('The testing results of the whole dataset is empty.')
+            if len(predictions) == 0:
+                warnings.warn(
+                    'The testing results of the whole dataset is empty.')
                 break
             cocoDt = cocoGt.loadRes(predictions)
             cocoEval = COCOeval(cocoGt, cocoDt, iou_type)

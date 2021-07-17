@@ -71,10 +71,10 @@ dataset = dict(
     ),
     val=dict(
         type="COCODataset",
-        anno_file='../coco128/detections_train2017.json',
-        root='../coco128/images/train2017/',
-        # anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json',
-        # root='/mnt/disk/lxl/dataset/coco/images/val2017/',
+        # anno_file='../coco128/detections_train2017.json',
+        # root='../coco128/images/train2017/',
+        anno_file='/mnt/disk/lxl/workspace/coco/annotations/instances_val2017.json',
+        root='/mnt/disk/lxl/workspace/coco/images/val2017/',
         transforms=[
             dict(
                 type="Resize",

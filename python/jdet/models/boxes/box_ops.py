@@ -1,9 +1,11 @@
-import jittor as jt 
-import numpy as np 
-import math 
+import jittor as jt
+import numpy as np
+import math
+
 
 def norm_angle(angle, range=[-np.pi / 4, np.pi]):
     return (angle - range[0]) % range[1] + range[0]
+
 
 def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1., 1., 1.)):
     """Compute deltas of proposals w.r.t. gt.
@@ -45,7 +47,7 @@ def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 
     da = norm_angle(da) / np.pi
 
     deltas = jt.stack((dx, dy, dw, dh, da), -1)
-     
+
     means = jt.array(means)
     means = jt.array(means).unsqueeze(0)
     stds = jt.array(stds).unsqueeze(0)
@@ -100,9 +102,9 @@ def delta2bbox_rotated(rois, deltas, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1
     roi_h = (rois[:, 3]).unsqueeze(1).expand_as(dh)
     roi_angle = (rois[:, 4]).unsqueeze(1).expand_as(dangle)
     gx = dx * roi_w * jt.cos(roi_angle) \
-         - dy * roi_h * jt.sin(roi_angle) + roi_x
+        - dy * roi_h * jt.sin(roi_angle) + roi_x
     gy = dx * roi_w * jt.sin(roi_angle) \
-         + dy * roi_h * jt.cos(roi_angle) + roi_y
+        + dy * roi_h * jt.cos(roi_angle) + roi_y
     gw = roi_w * dw.exp()
     gh = roi_h * dh.exp()
 
@@ -137,7 +139,7 @@ def bbox2delta(proposals,
     assert proposals.size() == gt.size()
 
     proposals = proposals.float()
-    gt = gt.float()
+    gt = gt.float().copy()
     px = (proposals[..., 0] + proposals[..., 2]) * 0.5
     py = (proposals[..., 1] + proposals[..., 3]) * 0.5
     pw = proposals[..., 2] - proposals[..., 0]
@@ -150,6 +152,7 @@ def bbox2delta(proposals,
 
     dx = (gx - px) / pw
     dy = (gy - py) / ph
+
     dw = jt.log(gw / pw)
     dh = jt.log(gh / ph)
     deltas = jt.stack([dx, dy, dw, dh], dim=-1)
@@ -159,6 +162,7 @@ def bbox2delta(proposals,
     deltas = (deltas-means)/stds
 
     return deltas
+
 
 def delta2bbox(rois,
                deltas,
@@ -283,6 +287,7 @@ def poly_to_rotated_box_single(poly):
     rotated_box = np.array([x_ctr, y_ctr, width, height, angle])
     return rotated_box
 
+
 def poly_to_rotated_box_np(polys):
     """
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
@@ -310,8 +315,10 @@ def poly_to_rotated_box(polys):
     edge2 = jt.sqrt(
         jt.pow(pt2[..., 0] - pt3[..., 0], 2) + jt.pow(pt2[..., 1] - pt3[..., 1], 2))
 
-    angles1 = jt.atan2((pt2[..., 1] - pt1[..., 1]), (pt2[..., 0] - pt1[..., 0]))
-    angles2 = jt.atan2((pt4[..., 1] - pt1[..., 1]), (pt4[..., 0] - pt1[..., 0]))
+    angles1 = jt.atan2((pt2[..., 1] - pt1[..., 1]),
+                       (pt2[..., 0] - pt1[..., 0]))
+    angles2 = jt.atan2((pt4[..., 1] - pt1[..., 1]),
+                       (pt4[..., 0] - pt1[..., 0]))
     angles = polys.new_zeros(polys.shape[0])
     angles[edge1 > edge2] = angles1[edge1 > edge2]
     angles[edge1 <= edge2] = angles2[edge1 <= edge2]
@@ -326,6 +333,7 @@ def poly_to_rotated_box(polys):
     height = jt.min(edges, 1)
 
     return jt.stack([x_ctr, y_ctr, width, height, angles], 1)
+
 
 def cal_line_length(point1, point2):
     return math.sqrt(math.pow(point1[0] - point2[0], 2) + math.pow(point1[1] - point2[1], 2))
@@ -344,9 +352,9 @@ def get_best_begin_point_single(coordinate):
     force_flag = 0
     for i in range(4):
         temp_force = cal_line_length(combinate[i][0], dst_coordinate[0]) \
-                     + cal_line_length(combinate[i][1], dst_coordinate[1]) \
-                     + cal_line_length(combinate[i][2], dst_coordinate[2]) \
-                     + cal_line_length(combinate[i][3], dst_coordinate[3])
+            + cal_line_length(combinate[i][1], dst_coordinate[1]) \
+            + cal_line_length(combinate[i][2], dst_coordinate[2]) \
+            + cal_line_length(combinate[i][3], dst_coordinate[3])
         if temp_force < force:
             force = temp_force
             force_flag = i
@@ -360,6 +368,7 @@ def get_best_begin_point(coordinates):
     coordinates = list(map(get_best_begin_point_single, coordinates.tolist()))
     coordinates = np.array(coordinates)
     return coordinates
+
 
 def rotated_box_to_poly_single(rrect):
     """
@@ -378,7 +387,8 @@ def rotated_box_to_poly_single(rrect):
     poly = np.array([x0, y0, x1, y1, x2, y2, x3, y3], dtype=np.float32)
     poly = get_best_begin_point_single(poly)
     return poly
-    
+
+
 def rotated_box_to_poly_np(rrects):
     """
     rrect:[x_ctr,y_ctr,w,h,angle]
@@ -401,6 +411,7 @@ def rotated_box_to_poly_np(rrects):
     polys = get_best_begin_point(polys)
     return polys.astype(np.float32)
 
+
 def rotated_box_to_bbox_np(rotatex_boxes):
     polys = rotated_box_to_poly_np(rotatex_boxes)
     xmin = polys[:, ::2].min(1, keepdims=True)
@@ -409,6 +420,7 @@ def rotated_box_to_bbox_np(rotatex_boxes):
     ymax = polys[:, 1::2].max(1, keepdims=True)
     return np.concatenate([xmin, ymin, xmax, ymax], axis=1)
 
+
 def rotated_box_to_bbox(rotatex_boxes):
     polys = rotated_box_to_poly(rotatex_boxes)
     xmin, _ = polys[:, ::2].min(1)
@@ -416,6 +428,7 @@ def rotated_box_to_bbox(rotatex_boxes):
     xmax, _ = polys[:, ::2].max(1)
     ymax, _ = polys[:, 1::2].max(1)
     return jt.stack([xmin, ymin, xmax, ymax], dim=1)
+
 
 def bbox2result(bboxes, labels, num_classes):
     """Convert detection results to a list of numpy arrays.
