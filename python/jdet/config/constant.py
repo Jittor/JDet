@@ -71,3 +71,12 @@ DOTA1_CLASSES = ['plane', 'baseball-diamond', 'bridge', 'ground-track-field',
                'small-vehicle', 'large-vehicle', 'ship', 'tennis-court',
                'basketball-court', 'storage-tank', 'soccer-ball-field',
                'roundabout', 'harbor', 'swimming-pool', 'helicopter']
+
+FAIR_CLASSES = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919', 
+        'A220', 'A321', 'A330', 'A350', 'ARJ21', 'other-airplane', 'Passenger Ship', 
+        'Motorboat', 'Fishing Boat', 'Tugboat', 'Engineering Ship', 'Liquid Cargo Ship', 
+        'Dry Cargo Ship', 'Warship', 'other-ship', 'Small Car', 'Bus', 'Cargo Truck', 
+        'Dump Truck', 'Van', 'Trailer', 'Tractor', 'Excavator', 'Truck Tractor', 
+        'other-vehicle', 'Basketball Court', 'Tennis Court', 'Football Field', 
+        'Baseball Field', 'Intersection', 'Roundabout', 'Bridge'
+    ]
