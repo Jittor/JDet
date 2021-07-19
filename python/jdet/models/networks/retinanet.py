@@ -37,12 +37,10 @@ class RetinaNet(nn.Module):
             losses (dict): losses
         '''
         features = self.backbone(images)
-        
         if self.neck:
             features = self.neck(features)
-        
         results,losses = self.rpn_net(features, targets)
-        # self.draw(images, results, targets, "temp.jpg")
+
         if self.is_training():
             return losses 
         else:

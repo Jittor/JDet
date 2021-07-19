@@ -83,8 +83,8 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        anno_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        image_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",

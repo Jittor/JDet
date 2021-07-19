@@ -11,6 +11,7 @@ from jdet.utils.registry import build_from_cfg,MODELS
 import numpy as np
 import jdet
 from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh
+# from my_utils import get_var
 
 @HEADS.register_module()
 class RetinaHead(nn.Module):
@@ -140,9 +141,18 @@ class RetinaHead(nn.Module):
         else:
             if (self.anchor_mode == 'H'):
                 bbox_ = rotated_box_to_bbox(bbox) #TODO move to outside/dataloader
+                # bbox_ = get_var('gt_boxes_h')[:, :-1] #TODO delete
                 iou = bbox_iou(roi[:, :4], bbox_)
             else:
                 iou = box_iou_rotated(roi, bbox) #TODO check
+
+            # y_jt = bbox_.data
+            # y_tf = get_var('gt_boxes_h').data[:, :-1]
+            # print(y_jt.shape, y_tf.shape)
+            # print(y_jt)
+            # print(y_tf)
+            # print(np.abs(y_jt - y_tf).mean())
+
         gt_assignment,max_iou = iou.argmax(dim=1)
 
         gt_roi_label = -jt.ones((gt_assignment.shape[0],))
@@ -154,6 +164,37 @@ class RetinaHead(nn.Module):
         gt_roi_label[neg_index] = 0  # negative labels --> 0
         gt_roi_label[pos_index] = label[gt_assignment[pos_index]]
 
+        # shapes = [210000,52500,13125,3549,1029]
+        # s = 0
+        # print("==========")
+        # for ss in shapes:
+        #     if (iou.shape[0] == ss):
+        #         y_jt = iou.data
+        #         y_tf = get_var('overlaps').data[s:s+ss]
+        #         print(y_jt.max(), y_tf.max())
+        #         print(y_jt.shape, y_tf.shape)
+        #         print(np.abs(y_jt - y_tf).mean())
+
+                
+        #         y_tf = get_var('anchor_states').data[s:s+ss]
+        #         neg = neg_index.data
+        #         pos = pos_index.data
+        #         print(y_tf.shape)
+        #         right = 0
+        #         for ne in neg:
+        #             if (y_tf[ne] == 0):
+        #                 right += 1
+        #         print(right / len(neg), right, len(neg))
+        #         right = 0
+        #         for po in pos:
+        #             if (y_tf[po] == 1):
+        #                 right += 1
+        #         if (len(pos)==0):
+        #             print(0)
+        #         else:
+        #             print(right / len(pos), right, len(pos))
+        #     s += ss
+
         # Compute offsets and scales to match sampled RoIs to the GTs.
         gt_roi_loc = jt.zeros(roi.shape)
         if (self.mode == 'H'):
@@ -162,12 +203,40 @@ class RetinaHead(nn.Module):
             bbox_ = bbox
             roi_ = self.cvt2_w_greater_than_h(boxes_x0y0x1y1_to_xywh(roi))
             gt_roi_loc[pos_index] = bbox2loc_r(roi_[pos_index], bbox_[gt_assignment[pos_index]])
+            # gt_roi_loc_ = bbox2loc_r(roi_, bbox_[gt_assignment]) #TODO: change to the row above
 
+            # shapes = [210000,52500,13125,3549,1029]
+            # s = 0
+            # print("==========")
+            # for ss in shapes:
+            #     if (iou.shape[0] == ss):
+            #         y_jt = roi_.data
+            #         y_tf = boxes_xywh_to_x0y0x1y1(get_var('anchors__')[s:s+ss])
+            #         y_tf[:, 4] *= np.pi / 180
+            #         y_tf = y_tf.data
+            #         print(y_jt.shape, y_tf.shape)
+            #         print(np.abs(y_jt - y_tf).mean())
+
+            #         y_jt = bbox_[gt_assignment].data
+            #         y_tf = boxes_xywh_to_x0y0x1y1(get_var('target_boxes__')[s:s+ss, :5])
+            #         y_tf[:, 4] *= np.pi / 180
+            #         y_tf = y_tf.data
+            #         print(y_jt.shape, y_tf.shape)
+            #         print(np.abs(y_jt - y_tf).mean())
+
+            #         y_jt = gt_roi_loc_.data
+            #         y_tf = get_var('target_delta').data[s:s+ss]
+            #         print(y_jt.shape)
+            #         print(y_tf.shape)
+            #         print(np.abs(y_jt - y_tf).mean())
+            #     s += ss
         return gt_roi_loc, gt_roi_label
 
     # input xywha(pi)
     # output xywha(pi)
     def cvt2_w_greater_than_h(self, boxes, reverse_hw=True):
+        # h = boxes[:, 2:3] - boxes[:, 0:1]
+        # w = boxes[:, 3:4] - boxes[:, 1:2]
         if (reverse_hw): #TODO: yangxue?
             x, y, w, h, a = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3], boxes[:, 4]
             boxes = jt.stack([x, y, h, w, a], dim=1)
@@ -180,6 +249,7 @@ class RetinaHead(nn.Module):
         remain_coords = boxes * remain_mask.reshape([-1, 1])
 
         boxes[:, [2, 3]] = boxes[:, [3, 2]]
+        # boxes[:, 4] += 90 #ori
         boxes[:, 4] += 0.5 * np.pi
 
         convert_coords = boxes * convert_mask.reshape([-1, 1])
@@ -197,6 +267,27 @@ class RetinaHead(nn.Module):
                 proposals = boxes_x0y0x1y1_to_xywh(proposals_[i])
                 proposals = self.cvt2_w_greater_than_h(proposals)
                 proposals[:, 4] += 0.5 * np.pi#TODO: yangxue?
+
+                # h = proposals[:, 2:3] - proposals[:, 0:1]
+                # w = proposals[:, 3:4] - proposals[:, 1:2]
+                # cx = proposals[:, 0:1] + 0.5 * h
+                # cy = proposals[:, 1:2] + 0.5 * w
+                # a = proposals[:, 4:5]
+                
+                # proposals = jt.concat([cx, cy, w, h, a], 1)
+                
+                # remain_mask = w > h
+                # convert_mask = 1 - remain_mask
+                # remain_coords = proposals * remain_mask.reshape([-1, 1])
+
+                # proposals[:, [2, 3]] = proposals[:, [3, 2]]
+                # # proposals[:, 4] += 90 #ori
+                # proposals[:, 4] += 0.5 * np.pi
+
+                # convert_coords = proposals * convert_mask.reshape([-1, 1])
+                # proposals = remain_coords + convert_coords
+                # cx, cy, w, h, a = proposals[:, 0:1], proposals[:, 1:2], proposals[:, 2:3], proposals[:, 3:4], proposals[:, 4:5]
+                # proposals = jt.concat([cx - 0.5 * w, cy - 0.5 * h, cx + 0.5 * w, cy + 0.5 * h, a], 1)
                 cls_bbox = loc2bbox_r(proposals,bbox_pred_[i])
 
             probs = score_[i].sigmoid()
@@ -219,7 +310,7 @@ class RetinaHead(nn.Module):
             for j in range(self.n_class):
                 score_j = score[:,j]
                 bbox_j = bbox
-                # #TODO Err
+                # #Err
                 # mask = ((score_j>self.score_thresh)+(bbox_j[:, 4] < 90) + (bbox_j[:, 4] > -90))==3
                 # bbox_j = bbox_j[mask,:]
                 # score_j = score_j[mask]
@@ -286,6 +377,8 @@ class RetinaHead(nn.Module):
             inputs = all_cls_score_[i][all_gt_roi_labels>=0]
             cates = all_gt_roi_labels[all_gt_roi_labels>=0]#.unsqueeze(1)
 
+            # class_range = jt.index((self.n_class,),dim=0)+1
+            # cates = (cates==class_range)
             roi_cls_loss = sigmoid_focal_loss(inputs,cates,reduction="sum",alpha=0.25)
             losses['roi_cls_loss'] += roi_cls_loss/normalizer
             losses['roi_loc_loss'] += roi_loc_loss/normalizer
@@ -319,21 +412,81 @@ class RetinaHead(nn.Module):
             bbox_pred, cls_score = self.execute_single(x)
             anchor = anchors[id] #x0,y0,x1,y1
 
+            # #yangxue
+            # x_c = (anchor[:, 2] + anchor[:, 0]) / 2
+            # y_c = (anchor[:, 3] + anchor[:, 1]) / 2
+            # h = anchor[:, 2] - anchor[:, 0]
+            # w = anchor[:, 3] - anchor[:, 1]
+            # a = -0.5 * np.pi * jt.ones([anchor.shape[0]])
+            # anchor = boxes_xywh_to_x0y0x1y1(jt.stack([x_c, y_c, w, h, a],dim=1))
+
+            # anchor = jt.contrib.concat([anchor, -90 * jt.ones([anchor.shape[0], 1])], 1) #ori
             anchor = jt.contrib.concat([anchor, -0.5 * np.pi * jt.ones([anchor.shape[0], 1])], 1)
 
             for i,target in enumerate(targets):
                 if self.is_training():
                     gt_bbox = target["bboxes"]#xywha
+                    # gt_bbox = get_var('gt_boxes_r')#TODO delete
+                    # gt_bbox[:, 4] *= np.pi / 180#TODO delete
                     gt_label = target["labels"]
                     gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yangxue?
+
+                    # from jdet.models.boxes.box_ops import rotated_box_to_poly_single
+                    # from jdet.utils.visualization import draw_poly
+                    # import cv2
+                    # def draw(img, boxes, out_path, isdeg=False):
+                    #     for box in boxes:
+                    #         if (isdeg):
+                    #             box[4] = box[4] / 180 * np.pi
+                    #         box = rotated_box_to_poly_single(box)
+                    #         box = box.reshape(-1,2).astype(int)
+                    #         draw_poly(img,box,color=(255,0,0),thickness=2)
+                    #     cv2.imwrite(out_path,img)
+                    # def draw_(img, boxes, out_path):
+                    #     boxes = np.concatenate([boxes, np.zeros([boxes.shape[0], 1])],axis=1)
+                    #     boxes = boxes_x0y0x1y1_to_xywh(jt.array(boxes)).data
+                    #     draw(img, boxes, out_path)
+
+                    # print(gt_bbox)
+                    # print(get_var('gt_boxes_r'))
+                    # draw(np.zeros((800,800,3)), gt_bbox.data, 'out1.jpg')
+                    # draw(np.zeros((800,800,3)), get_var('gt_boxes_r').data, 'out2.jpg',True)
+                    
+                    # bbox_1 = rotated_box_to_bbox(gt_bbox) #TODO move to outside/dataloader
+                    # bbox_2 = get_var('gt_boxes_h')[:, :-1] #TODO delete
+                    # draw_(np.zeros((800,800,3)), bbox_1.data, 'out3.jpg')
+                    # draw_(np.zeros((800,800,3)), bbox_2.data, 'out4.jpg')
+                    # exit(0)
+                    
+
+
 
                     gt_roi_loc,gt_roi_label= self.assign_labels(anchor,gt_bbox,gt_label)
                     all_gt_roi_locs[i].append(gt_roi_loc)
                     all_gt_roi_labels[i].append(gt_roi_label)
+                    # gt_roi_locs.append(gt_roi_loc)
+                    # gt_roi_labels.append(gt_roi_label)
 
                 all_proposals[i].append(anchor)
+                # indexes.append(index)
+                # proposals.append(anchor)
                 all_bbox_pred[i].append(bbox_pred[i])
                 all_cls_score[i].append(cls_score[i])
+
+
+            # proposals = jt.contrib.concat(proposals,dim=0)
+            # indexes = jt.contrib.concat(indexes,dim=0)
+            # all_bbox_pred.append(bbox_pred)
+            # all_cls_score.append(cls_score)
+            # all_proposals.append(proposals)
+            # all_indexes.append(indexes)
+
+            # if self.is_training():
+            #     gt_roi_locs = jt.contrib.concat(gt_roi_locs,dim=0)
+            #     gt_roi_labels = jt.contrib.concat(gt_roi_labels,dim=0)
+            #     all_gt_roi_locs.append(gt_roi_locs)
+            #     all_gt_roi_labels.append(gt_roi_labels)
+        
 
         for i in range(n):
             all_bbox_pred[i] = jt.concat(all_bbox_pred[i], 0)
@@ -343,6 +496,15 @@ class RetinaHead(nn.Module):
                 all_gt_roi_locs[i] = jt.concat(all_gt_roi_locs[i],0)
                 all_gt_roi_labels[i] = jt.concat(all_gt_roi_labels[i],0)
 
+        # all_bbox_pred = jt.contrib.concat(all_bbox_pred,dim=0)
+        # all_cls_score = jt.contrib.concat(all_cls_score,dim=0)
+        # all_proposals = jt.contrib.concat(all_proposals,dim=0)
+        # all_indexes = jt.contrib.concat(all_indexes,dim=0)
+    
+        # if self.is_training():
+        #     all_gt_roi_locs = jt.contrib.concat(all_gt_roi_locs,dim=0)
+        #     all_gt_roi_labels = jt.contrib.concat(all_gt_roi_labels,dim=0)
+        
         losses = dict()
         results = []
         if self.is_training():

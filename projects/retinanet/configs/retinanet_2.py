@@ -118,13 +118,13 @@ scheduler = dict(
     warmup= "linear",
     warmup_iters= 14000,
     warmup_ratio= 0.1,
-    milestones= [24])
+    milestones= [27])
 
 logger = dict(
     type= "RunLogger")
 
-work_dir = "./exp/retinanet"
-max_epoch = 26
+work_dir = "./exp/retinanet_2"
+max_epoch = 30
 eval_interval = 1
 log_interval = 50
 checkpoint_interval = 1
