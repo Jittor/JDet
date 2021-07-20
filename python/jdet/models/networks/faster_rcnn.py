@@ -9,7 +9,7 @@ class FasterRCNN(nn.Module):
 
     def __init__(self,
                  backbone,
-                 rpn,
+                 rpn_head,
                  bbox_roi_extractor,
                  bbox_head,
                  train_cfg,
@@ -21,7 +21,7 @@ class FasterRCNN(nn.Module):
         self.backbone = build_from_cfg(backbone, BACKBONES)
         self.neck = build_from_cfg(neck, NECKS)
         self.shared_head = build_from_cfg(shared_head, SHARED_HEADS)
-        self.rpn = build_from_cfg(rpn, HEADS)
+        self.rpn_head = build_from_cfg(rpn_head, HEADS)
         self.bbox_roi_extractor = build_from_cfg(bbox_roi_extractor, ROI_EXTRACTORS)
         self.bbox_head = build_from_cfg(bbox_head, HEADS)
 
@@ -29,7 +29,12 @@ class FasterRCNN(nn.Module):
         self.test_cfg = test_cfg
     
 
-    def excute_train(self, images, targets):
+    def excute_train(self,
+                     images,
+                     image_meta,
+                     gt_bboxes,
+                     gt_labels,
+                     gt_bboxes_ignore=None):
         '''
         Args:
             images (jt.Var): image tensors, shape is [N,C,H,W]
@@ -41,18 +46,31 @@ class FasterRCNN(nn.Module):
         features = self.backbone(images)
         if(self.neck):
             features = self.neck(features)
-        proposal_list, rpn_loss = self.rpn(features, targets)
-        losses.update(rpn_loss)
+
+        rpn_outs = self.rpn_head(images)
+        rpn_loss_inputs = rpn_outs + (gt_bboxes, image_meta,
+                                        self.train_cfg.rpn)
+        rpn_losses = self.rpn_head.loss(
+            *rpn_loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
+        losses.update(rpn_losses)
+
+        proposal_cfg = self.train_cfg.get('rpn_proposal',
+                                            self.test_cfg.rpn)
+        proposal_inputs = rpn_outs + (image_meta, proposal_cfg)
+        proposal_list = self.rpn_head.get_bboxes(*proposal_inputs)
 
         bbox_assigner = build_from_cfg(self.train_cfg.rcnn.assigner, BOXES)
         bbox_sampler = build_from_cfg(self.train_cfg.rcnn.sampler, BOXES) #ingnored: context=self
+        num_imgs = images.shape[0]
+        if gt_bboxes_ignore is None:
+            gt_bboxes_ignore = [None for _ in range(num_imgs)]
         sampling_results = []
-        for proposal, target in zip(proposal_list, targets):
+        for proposal, gt_bbox, gt_bbox_ignore, gt_label in zip(proposal_list, gt_bboxes, gt_bboxes_ignore, gt_labels):
             assign_result = bbox_assigner.assign(
-                proposal, target['bboxes'], target['bboxes_ignore'], target['labels']
+                proposal, gt_bbox, gt_bbox_ignore, gt_label
             )
             sampling_result = bbox_sampler.sample(
-                assign_result, proposal, target['bboxes'], target['labels']
+                assign_result, proposal, gt_bbox, gt_label
                 #ignored: feats=[lvl_feat[i][None] for lvl_feat in images])
             )
             sampling_results.append(sampling_result)

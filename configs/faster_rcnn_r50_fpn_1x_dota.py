@@ -121,10 +121,6 @@ dataset = dict(
         root=data_root + 'trainval1024/images/',
         transforms=[
             dict(
-                type="RotatedResize",
-                min_size=1024,
-                max_size=1024),
-            dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
@@ -134,9 +130,9 @@ dataset = dict(
                 size_divisor=32),
             dict(type='RotatedRandomFlip', prob=0.5)
         ]
-#        with_mask=False,
-#        with_crowd=True,
-#        with_label=True
+        #with_mask=False,
+        #with_crowd=True,
+        #with_label=True
         ),
     val=dict(
         type=dataset_type,
@@ -157,21 +153,30 @@ dataset = dict(
                 size_divisor=32),
             dict(type='RotatedRandomFlip', prob=0)
         ]
-#        with_mask=False,
-#        with_crowd=True,
-#        with_label=True
+        #with_mask=False,
+        #with_crowd=True,
+        #with_label=True
         ),
     test=dict(
         type=dataset_type,
         anno_file=data_root + 'test1024/DOTA_test1024.json',
         root=data_root + 'test1024/images',
-        img_scale=(1024, 1024),
-        img_norm_cfg=img_norm_cfg,
-        size_divisor=32,
-        flip_ratio=0,
-        with_mask=False,
-        with_label=False,
-        test_mode=True))
+        transforms=[
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=True),
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(type='RotatedRandomFlip', prob=0)
+        ]
+        #with_mask=False,
+        #with_label=False,
+        #test_mode=True
+    )
+)
 # optimizer
 optimizer = dict(
     type='SGD', 

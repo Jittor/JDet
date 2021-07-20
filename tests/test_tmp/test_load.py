@@ -1,8 +1,9 @@
+import torch
+
 import jittor.nn as nn
 import jittor as jt
 
-from jdet.utils.registry import LOSSES
-
+from jdet.models.losses import CrossEntropyLoss
 def weighted_cross_entropy(pred, label, weight, avg_factor=None, reduce=True):
     if avg_factor is None:
         avg_factor = max(jt.sum(weight > 0).float().item(), 1.)
@@ -30,8 +31,8 @@ def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):
         pred, label.float(), weight.float(),
         size_average=False)[None] / avg_factor
 
-@LOSSES.register_module()
-class CrossEntropyLoss(nn.Module):
+'''
+class CrossEntropyLoss(jt.nn.Module):
 
     def __init__(self, use_sigmoid=False, use_mask=False, loss_weight=1.0):
         super(CrossEntropyLoss, self).__init__()
@@ -52,3 +53,6 @@ class CrossEntropyLoss(nn.Module):
         loss_cls = self.loss_weight * self.cls_criterion(
             cls_score, label, label_weight, *args, **kwargs)
         return loss_cls
+'''
+model = CrossEntropyLoss(False, False, 1.0)
+model.load('fake_rcnn.pth')
