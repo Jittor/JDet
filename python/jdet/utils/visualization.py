@@ -128,6 +128,17 @@ def visualize_r_result(img,detection,out_path='test.jpg'):
         
     cv2.imwrite(out_path,img)
 
+def visualize_r_result_boxes(img,detection,out_path='test.jpg'):
+    bboxes = detection[:, :5]
+    if hasattr(bboxes,"numpy"):
+        bboxes = bboxes.numpy()
+    for i in range(bboxes.shape[0]):
+        box = bboxes[i]
+        box = rotated_box_to_poly_single(box)
+        box = box.reshape(-1,2).astype(int)
+        draw_poly(img,box,color=(255,0,0),thickness=2)
+    cv2.imwrite(out_path,img)
+
 def draw_poly(img,point,color,thickness):
     cv2.line(img, tuple(point[0]), tuple(point[1]), color, thickness)
     cv2.line(img, tuple(point[1]), tuple(point[2]), color, thickness)
