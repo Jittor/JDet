@@ -342,6 +342,8 @@ def main(weight_path):
             print(keys_[i][1], " "*(80-len(keys_[i][1])), ours_names[i])
             pairs.append([keys_[i][1], ours_names[i]])
         # print(keys_[i][1])
+    import json
+    json.dump(pairs, open(weight_path + '_pairs.json', "w"))
     out_data = {}
     for p in pairs:
         out_data[p[1]] = data[p[0]]
