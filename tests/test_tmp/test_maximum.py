@@ -1,6 +1,6 @@
 import jittor as jt
 import torch
-box1 = [[[462., 491., 1023., 667.], [335, 361, 357, 415]]]
+box1 = [[[462., 491., 1023., 667.], [335., 361., 357., 415.]]]
 a = jt.array(box1)
 b = jt.full((1, 237136, 4), 500)
 c = torch.tensor(box1)

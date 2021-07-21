@@ -27,9 +27,9 @@ def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):
         label, weight = _expand_binary_labels(label, weight, pred.size(-1))
     if avg_factor is None:
         avg_factor = max(jt.sum(weight > 0).float().item(), 1.)
-    return nn.binary_cross_entropy_with_logits(
+    return (nn.binary_cross_entropy_with_logits(
         pred, label.float(), weight.float(),
-        size_average=False)[None] / avg_factor
+        size_average=False)[None] / avg_factor).squeeze(0)          #squeeze(not sure)
 
 @LOSSES.register_module()
 class CrossEntropyLoss(nn.Module):

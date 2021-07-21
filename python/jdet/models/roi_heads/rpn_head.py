@@ -200,17 +200,17 @@ class AnchorHead(nn.Module):
         num_levels = len(cls_scores)
 
         mlvl_anchors = [
-            self.anchor_generators[i].grid_anchors(cls_scores[i].size()[-2:],
+            self.anchor_generators[i].grid_anchors(cls_scores[i].shape[-2:],
                                                    self.anchor_strides[i])
             for i in range(num_levels)
         ]
         result_list = []
         for img_id in range(len(img_metas)):
             cls_score_list = [
-                cls_scores[i][img_id].detach() for i in range(num_levels)
+                cls_scores[i][img_id] for i in range(num_levels)
             ]
             bbox_pred_list = [
-                bbox_preds[i][img_id].detach() for i in range(num_levels)
+                bbox_preds[i][img_id] for i in range(num_levels)
             ]
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
@@ -286,7 +286,7 @@ class RPNHead(AnchorHead):
         for idx in range(len(cls_scores)):
             rpn_cls_score = cls_scores[idx]
             rpn_bbox_pred = bbox_preds[idx]
-            assert rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:]
+            assert rpn_cls_score.shape[-2:] == rpn_bbox_pred.shape[-2:]
             anchors = mlvl_anchors[idx]
             rpn_cls_score = rpn_cls_score.permute(1, 2, 0)
             if self.use_sigmoid_cls:
@@ -312,7 +312,8 @@ class RPNHead(AnchorHead):
                 scores = scores[valid_inds]
             proposals = jt.contrib.concat([proposals, scores.unsqueeze(-1)], dim=-1)
             #proposals, _ = jt.nms(proposals, cfg.nms_thr)
-            proposals = jt.nms(proposals, cfg.nms_thr)
+            proposals_inds = jt.nms(proposals, cfg.nms_thr)
+            proposals = proposals[proposals_inds]
             proposals = proposals[:cfg.nms_post, :]
             mlvl_proposals.append(proposals)
         proposals = jt.contrib.concat(mlvl_proposals, 0)

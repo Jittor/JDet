@@ -179,7 +179,6 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
                         bboxes2[..., :, 2:].unsqueeze(-3))  # [B, rows, cols, 2]
 
         wh = (rb - lt).clamp(min_v=0)  # [B, rows, cols, 2]
-        print(bboxes2.shape)
         '''
         a = jt.maximum(bboxes1[..., :, :2].unsqueeze(-2), bboxes2[..., 5000:10000, :2].unsqueeze(-3))
         b = jt.minimum(bboxes1[..., :, 2:].unsqueeze(-2), bboxes2[..., 5000:10000, 2:].unsqueeze(-3))
@@ -191,7 +190,6 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         print(e.sum(), f.sum())
         print(jt.__version__)
         '''
-        print(bboxes1)
         overlap = wh[..., 0] * wh[..., 1]
 
         if mode in ['iou', 'giou']:

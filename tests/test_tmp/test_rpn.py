@@ -124,10 +124,10 @@ loss_cfg = loss_input['cfg']
 get_bboxes_input = torch.load('get_bboxes_input.pt')
 bboxes_cls_scores = []
 for cls_score in get_bboxes_input['cls_scores']:
-    bboxes_cls_scores.append(cls_score.cpu().detach().numpy())
+    bboxes_cls_scores.append(jt.array(cls_score.cpu().detach().numpy()))
 bboxes_bbox_preds = []
 for bbox_pred in get_bboxes_input['bbox_preds']:
-    bboxes_bbox_preds.append(bbox_pred.cpu().detach().numpy())
+    bboxes_bbox_preds.append(jt.array(bbox_pred.cpu().detach().numpy()))
 bboxes_img_metas = get_bboxes_input['img_metas']
 bboxes_cfg = get_bboxes_input['cfg']
 
@@ -140,3 +140,10 @@ loss_output = rpn_model.loss(cls_scores=loss_cls_scores,
                              gt_bboxes=loss_gt_bboxes,
                              img_metas=loss_img_metas,
                              cfg=loss_cfg)
+print(loss_output)
+get_bboxes_output = rpn_model.get_bboxes(
+                                         cls_scores = bboxes_cls_scores,
+                                         bbox_preds = bboxes_bbox_preds,
+                                         img_metas = bboxes_img_metas,
+                                         cfg = bboxes_cfg)
+get_bboxes_std = torch.load('get_bboxes_std.pt')
