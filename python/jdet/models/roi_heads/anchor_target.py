@@ -1,4 +1,4 @@
-import torch
+import jittor as jt
 
 from ..boxes.sampler import PseudoSampler
 from jdet.utils.general import multi_apply
@@ -12,6 +12,7 @@ def assign_and_sample(bboxes, gt_bboxes, gt_bboxes_ignore, gt_labels, cfg):
     bbox_sampler = build_from_cfg(cfg.sampler, BOXES)
     assign_result = bbox_assigner.assign(bboxes, gt_bboxes, gt_bboxes_ignore,
                                          gt_labels)
+    # input shape of sample: (B, n, 4), (B, m, 4)
     sampling_result = bbox_sampler.sample(assign_result, bboxes, gt_bboxes,
                                           gt_labels)
     return assign_result, sampling_result
@@ -52,8 +53,8 @@ def anchor_target(anchor_list,
     # concat all level anchors and flags to a single tensor
     for i in range(num_imgs):
         assert len(anchor_list[i]) == len(valid_flag_list[i])
-        anchor_list[i] = torch.cat(anchor_list[i])
-        valid_flag_list[i] = torch.cat(valid_flag_list[i])
+        anchor_list[i] = jt.contrib.concat(anchor_list[i])
+        valid_flag_list[i] = jt.contrib.concat(valid_flag_list[i])
 
     # compute targets for each image
     if gt_bboxes_ignore_list is None:
@@ -95,7 +96,7 @@ def images_to_levels(target, num_level_anchors):
 
     [target_img0, target_img1] -> [target_level0, target_level1, ...]
     """
-    target = torch.stack(target, 0)
+    target = jt.stack(target, 0)
     level_targets = []
     start = 0
     for n in num_level_anchors:
@@ -120,7 +121,7 @@ def anchor_target_single(flat_anchors,
     inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
                                        img_meta['img_shape'][:2],
                                        cfg.allowed_border)
-    if not inside_flags.any():
+    if not inside_flags.any_():
         return (None, ) * 6
     # assign gt and sample anchors
     anchors = flat_anchors[inside_flags, :]
@@ -138,10 +139,10 @@ def anchor_target_single(flat_anchors,
 
     num_valid_anchors = anchors.shape[0]
 
-    bbox_targets = torch.zeros_like(anchors)
-    bbox_weights = torch.zeros_like(anchors)
-    labels = anchors.new_zeros(num_valid_anchors, dtype=torch.long)
-    label_weights = anchors.new_zeros(num_valid_anchors, dtype=torch.float)
+    bbox_targets = jt.zeros_like(anchors)
+    bbox_weights = jt.zeros_like(anchors)
+    labels = anchors.new_zeros(num_valid_anchors, dtype=jt.long)
+    label_weights = anchors.new_zeros(num_valid_anchors, dtype=jt.float)
 
     pos_inds = sampling_result.pos_inds
     neg_inds = sampling_result.neg_inds

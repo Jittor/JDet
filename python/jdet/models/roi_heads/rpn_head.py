@@ -88,7 +88,7 @@ class AnchorHead(nn.Module):
         bbox_pred = self.conv_reg(x)
         return cls_score, bbox_pred
 
-    def forward(self, feats):
+    def execute(self, feats):
         return multi_apply(self.forward_single, feats)
 
     def get_anchors(self, featmap_sizes, img_metas):

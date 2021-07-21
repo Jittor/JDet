@@ -1,4 +1,5 @@
-import jittor as jt 
+import jittor as jt
+from numpy.lib.arraysetops import isin 
 from jdet.utils.registry import BOXES,build_from_cfg
 
 class AssignResult:
@@ -86,6 +87,8 @@ class MaxIoUAssigner:
         if bboxes.shape[0] == 0 or gt_bboxes.shape[0] == 0:
             raise ValueError('No gt or bboxes')
 
+        print(gt_bboxes.shape)
+        print(bboxes.shape)
         overlaps = self.iou_calculator(gt_bboxes, bboxes)
 
         if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
@@ -160,3 +163,17 @@ class MaxIoUAssigner:
             assigned_labels = None
 
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+
+@BOXES.register_module()
+class MaxIoUAssignerCy(MaxIoUAssigner):
+    def __init__(self, *args, **kwargs):
+        super(MaxIoUAssignerCy, self).__init__(*args, **kwargs)
+
+    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
+        batch_bboxes = jt.unsqueeze(bboxes, 0)
+        batch_gt_bboxes = jt.unsqueeze(gt_bboxes, 0)
+        if gt_bboxes_ignore is not None:
+            batch_gt_bboxes_ignore = jt.unsqueeze(gt_bboxes_ignore, 0)
+        else:
+            batch_gt_bboxes_ignore = None
+        super(MaxIoUAssignerCy, self).assign(batch_bboxes, batch_gt_bboxes, batch_gt_bboxes_ignore, gt_labels)
