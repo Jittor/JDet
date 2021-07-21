@@ -239,8 +239,8 @@ class AnchorGeneratorRotated:
         valid_y[:valid_h] = 1
         valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)
         valid = valid_xx & valid_yy
-        valid = valid[:, None].expand(
-            valid.size(0), num_base_anchors).view(-1)
+        valid = valid[:, None].expand((
+            valid.size(0), num_base_anchors)).view(-1)
         return valid
 
 

@@ -19,7 +19,7 @@ def _expand_binary_labels(labels, label_weights, label_channels):
     if inds.numel() > 0:
         bin_labels[inds, labels[inds] - 1] = 1
     bin_label_weights = label_weights.view(-1, 1).expand(
-        label_weights.size(0), label_channels)
+        (label_weights.size(0), label_channels))
     return bin_labels, bin_label_weights
 
 def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):
