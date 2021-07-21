@@ -1,6 +1,7 @@
 import torch
 import jittor as jt
 from jdet.utils.registry import HEADS, build_from_cfg
+import numpy as np
 rpn_head=dict(
     type='RPNHead',
     in_channels=256,
@@ -103,6 +104,7 @@ get_bboxes_output = rpn_model.get_bboxes(
                                          cfg = get_bboxes_input['cfg'])
 torch.save(get_bboxes_output, 'get_bboxes_std.pt')
 '''
+np.random.seed(514)
 rpn_model = build_from_cfg(rpn_head, HEADS)
 rpn_model.load('fake_rpn.pth')
 

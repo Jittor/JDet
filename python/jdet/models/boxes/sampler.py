@@ -69,7 +69,7 @@ class BaseSampler(metaclass=ABCMeta):
         Returns:
             :obj:`SamplingResult`: Sampling result.
         """
-        gt_bboxes = gt_bboxes.to(bboxes)
+#        gt_bboxes = gt_bboxes.to(bboxes)
         if len(bboxes.shape) < 2:
             bboxes = bboxes[None, :]
 

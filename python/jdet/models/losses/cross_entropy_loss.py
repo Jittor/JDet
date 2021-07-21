@@ -13,8 +13,9 @@ def weighted_cross_entropy(pred, label, weight, avg_factor=None, reduce=True):
         return raw * weight / avg_factor
 
 def _expand_binary_labels(labels, label_weights, label_channels):
-    bin_labels = labels.new_full((labels.size(0), label_channels), 0)
-    inds = jt.nonzero(labels >= 1).squeeze()
+    bin_labels = jt.full((labels.size(0), label_channels), 0)
+#    inds = jt.nonzero(labels >= 1).squeeze()
+    inds = jt.nonzero(labels >= 1)              #TODO: add default squeeze
     if inds.numel() > 0:
         bin_labels[inds, labels[inds] - 1] = 1
     bin_label_weights = label_weights.view(-1, 1).expand(
@@ -22,7 +23,7 @@ def _expand_binary_labels(labels, label_weights, label_channels):
     return bin_labels, bin_label_weights
 
 def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):
-    if pred.dim() != label.dim():
+    if pred.ndim != label.ndim:
         label, weight = _expand_binary_labels(label, weight, pred.size(-1))
     if avg_factor is None:
         avg_factor = max(jt.sum(weight > 0).float().item(), 1.)
@@ -48,7 +49,7 @@ class CrossEntropyLoss(nn.Module):
         else:
             self.cls_criterion = weighted_cross_entropy
 
-    def excute(self, cls_score, label, label_weight, *args, **kwargs):
+    def execute(self, cls_score, label, label_weight, *args, **kwargs):
         loss_cls = self.loss_weight * self.cls_criterion(
             cls_score, label, label_weight, *args, **kwargs)
         return loss_cls

@@ -622,8 +622,8 @@ class AnchorGenerator(object):
         feat_h, feat_w = featmap_size
         valid_h, valid_w = valid_size
         assert valid_h <= feat_h and valid_w <= feat_w
-        valid_x = jt.zeros(feat_w, dtype=jt.uint8)
-        valid_y = jt.zeros(feat_h, dtype=jt.uint8)
+        valid_x = jt.zeros(feat_w, dtype=jt.bool)
+        valid_y = jt.zeros(feat_h, dtype=jt.bool)
         valid_x[:valid_w] = 1
         valid_y[:valid_h] = 1
         valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)

@@ -44,7 +44,7 @@ def bbox_target_single(pos_bboxes,
     num_pos = pos_bboxes.size(0)
     num_neg = neg_bboxes.size(0)
     num_samples = num_pos + num_neg
-    labels = jt.zeros(num_samples, dtype=jt.long)
+    labels = jt.zeros(num_samples, dtype=jt.int)        #origin: torch.long
     label_weights = jt.zeros(num_samples)
     bbox_targets = jt.zeros(num_samples, 4)
     bbox_weights = jt.zeros(num_samples, 4)

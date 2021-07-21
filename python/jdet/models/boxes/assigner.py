@@ -87,19 +87,20 @@ class MaxIoUAssigner:
         if bboxes.shape[0] == 0 or gt_bboxes.shape[0] == 0:
             raise ValueError('No gt or bboxes')
 
-        print(gt_bboxes.shape)
-        print(bboxes.shape)
-        overlaps = self.iou_calculator(gt_bboxes, bboxes)
+        overlaps = self.iou_calculator(gt_bboxes.unsqueeze(0), bboxes.unsqueeze(0))
+        overlaps = overlaps.squeeze(0)
 
         if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
                 gt_bboxes_ignore.numel() > 0):
             if self.ignore_wrt_candidates:
                 ignore_overlaps = self.iou_calculator(
-                    bboxes, gt_bboxes_ignore, mode='iof')
+                    bboxes.unsqueeze(0), gt_bboxes_ignore.unsqueeze(0), mode='iof')
+                ignore_overlaps.squeeze(0)
                 ignore_max_overlaps= ignore_overlaps.max(dim=1)
             else:
                 ignore_overlaps = self.iou_calculator(
-                    gt_bboxes_ignore, bboxes, mode='iof')
+                    gt_bboxes_ignore.unsqueeze(0), bboxes.unsqueeze(0), mode='iof')
+                ignore_overlaps.squeeze(0)
                 ignore_max_overlaps = ignore_overlaps.max(dim=0)
             overlaps[:, ignore_max_overlaps > self.ignore_iof_thr] = -1
 
@@ -168,12 +169,3 @@ class MaxIoUAssigner:
 class MaxIoUAssignerCy(MaxIoUAssigner):
     def __init__(self, *args, **kwargs):
         super(MaxIoUAssignerCy, self).__init__(*args, **kwargs)
-
-    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
-        batch_bboxes = jt.unsqueeze(bboxes, 0)
-        batch_gt_bboxes = jt.unsqueeze(gt_bboxes, 0)
-        if gt_bboxes_ignore is not None:
-            batch_gt_bboxes_ignore = jt.unsqueeze(gt_bboxes_ignore, 0)
-        else:
-            batch_gt_bboxes_ignore = None
-        super(MaxIoUAssignerCy, self).assign(batch_bboxes, batch_gt_bboxes, batch_gt_bboxes_ignore, gt_labels)

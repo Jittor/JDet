@@ -25,7 +25,7 @@ def bbox2delta(proposals, gt, means=[0, 0, 0, 0], stds=[1, 1, 1, 1]):
 
     means = jt.float32(means).unsqueeze(0)
     stds = jt.float32(stds).unsqueeze(0)
-    deltas = deltas.sub_(means).div_(stds)
+    deltas = deltas.subtract(means).divide(stds)
 
     return deltas
 

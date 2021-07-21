@@ -101,7 +101,10 @@ def images_to_levels(target, num_level_anchors):
     start = 0
     for n in num_level_anchors:
         end = start + n
-        level_targets.append(target[:, start:end].squeeze(0))
+        if target.shape[0] == 1:
+            level_targets.append(target[:, start:end].squeeze(0))
+        else:
+            level_targets.append(target[:, start:end])
         start = end
     return level_targets
 
@@ -141,8 +144,8 @@ def anchor_target_single(flat_anchors,
 
     bbox_targets = jt.zeros_like(anchors)
     bbox_weights = jt.zeros_like(anchors)
-    labels = anchors.new_zeros(num_valid_anchors, dtype=jt.long)
-    label_weights = anchors.new_zeros(num_valid_anchors, dtype=jt.float)
+    labels = jt.zeros(num_valid_anchors, dtype=jt.int)          #origin : torch.long
+    label_weights = jt.zeros(num_valid_anchors, dtype=jt.float)
 
     pos_inds = sampling_result.pos_inds
     neg_inds = sampling_result.neg_inds
@@ -195,11 +198,11 @@ def anchor_inside_flags(flat_anchors, valid_flags, img_shape,
 def unmap(data, count, inds, fill=0):
     """ Unmap a subset of item (data) back to the original set of items (of
     size count) """
-    if data.dim() == 1:
-        ret = data.new_full((count, ), fill)
+    if data.ndim == 1:
+        ret = jt.full((count, ), fill)
         ret[inds] = data
     else:
         new_size = (count, ) + data.size()[1:]
-        ret = data.new_full(new_size, fill)
+        ret = jt.full(new_size, fill)
         ret[inds, :] = data
     return ret
