@@ -296,34 +296,34 @@ class RPNHead(AnchorHead):
                 rpn_cls_score = rpn_cls_score.reshape(-1, 2)
                 scores = rpn_cls_score.softmax(dim=1)[:, 1]
             rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-            if cfg.nms_pre > 0 and scores.shape[0] > cfg.nms_pre:
-                _, topk_inds = scores.topk(cfg.nms_pre)
+            if cfg['nms_pre'] > 0 and scores.shape[0] > cfg['nms_pre']:
+                _, topk_inds = scores.topk(cfg['nms_pre'])
                 rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
                 anchors = anchors[topk_inds, :]
                 scores = scores[topk_inds]
             proposals = delta2bbox(anchors, rpn_bbox_pred, self.target_means,
                                    self.target_stds, img_shape)
-            if cfg.min_bbox_size > 0:
+            if cfg['min_bbox_size'] > 0:
                 w = proposals[:, 2] - proposals[:, 0] + 1
                 h = proposals[:, 3] - proposals[:, 1] + 1
-                valid_inds = jt.nonzero((w >= cfg.min_bbox_size) &
-                                           (h >= cfg.min_bbox_size)).squeeze()
+                valid_inds = jt.nonzero((w >= cfg['min_bbox_size']) &
+                                           (h >= cfg['min_bbox_size'])).squeeze()
                 proposals = proposals[valid_inds, :]
                 scores = scores[valid_inds]
             proposals = jt.contrib.concat([proposals, scores.unsqueeze(-1)], dim=-1)
             #proposals, _ = jt.nms(proposals, cfg.nms_thr)
-            proposals_inds = jt.nms(proposals, cfg.nms_thr)
+            proposals_inds = jt.nms(proposals, cfg['nms_thr'])
             proposals = proposals[proposals_inds]
-            proposals = proposals[:cfg.nms_post, :]
+            proposals = proposals[:cfg['nms_post'], :]
             mlvl_proposals.append(proposals)
         proposals = jt.contrib.concat(mlvl_proposals, 0)
-        if cfg.nms_across_levels:
+        if cfg['nms_across_levels']:
             #proposals, _ = jt.nms(proposals, cfg.nms_thr)
-            proposals = jt.nms(proposals, cfg.nms_thr)
-            proposals = proposals[:cfg.max_num, :]
+            proposals = jt.nms(proposals, cfg['nms_thr'])
+            proposals = proposals[:cfg['max_num'], :]
         else:
             scores = proposals[:, 4]
-            num = min(cfg.max_num, proposals.shape[0])
+            num = min(cfg['max_num'], proposals.shape[0])
             _, topk_inds = scores.topk(num)
             proposals = proposals[topk_inds, :]
         return proposals

@@ -8,8 +8,8 @@ from jdet.utils.registry import BOXES, build_from_cfg
 #TODO: use functions in 'anchor_generator' to delete this file
 
 def assign_and_sample(bboxes, gt_bboxes, gt_bboxes_ignore, gt_labels, cfg):
-    bbox_assigner = build_from_cfg(cfg.assigner, BOXES)
-    bbox_sampler = build_from_cfg(cfg.sampler, BOXES)
+    bbox_assigner = build_from_cfg(cfg['assigner'], BOXES)
+    bbox_sampler = build_from_cfg(cfg['sampler'], BOXES)
     assign_result = bbox_assigner.assign(bboxes, gt_bboxes, gt_bboxes_ignore,
                                          gt_labels)
     # input shape of sample: (B, n, 4), (B, m, 4)
@@ -123,7 +123,7 @@ def anchor_target_single(flat_anchors,
                          unmap_outputs=True):
     inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
                                        img_meta['img_shape'][:2],
-                                       cfg.allowed_border)
+                                       cfg['allowed_border'])
     if not inside_flags.any_():
         return (None, ) * 6
     # assign gt and sample anchors
@@ -133,7 +133,7 @@ def anchor_target_single(flat_anchors,
         assign_result, sampling_result = assign_and_sample(
             anchors, gt_bboxes, gt_bboxes_ignore, None, cfg)
     else:
-        bbox_assigner = build_from_cfg(cfg.assigner, BOXES)
+        bbox_assigner = build_from_cfg(cfg['assigner'], BOXES)
         assign_result = bbox_assigner.assign(anchors, gt_bboxes,
                                              gt_bboxes_ignore, gt_labels)
         bbox_sampler = PseudoSampler()
@@ -162,10 +162,10 @@ def anchor_target_single(flat_anchors,
             labels[pos_inds] = 1
         else:
             labels[pos_inds] = gt_labels[sampling_result.pos_assigned_gt_inds]
-        if cfg.pos_weight <= 0:
+        if cfg['pos_weight'] <= 0:
             label_weights[pos_inds] = 1.0
         else:
-            label_weights[pos_inds] = cfg.pos_weight
+            label_weights[pos_inds] = cfg['pos_weight']
     if len(neg_inds) > 0:
         label_weights[neg_inds] = 1.0
 

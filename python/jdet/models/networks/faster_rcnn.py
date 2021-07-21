@@ -4,6 +4,9 @@ from jdet.utils.registry import BOXES, MODELS, build_from_cfg, BACKBONES, HEADS,
 from jdet.ops.bbox_transfomrs import bbox2roi
 
 
+#debug
+import numpy as np
+
 @MODELS.register_module()
 class FasterRCNN(nn.Module):
 
@@ -29,7 +32,7 @@ class FasterRCNN(nn.Module):
         self.test_cfg = test_cfg
     
 
-    def excute_train(self,
+    def execute_train(self,
                      images,
                      image_meta,
                      gt_bboxes,
@@ -47,48 +50,50 @@ class FasterRCNN(nn.Module):
         if(self.neck):
             features = self.neck(features)
 
-        rpn_outs = self.rpn_head(images)
+        rpn_outs = self.rpn_head(features)
         rpn_loss_inputs = rpn_outs + (gt_bboxes, image_meta,
-                                        self.train_cfg.rpn)
+                                        self.train_cfg['rpn'])
         rpn_losses = self.rpn_head.loss(
             *rpn_loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         losses.update(rpn_losses)
 
         proposal_cfg = self.train_cfg.get('rpn_proposal',
-                                            self.test_cfg.rpn)
+                                            self.test_cfg['rpn'])
         proposal_inputs = rpn_outs + (image_meta, proposal_cfg)
         proposal_list = self.rpn_head.get_bboxes(*proposal_inputs)
+        np.random.seed(514)
 
-        bbox_assigner = build_from_cfg(self.train_cfg.rcnn.assigner, BOXES)
-        bbox_sampler = build_from_cfg(self.train_cfg.rcnn.sampler, BOXES) #ingnored: context=self
+        bbox_assigner = build_from_cfg(self.train_cfg['rcnn']['assigner'], BOXES) # TODO: better config
+        bbox_sampler = build_from_cfg(self.train_cfg['rcnn']['sampler'], BOXES) #ingnored: context=self
         num_imgs = images.shape[0]
         if gt_bboxes_ignore is None:
             gt_bboxes_ignore = [None for _ in range(num_imgs)]
         sampling_results = []
+
         for proposal, gt_bbox, gt_bbox_ignore, gt_label in zip(proposal_list, gt_bboxes, gt_bboxes_ignore, gt_labels):
             assign_result = bbox_assigner.assign(
                 proposal, gt_bbox, gt_bbox_ignore, gt_label
             )
             sampling_result = bbox_sampler.sample(
                 assign_result, proposal, gt_bbox, gt_label
-                #ignored: feats=[lvl_feat[i][None] for lvl_feat in images])
+                #ignored: feats=[lvl_feat[i][None] for lvl_feat in features])
             )
             sampling_results.append(sampling_result)
 
         rois = bbox2roi([res.bboxes for res in sampling_results])
         bbox_feats = self.bbox_roi_extractor(
-            images[:self.bbox_roi_extractor.num_inputs], rois)
+            features[:self.bbox_roi_extractor.num_inputs], rois)
         cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
         bbox_targets = self.bbox_head.get_target(
-            sampling_results, self.train_cfg.rcnn)
+            sampling_results, self.train_cfg['rcnn'])
         loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
                                         *bbox_targets)
 
         losses.update(loss_bbox)
         return losses
     
-    def excute(self, images, targets=None):
+    def execute(self, images, targets=None):
         if self.is_training():
             return self.excute_train(images, targets)
         else:

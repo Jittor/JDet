@@ -46,13 +46,13 @@ def bbox_target_single(pos_bboxes,
     num_samples = num_pos + num_neg
     labels = jt.zeros(num_samples, dtype=jt.int)        #origin: torch.long
     label_weights = jt.zeros(num_samples)
-    bbox_targets = jt.zeros(num_samples, 4)
-    bbox_weights = jt.zeros(num_samples, 4)
+    bbox_targets = jt.zeros((num_samples, 4))
+    bbox_weights = jt.zeros((num_samples, 4))
     # import pdb
     # pdb.set_trace()
     if num_pos > 0:
         labels[:num_pos] = pos_gt_labels
-        pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
+        pos_weight = 1.0 if cfg['pos_weight'] <= 0 else cfg['pos_weight']
         label_weights[:num_pos] = pos_weight
         pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, target_means,
                                       target_stds)
@@ -73,11 +73,11 @@ def accuracy(pred, target, topk=1):
     maxk = max(topk)
     _, pred_label = pred.topk(maxk, 1, True, True)
     pred_label = pred_label.t()
-    correct = pred_label.eq(target.view(1, -1).expand_as(pred_label))
+    correct = pred_label.equal(target.view(1, -1).expand_as(pred_label))
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        correct_k = correct[:k].view(-1).float().sum(0, keepdims=True)
 #        res.append(correct_k.mul_(100.0 / pred.size(0)))
         correct_k *= 100.0 / pred.shape[0]
         res.append(correct_k)

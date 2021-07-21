@@ -64,21 +64,21 @@ class SingleRoIExtractor(nn.Module):
         scale = jt.sqrt(
             (rois[:, 3] - rois[:, 1] + 1) * (rois[:, 4] - rois[:, 2] + 1))
         target_lvls = jt.floor(jt.log2(scale / self.finest_scale + 1e-6))
-        target_lvls = target_lvls.clamp(min=0, max=num_levels - 1).long()
+        target_lvls = target_lvls.clamp(min_v=0, max_v=num_levels - 1).long()
         return target_lvls
 
-    def excute(self, feats, rois):
+    def execute(self, feats, rois):
         if len(feats) == 1:
             return self.roi_layers[0](feats[0], rois)
 
-        out_size = self.roi_layers[0].out_size
+        out_size = self.roi_layers[0].output_size[0]            #not sure
         num_levels = len(feats)
         target_lvls = self.map_roi_levels(rois, num_levels)
         roi_feats = jt.zeros(shape=(rois.shape[0], self.out_channels,
                                             out_size, out_size), dtype="float32")
         for i in range(num_levels):
             inds = target_lvls == i
-            if inds.any():
+            if inds.any_():
                 rois_ = rois[inds, :]
                 roi_feats_t = self.roi_layers[i](feats[i], rois_)
                 roi_feats[inds] += roi_feats_t

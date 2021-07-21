@@ -70,7 +70,8 @@ class ConvFCBBoxHead(BBoxHead):
             if self.num_reg_fcs == 0:
                 self.reg_last_dim *= (self.roi_feat_size * self.roi_feat_size)
 
-        self.relu = nn.ReLU(inplace=True)
+        #self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()               #warning: not sure
         # reconstruct fc_cls and fc_reg since input channels are changed
         if self.with_cls:
             self.fc_cls = nn.Linear(self.cls_last_dim, self.num_classes)
@@ -126,7 +127,7 @@ class ConvFCBBoxHead(BBoxHead):
                     nn.init.xavier_uniform_(m.weight)
                     nn.init.constant_(m.bias, 0)
 
-    def excute(self, x):
+    def execute(self, x):
         # shared part
         if self.num_shared_convs > 0:
             for conv in self.shared_convs:
@@ -144,7 +145,7 @@ class ConvFCBBoxHead(BBoxHead):
 
         for conv in self.cls_convs:
             x_cls = conv(x_cls)
-        if x_cls.dim() > 2:
+        if x_cls.ndim > 2:
             if self.with_avg_pool:
                 x_cls = self.avg_pool(x_cls)
             x_cls = x_cls.view(x_cls.size(0), -1)
@@ -153,7 +154,7 @@ class ConvFCBBoxHead(BBoxHead):
 
         for conv in self.reg_convs:
             x_reg = conv(x_reg)
-        if x_reg.dim() > 2:
+        if x_reg.ndim > 2:
             if self.with_avg_pool:
                 x_reg = self.avg_pool(x_reg)
             x_reg = x_reg.view(x_reg.size(0), -1)

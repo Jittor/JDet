@@ -6,7 +6,7 @@ from jdet.utils.registry import LOSSES
 def weighted_cross_entropy(pred, label, weight, avg_factor=None, reduce=True):
     if avg_factor is None:
         avg_factor = max(jt.sum(weight > 0).float().item(), 1.)
-    raw = nn.cross_entropy(pred, label, reduction='none')
+    raw = nn.cross_entropy_loss(pred, label, reduction='none')
     if reduce:
         return jt.sum(raw * weight)[None] / avg_factor
     else:
