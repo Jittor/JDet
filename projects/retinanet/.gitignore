@@ -4,3 +4,4 @@ exps
 *.jpg
 cache_check
 logs
+*.pk

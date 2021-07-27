@@ -28,7 +28,7 @@ class Runner:
     
         self.model = build_from_cfg(cfg.model,MODELS)
         if (cfg.parameter_groups_generator):
-            params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=self.model.named_parameters())
+            params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=self.model.named_parameters(), model=self.model)
         else:
             params = self.model.parameters()
         self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=params)

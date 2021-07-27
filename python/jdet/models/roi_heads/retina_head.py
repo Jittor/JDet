@@ -11,6 +11,7 @@ from jdet.utils.registry import build_from_cfg,MODELS
 import numpy as np
 import jdet
 from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh
+# from my_utils import get_var
 
 @HEADS.register_module()
 class RetinaHead(nn.Module):
@@ -139,7 +140,10 @@ class RetinaHead(nn.Module):
             iou = bbox_iou(roi, bbox)
         else:
             if (self.anchor_mode == 'H'):
-                bbox_ = rotated_box_to_bbox(bbox) #TODO move to outside/dataloader
+                bbox__ = bbox.copy()
+                bbox__[:, 4] += np.pi / 2
+                bbox_ = rotated_box_to_bbox(bbox__) #TODO move to outside/dataloader
+                # bbox_ = get_var('gt_boxes_h')[:, :-1] #TODO delete
                 iou = bbox_iou(roi[:, :4], bbox_)
             else:
                 iou = box_iou_rotated(roi, bbox) #TODO check
@@ -165,9 +169,10 @@ class RetinaHead(nn.Module):
 
         return gt_roi_loc, gt_roi_label
 
-    # input xywha(pi)
-    # output xywha(pi)
+    # input xywha(pi)  [-pi/2,0)
+    # output xywha(pi) [-pi,0)
     def cvt2_w_greater_than_h(self, boxes, reverse_hw=True):
+        boxes = boxes.copy()
         if (reverse_hw): #TODO: yangxue?
             x, y, w, h, a = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3], boxes[:, 4]
             boxes = jt.stack([x, y, h, w, a], dim=1)
@@ -324,6 +329,8 @@ class RetinaHead(nn.Module):
             for i,target in enumerate(targets):
                 if self.is_training():
                     gt_bbox = target["bboxes"]#xywha
+                    # gt_bbox = get_var('gt_boxes_r')#TODO delete
+                    # gt_bbox[:, 4] *= np.pi / 180#TODO delete
                     gt_label = target["labels"]
                     gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yangxue?
 
