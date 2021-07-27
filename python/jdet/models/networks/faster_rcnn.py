@@ -61,7 +61,6 @@ class FasterRCNN(nn.Module):
                                             self.test_cfg['rpn'])
         proposal_inputs = rpn_outs + (image_meta, proposal_cfg)
         proposal_list = self.rpn_head.get_bboxes(*proposal_inputs)
-        np.random.seed(514)
 
         bbox_assigner = build_from_cfg(self.train_cfg['rcnn']['assigner'], BOXES) # TODO: better config
         bbox_sampler = build_from_cfg(self.train_cfg['rcnn']['sampler'], BOXES) #ingnored: context=self
