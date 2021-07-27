@@ -5,6 +5,10 @@ from jdet.models.networks import FasterRCNN
 from jdet.models.losses import CrossEntropyLoss
 from jdet.utils.registry import build_from_cfg, HEADS, LOSSES, MODELS
 
+if jt.has_cuda:
+    jt.flags.use_cuda = 1
+
+
 model_cfg=dict(
     type='FasterRCNN',
     pretrained='modelzoo://resnet50',
@@ -124,3 +128,4 @@ for ignore in input['gt_bboxes_ignore']:
     gt_bboxes_ignore.append(jt.array(ignore.cpu().detach().numpy()))
 
 losses = model.execute_train(img, img_meta, gt_bboxes, gt_labels, gt_bboxes_ignore)
+print(losses)
