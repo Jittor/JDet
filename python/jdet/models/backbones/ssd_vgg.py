@@ -70,7 +70,8 @@ class SSD_VGG(nn.Module):
         self.out_feature_indices = out_feature_indices
 
         self.inplanes = 1024
-        self.extra = self._make_extra_layers(self.extra_setting[input_size])
+        self.extra_layers = self._make_extra_layers(
+            self.extra_setting[input_size])
         self.l2_norm = L2Norm(
             self.features[out_feature_indices[0] - 1].out_channels,
             l2_norm_scale)
@@ -81,7 +82,8 @@ class SSD_VGG(nn.Module):
             x = layer(x)
             if i in self.out_feature_indices:
                 outs.append(x)
-        for i, layer in enumerate(self.extra):
+
+        for i, layer in enumerate(self.extra_layers):
             x = nn.relu(layer(x))
             if i % 2 == 1:
                 outs.append(x)
@@ -124,9 +126,10 @@ def make_layers(cfg, batch_norm=False):
     in_channels = 3
     for v in cfg:
         if v == 'M':
-            layers += [nn.Pool(kernel_size=2, stride=2, op="maximum")]
+            layers += [nn.Pool(kernel_size=2, stride=2,
+                               op="maximum", ceil_mode=True)]
         else:
-            conv2d = nn.Conv(in_channels, v, kernel_size=3, padding=1)
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm(v), nn.ReLU()]
             else:

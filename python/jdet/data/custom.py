@@ -30,15 +30,15 @@ class CustomDataset(Dataset):
     ]
     '''
     CLASSES = None
-    def __init__(self,image_dir,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
+    def __init__(self,images_dir,annotations_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
         super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
 
-        self.image_dir = os.path.abspath(image_dir) 
-        self.anno_file = os.path.abspath(anno_file)
+        self.images_dir = os.path.abspath(images_dir) 
+        self.annotations_file = os.path.abspath(annotations_file)
 
         self.transforms = Compose(transforms)
         
-        self.img_infos = jt.load(self.anno_file)
+        self.img_infos = jt.load(self.annotations_file)
         if filter_empty_gt:
             self.img_infos = self._filter_imgs()
         self.total_len = len(self.img_infos)
@@ -54,7 +54,7 @@ class CustomDataset(Dataset):
             idx = np.random.choice(np.arange(self.total_len))
         anno = img_info["ann"]
 
-        img_path = os.path.join(self.image_dir, img_info["filename"])
+        img_path = os.path.join(self.images_dir, img_info["filename"])
         image = Image.open(img_path).convert("RGB")
 
         width,height = image.size 

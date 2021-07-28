@@ -4,6 +4,7 @@ import jittor as jt
 import cv2 
 import os
 from jdet.config import COCO_CLASSES
+from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 
 _COLORS = np.array(
     [
@@ -105,6 +106,44 @@ def draw_boxes(img,boxes,cats):
     for box,cat in zip(boxes,cats):
         img = draw_box(img,box,cat,(255,0,0))
     cv2.imwrite("test.png",img)
+
+def visualize_r_result(img,detection,out_path='test.jpg'):
+    bboxes = detection[0][:, :5]
+    scores = detection[0][:, 5]
+    labels = detection[1]
+    if hasattr(bboxes,"numpy"):
+        bboxes = bboxes.numpy()
+    if hasattr(scores,"numpy"):
+        scores = scores.numpy()
+    if hasattr(labels,"numpy"):
+        labels = labels.numpy()
+    print(bboxes.shape)
+    for box,label,score in zip(bboxes,labels,scores):
+        box = rotated_box_to_poly_single(box)
+        box = box.reshape(-1,2).astype(int)
+        text = f"{label}:{score:.2}"
+        draw_poly(img,box,color=(255,0,0),thickness=2)
+
+        img = cv2.putText(img=img, text=text, org=(box[0][0],box[0][1]-5), fontFace=0, fontScale=0.5, color=(255,0,0), thickness=1)
+        
+    cv2.imwrite(out_path,img)
+
+def visualize_r_result_boxes(img,detection,out_path='test.jpg'):
+    bboxes = detection[:, :5]
+    if hasattr(bboxes,"numpy"):
+        bboxes = bboxes.numpy()
+    for i in range(bboxes.shape[0]):
+        box = bboxes[i]
+        box = rotated_box_to_poly_single(box)
+        box = box.reshape(-1,2).astype(int)
+        draw_poly(img,box,color=(255,0,0),thickness=2)
+    cv2.imwrite(out_path,img)
+
+def draw_poly(img,point,color,thickness):
+    cv2.line(img, tuple(point[0]), tuple(point[1]), color, thickness)
+    cv2.line(img, tuple(point[1]), tuple(point[2]), color, thickness)
+    cv2.line(img, tuple(point[2]), tuple(point[3]), color, thickness)
+    cv2.line(img, tuple(point[3]), tuple(point[0]), color, thickness)
 
 def visualize_results(detections,classes,files,save_dir):
     os.makedirs(save_dir,exist_ok=True)

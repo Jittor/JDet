@@ -382,7 +382,7 @@ __global__ void nms_rotated_cuda_kernel(
         dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 3];
     block_boxes[threadIdx.x * BOX_LENGTH + 4] =
         dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 4];
-    if (BOX_LENGTH>5)
+    if (BOX_LENGTH >= 6)
       block_boxes[threadIdx.x * BOX_LENGTH + 5] =
           dev_boxes[(threadsPerBlock * col_start + threadIdx.x) * BOX_LENGTH + 5];
   }
@@ -525,9 +525,8 @@ def ml_nms_rotated(dets,scores,labels,iou_threshold):
     return jt.where(keep)[0]
 
 def nms_rotated(dets,scores,iou_threshold):
-    # angle range pi/2
     if dets.numel()==0:
-        return jt.zeros((0,)).int32()
+      return jt.array([])
     assert dets.numel()>0 and dets.ndim==2
     assert dets.dtype==scores.dtype
     order_t,_ = scores.argsort(0,descending=True)

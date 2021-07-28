@@ -490,6 +490,7 @@ class AnchorGenerator:
         return repr_str
 
 
+
 @BOXES.register_module()
 class AnchorGeneratorRotated:
     def __init__(self, strides, ratios, scales, base_sizes=None, angles=[0, ], scale_major=True, centers=None, center_offset=0.5, mode='H'):

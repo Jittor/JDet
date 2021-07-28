@@ -28,39 +28,51 @@ class Runner:
         self.resume_path = cfg.resume_path
     
         self.model = build_from_cfg(cfg.model,MODELS)
-        self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=self.model.parameters())
+        if (cfg.parameter_groups_generator):
+            params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=self.model.named_parameters())
+        else:
+            params = self.model.parameters()
+        self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=params)
         self.scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=self.optimizer)
-        self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
-        self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
-        self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
+        self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
+        self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS) if cfg.dataset.val else None
+        self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS) if cfg.dataset.test else None
         
         self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
         save_file = build_file(self.work_dir,prefix="config.yaml")
         save_cfg(save_file)
 
-        self.iter = 1
-        self.epoch = 1
-        self.start_time = time.time()
+        self.iter = 0
+        self.epoch = 0
 
+        if self.max_epoch:
+            self.total_iter = self.max_epoch * len(self.train_dataset)
+        else:
+            self.total_iter = self.max_iter
+
+        if (cfg.pretrained_weights):
+            self.model.load(cfg.pretrained_weights)
         if check_file(self.resume_path):
             self.resume()
 
     @property
     def finish(self):
         if self.max_epoch:
-            return self.epoch>self.max_epoch
+            return self.epoch>=self.max_epoch
         else:
-            return self.iter>self.max_iter
+            return self.iter>=self.max_iter
     
     def run(self):
         self.logger.print_log("Start running")
         while not self.finish:
             self.train()
-            if check_interval(self.epoch,self.eval_interval):
+            if check_interval(self.epoch,self.eval_interval) and False: #TODO val evaluation is not implemented
                 # TODO: need remove this
                 self.model.eval()
                 self.val()
+            if check_interval(self.epoch,self.checkpoint_interval):
+                self.save()
         self.test()
 
     def train(self):
@@ -74,6 +86,7 @@ class Runner:
         # hook = auto_diff.Hook("s2anet",rtol=1e-4, atol=1e-4)
         # hook.hook_module(self.model)
 
+        start_time = time.time()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
             # tmp_loss = losses["loss_odm_cls"]
@@ -97,9 +110,9 @@ class Runner:
             batch_size = len(targets)*jt.mpi.world_size()
 
             if check_interval(self.iter,self.log_interval):
-                ptime = time.time()-self.start_time
+                ptime = time.time()-start_time
                 fps = batch_size*self.iter/ptime
-                eta_time = (len(self.train_dataset)*self.max_epoch-self.iter)*ptime/self.iter
+                eta_time = (total_iter-self.iter)*ptime/self.iter
                 eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     lr = self.optimizer.cur_lr(),
@@ -120,9 +133,6 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
-
-        if check_interval(self.epoch,self.checkpoint_interval):
-            self.save()
         self.epoch +=1
 
 
@@ -196,9 +206,8 @@ class Runner:
         save_file = build_file(self.work_dir,prefix=f"checkpoints/ckpt_{self.epoch}.pkl")
         jt.save(save_data,save_file)
     
-
-    def resume(self):
-        resume_data = jt.load(self.resume_path)
+    def load(self, load_path):
+        resume_data = jt.load(load_path)
         
         meta = resume_data.get("meta",dict())
         self.epoch = meta.get("epoch",self.epoch)
@@ -210,4 +219,7 @@ class Runner:
         self.optimizer.load_parameters(resume_data.get("optimizer",dict()))
         self.model.load_parameters(resume_data.get("model",dict()) if "model" in resume_data else resume_data.get("state_dict",dict()))
 
-        self.logger.print_log(f"Loading model parameters from {self.resume_path}")
+        self.logger.print_log(f"Loading model parameters from {load_path}")
+
+    def resume(self):
+        self.load(self.resume_path)
