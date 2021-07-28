@@ -8,7 +8,8 @@ from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 
 
-from jdet.ops.dcn_v2 import DeformConv
+# from jdet.ops.dcn_v2 import DeformConv
+from jdet.ops._dcn import DeformConv
 from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import delta2bbox_rotated
