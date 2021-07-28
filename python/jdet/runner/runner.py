@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import jdet
 import pickle
+import datetime
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
@@ -38,8 +39,9 @@ class Runner:
         save_file = build_file(self.work_dir,prefix="config.yaml")
         save_cfg(save_file)
 
-        self.iter = 0
-        self.epoch = 0
+        self.iter = 1
+        self.epoch = 1
+        self.start_time = time.time()
 
         if check_file(self.resume_path):
             self.resume()
@@ -47,9 +49,9 @@ class Runner:
     @property
     def finish(self):
         if self.max_epoch:
-            return self.epoch>=self.max_epoch
+            return self.epoch>self.max_epoch
         else:
-            return self.iter>=self.max_iter
+            return self.iter>self.max_iter
     
     def run(self):
         self.logger.print_log("Start running")
@@ -58,30 +60,47 @@ class Runner:
             if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 self.model.eval()
-                self.val()            
-            if check_interval(self.epoch,self.checkpoint_interval):
-                self.save()
+                self.val()
         self.test()
 
     def train(self):
         self.model.train()
         # import torch
         # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
+        # self.model.load_state_dict(torch.load("/home/lxl/workspace/s2anet/init_weight.pth"))
         # TODO : remove thiss
         self.model.backbone.train()
-        start_time = time.time()
-        img_num = 0
+        # from jittor_utils import auto_diff
+        # hook = auto_diff.Hook("s2anet",rtol=1e-4, atol=1e-4)
+        # hook.hook_module(self.model)
+
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
+            # tmp_loss = losses["loss_odm_cls"]
             all_loss,losses = parse_losses(losses)
+            # all_loss = losses['loss_rpn_cls']+losses["loss_rpn_bbox"]
+            # print(all_loss)
+            # loss_fam_bbox,loss_odm_cls,loss_odm_bbox
+            # all_loss = tmp_loss[-1]
+            # print(all_loss)
+            # data = {}
+            # for p in self.model.parameters():
+            #     if p.dtype!="float32":
+            #         continue
+            #     grad = jt.grad(all_loss,p)
+            #     data[p.name()]=(p.numpy(),grad.numpy())
+            # jt.save(data,"jt_grad.pkl") 
+            # exit()
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
 
             batch_size = len(targets)*jt.mpi.world_size()
-            img_num +=batch_size
 
             if check_interval(self.iter,self.log_interval):
-                fps = img_num/(time.time()-start_time)
+                ptime = time.time()-self.start_time
+                fps = batch_size*self.iter/ptime
+                eta_time = (len(self.train_dataset)*self.max_epoch-self.iter)*ptime/self.iter
+                eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     lr = self.optimizer.cur_lr(),
                     iter = self.iter,
@@ -89,7 +108,8 @@ class Runner:
                     batch_idx = batch_idx,
                     batch_size = batch_size,
                     total_loss = all_loss,
-                    fps=fps
+                    fps=fps,
+                    eta=eta_str
                 )
                 data.update(losses)
                 data = sync(data)
@@ -100,7 +120,9 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
-            
+
+        if check_interval(self.epoch,self.checkpoint_interval):
+            self.save()
         self.epoch +=1
 
 
@@ -149,7 +171,7 @@ class Runner:
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-            
+                
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
 
