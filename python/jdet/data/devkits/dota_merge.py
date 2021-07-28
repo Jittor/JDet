@@ -32,9 +32,9 @@ def prepare(result_pkl,save_path):
         f_out.close()
 
 def test():
-    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet/test/test_26.pkl"
-    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet/test/submit/before_nms"
-    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet/test/submit/after_nms"
+    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_15/test/test_29.pkl"
+    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_15/test/submit29/before_nms"
+    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_15/test/submit29/after_nms"
     prepare(result_pkl,save_path)
     check_dir(final_path)
     mergebypoly(save_path,final_path)

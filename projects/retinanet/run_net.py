@@ -43,8 +43,8 @@ def main():
     elif args.task == "val":
         runner.val()
     elif args.task == "test":
-        runner.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
-        # runner.load("exps/jittor_train/retinanet/checkpoints/ckpt_26.pkl")
+        # runner.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
+        runner.load("exp/retinanet_15/checkpoints/ckpt_29.pkl")
         runner.test()
 
 if __name__ == "__main__":

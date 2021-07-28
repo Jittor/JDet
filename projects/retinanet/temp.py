@@ -1,5 +1,8 @@
 
+# import cv2
 import jittor as jt
+# img = cv2.imread("/mnt/disk/cxjyxx_me/JAD/datasets/test/DOTA/trainval/images/P0003.png")
+# print(img.shape)
 
 score_j = jt.random([10000])
 bbox_j = jt.random([10000, 5]) * 200 - 100
