@@ -120,15 +120,17 @@ class Resize:
 class RotatedResize(Resize):
 
     def _resize_boxes(self, target,size):
-        for key in ["bboxes","rboxes","polygons"]:
+        for key in ["bboxes","rboxes","polygons","bboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
+            if bboxes.ndim!=2:
+                continue
             bboxes = rotated_box_to_poly_np(bboxes)
 
             width,height = target["img_size"]
             new_w,new_h = size
-
+            
             bboxes[:,0::2] = bboxes[:,0::2]*float(new_w/width)
             bboxes[:,1::2] = bboxes[:,1::2]*float(new_h/height)
 
@@ -231,7 +233,7 @@ class RandomFlip:
 class RotatedRandomFlip(RandomFlip):
     def _flip_boxes(self,target,size):
         w,h = target["img_size"] 
-        for key in ["bboxes","rboxes"]:
+        for key in ["bboxes","rboxes","bboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
