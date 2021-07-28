@@ -1,1 +1,0 @@
-mpirun -np 4 python3.7 tools/run_net.py --config-file=configs/faster_rcnn_coco128_dist.yaml --use_cuda

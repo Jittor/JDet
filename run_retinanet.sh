@@ -1,1 +1,0 @@
-python3.7 tools/run_net.py --config-file=configs/retinanet_coco128.yaml --use_cuda --task=train

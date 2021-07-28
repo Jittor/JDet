@@ -27,3 +27,5 @@ build/
 *.jpg
 .idea
 *.swp
+*.pkl
+test_configs
