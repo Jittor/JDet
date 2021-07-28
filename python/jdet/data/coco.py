@@ -14,7 +14,7 @@ from terminaltables import AsciiTable
 
 from jdet.utils.registry import DATASETS
 from jdet.config import COCO_CLASSES
-from .transforms import Compose
+from jdet.data.transforms import Compose
 
 @DATASETS.register_module()
 class COCODataset(Dataset):
@@ -375,3 +375,13 @@ class COCODataset(Dataset):
                     f'{ap[0]:.3f} {ap[1]:.3f} {ap[2]:.3f} {ap[3]:.3f} '
                     f'{ap[4]:.3f} {ap[5]:.3f}')
         return eval_results
+
+
+def test_cocodataset():
+    dataset = COCODataset(root="/mnt/disk/lxl/dataset/coco/images/val2017",anno_file="/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json")
+    print(len(dataset.CLASSES))
+    print(len(dataset.cat_ids))
+
+
+if __name__ == "__main__":
+    test_cocodataset()
