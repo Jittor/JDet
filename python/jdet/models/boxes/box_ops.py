@@ -2,8 +2,9 @@ import jittor as jt
 import numpy as np 
 import math 
 
-def norm_angle(angle, range=[-np.pi / 4, np.pi]):
-    return (angle - range[0]) % range[1] + range[0]
+def norm_angle(angle, range=[float(-np.pi / 4), float(np.pi)]):
+    ret = (angle - range[0]) % range[1] + range[0]
+    return ret
 
 def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1., 1., 1.)):
     """Compute deltas of proposals w.r.t. gt.
@@ -39,8 +40,8 @@ def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 
 
     dx = (cosa * coord[..., 0] + sina * coord[..., 1]) / proposals_widths
     dy = (-sina * coord[..., 0] + cosa * coord[..., 1]) / proposals_heights
-    dw = jt.log(gt_widths / proposals_widths)
-    dh = jt.log(gt_heights / proposals_heights)
+    dw = jt.safe_log(gt_widths / proposals_widths)
+    dh = jt.safe_log(gt_heights / proposals_heights)
     da = (gt_angle - proposals_angles)
     da = norm_angle(da) / np.pi
 
@@ -115,8 +116,9 @@ def delta2bbox_rotated(rois, deltas, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1
 
 def bbox2delta(proposals,
                gt,
-               means=(0., 0., 0., 0.),
-               stds=(1., 1., 1., 1.)):
+               means=None,
+               stds=None,
+               weights = None):
     """Compute deltas of proposals w.r.t. gt in the MMDet V1.x manner.
 
     We usually compute the deltas of x, y, w, h of proposals w.r.t ground
@@ -150,23 +152,30 @@ def bbox2delta(proposals,
 
     dx = (gx - px) / pw
     dy = (gy - py) / ph
-    dw = jt.log(gw / pw)
-    dh = jt.log(gh / ph)
+    dw = jt.safe_log(gw / pw)
+    dh = jt.safe_log(gh / ph)
     deltas = jt.stack([dx, dy, dw, dh], dim=-1)
 
-    means = jt.array(means).unsqueeze(0)
-    stds = jt.array(stds).unsqueeze(0)
-    deltas = (deltas-means)/stds
+    if means is not None and stds is not None:
+        means = jt.array(means).unsqueeze(0)
+        stds = jt.array(stds).unsqueeze(0)
+        deltas = (deltas-means)/stds
+    
+    if weights is not None:
+        assert deltas.shape[-1] == weights.shape[-1]
+        weights = jt.array(weights)
+        deltas*=weights
 
     return deltas
 
 
 def delta2bbox(rois,
                deltas,
-               means=(0., 0., 0., 0.),
-               stds=(1., 1., 1., 1.),
+               means=None,
+               stds=None,
                max_shape=None,
-               wh_ratio_clip=16 / 1000):
+               wh_ratio_clip=16 / 1000,
+               weights = None,):
     """Apply deltas to shift/scale base boxes in the MMDet V1.x manner.
 
     Typically the rois are anchor or proposed bounding boxes and the deltas are
@@ -206,13 +215,19 @@ def delta2bbox(rois,
                 [0.0000, 0.1321, 7.8891, 0.8679],
                 [5.3967, 2.4251, 6.0033, 3.7749]])
     """
-    means = jt.array(means).repeat(1, deltas.size(1) // 4)
-    stds = jt.array(stds).repeat(1, deltas.size(1) // 4)
-    denorm_deltas = deltas * stds + means
-    dx = denorm_deltas[:, 0::4]
-    dy = denorm_deltas[:, 1::4]
-    dw = denorm_deltas[:, 2::4]
-    dh = denorm_deltas[:, 3::4]
+    if weights is not None:
+        assert deltas.shape[-1] == len(weights)
+        weights = jt.array(weights)
+        deltas /= weights
+
+    if means is not None and stds is not None:
+        means = jt.array(means).repeat(1, deltas.size(1) // 4)
+        stds = jt.array(stds).repeat(1, deltas.size(1) // 4)
+        deltas = deltas * stds + means
+    dx = deltas[:, 0::4]
+    dy = deltas[:, 1::4]
+    dw = deltas[:, 2::4]
+    dh = deltas[:, 3::4]
     max_ratio = np.abs(np.log(wh_ratio_clip))
     dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
     dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
@@ -401,12 +416,38 @@ def rotated_box_to_poly_np(rrects):
     return polys.astype(np.float32)
 
 def rotated_box_to_bbox_np(rotatex_boxes):
+    if rotatex_boxes.shape[0]==0:
+        return np.zeros((0,4)),np.zeros((0,8))
     polys = rotated_box_to_poly_np(rotatex_boxes)
     xmin = polys[:, ::2].min(1, keepdims=True)
     ymin = polys[:, 1::2].min(1, keepdims=True)
     xmax = polys[:, ::2].max(1, keepdims=True)
     ymax = polys[:, 1::2].max(1, keepdims=True)
-    return np.concatenate([xmin, ymin, xmax, ymax], axis=1)
+    return np.concatenate([xmin, ymin, xmax, ymax], axis=1),polys
+
+def rotated_box_to_poly(rboxes):
+    """
+    rrect:[x_ctr,y_ctr,w,h,angle]
+    to
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    """
+    N = rboxes.shape[0]
+    x_ctr, y_ctr, width, height, angle = rboxes.select(1, 0), rboxes.select(
+        1, 1), rboxes.select(1, 2), rboxes.select(1, 3), rboxes.select(1, 4)
+    tl_x, tl_y, br_x, br_y = -width * 0.5, -height * 0.5, width * 0.5, height * 0.5
+
+    rects = jt.stack([tl_x, br_x, br_x, tl_x, tl_y, tl_y,
+                         br_y, br_y], dim=0).reshape(2, 4, N).permute(2, 0, 1)
+
+    sin, cos = jt.sin(angle), jt.cos(angle)
+    # M.shape=[N,2,2]
+    M = jt.stack([cos, -sin, sin, cos],dim=0).reshape(2, 2, N).permute(2, 0, 1)
+    # polys:[N,8]
+    polys = jt.matmul(M,rects).permute(2, 1, 0).reshape(-1, N).transpose(1, 0)
+    polys[:, ::2] += x_ctr.unsqueeze(1)
+    polys[:, 1::2] += y_ctr.unsqueeze(1)
+
+    return polys
 
 def rotated_box_to_bbox(rotatex_boxes):
     polys = rotated_box_to_poly(rotatex_boxes)
