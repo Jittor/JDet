@@ -19,11 +19,26 @@ def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=Non
         return loss.sum()
     else:
         return loss
+def sigmoid_cross_entropy_with_logits(logits, labels):
+    # The logistic loss formula from above is
+    #   x - x * z + log(1 + exp(-x))
+    # For x < 0, a more numerically stable formula is
+    #   -x * z + log(1 + exp(x))
+    # Note that these two expressions can be combined into the following:
+    #   max(x, 0) - x * z + log(1 + exp(-abs(x)))
+    # To allow computing gradients at zero, we define custom versions of max and
+    # abs functions.
+    relu_logits = jt.ternary(logits >= 0., logits, jt.broadcast_var(0.0, logits))
+    neg_abs_logits = -jt.abs(logits)
+    return relu_logits - logits * labels + jt.log((neg_abs_logits).exp() + 1)
+
 
 def sigmoid_focal_loss(inputs,targets,weight=None, alpha = -1,gamma = 2,reduction = "none",avg_factor=None):    
     targets = targets.broadcast(inputs,[1])
     targets = (targets.index(1)+1)==targets
     p = inputs.sigmoid()
+    # assert(weight is None)
+    # ce_loss = sigmoid_cross_entropy_with_logits(inputs, targets)
     ce_loss = binary_cross_entropy_with_logits(inputs, targets,weight, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)

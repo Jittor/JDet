@@ -168,7 +168,6 @@ def bbox2delta(proposals,
 
     return deltas
 
-
 def delta2bbox(rois,
                deltas,
                means=None,
@@ -224,19 +223,21 @@ def delta2bbox(rois,
         means = jt.array(means).repeat(1, deltas.size(1) // 4)
         stds = jt.array(stds).repeat(1, deltas.size(1) // 4)
         deltas = deltas * stds + means
-    dx = deltas[:, 0::4]
-    dy = deltas[:, 1::4]
-    dw = deltas[:, 2::4]
-    dh = deltas[:, 3::4]
+    dx = deltas[..., 0::4]
+    dy = deltas[..., 1::4]
+    dw = deltas[..., 2::4]
+    dh = deltas[..., 3::4]
     max_ratio = np.abs(np.log(wh_ratio_clip))
     dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
     dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
     # Compute center of each roi
-    px = ((rois[:, 0] + rois[:, 2]) * 0.5).unsqueeze(1).expand_as(dx)
-    py = ((rois[:, 1] + rois[:, 3]) * 0.5).unsqueeze(1).expand_as(dy)
+    px = ((rois[..., 0] + rois[..., 2]) *
+          0.5).unsqueeze(-1)  # .expand_as(dx)
+    py = ((rois[..., 1] + rois[..., 3]) *
+          0.5).unsqueeze(-1)  # .expand_as(dy)
     # Compute width/height of each roi
-    pw = (rois[:, 2] - rois[:, 0] + 1.0).unsqueeze(1).expand_as(dw)
-    ph = (rois[:, 3] - rois[:, 1] + 1.0).unsqueeze(1).expand_as(dh)
+    pw = (rois[..., 2] - rois[..., 0]).unsqueeze(-1)  # .expand_as(dw)
+    ph = (rois[..., 3] - rois[..., 1]).unsqueeze(-1)  # .expand_as(dh)
     # Use exp(network energy) to enlarge/shrink each roi
     gw = pw * dw.exp()
     gh = ph * dh.exp()
@@ -414,6 +415,15 @@ def rotated_box_to_poly_np(rrects):
     polys = np.array(polys)
     polys = get_best_begin_point(polys)
     return polys.astype(np.float32)
+    
+def rotated_box_to_poly(rrects):
+    """
+    rrect:[x_ctr,y_ctr,w,h,angle]
+    to
+    poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+    """
+    #TODO: implement jt version
+    return jt.array(rotated_box_to_poly_np(rrects.data))
 
 def rotated_box_to_bbox_np(rotatex_boxes):
     if rotatex_boxes.shape[0]==0:
@@ -451,8 +461,27 @@ def rotated_box_to_poly(rboxes):
 
 def rotated_box_to_bbox(rotatex_boxes):
     polys = rotated_box_to_poly(rotatex_boxes)
-    xmin, _ = polys[:, ::2].min(1)
-    ymin, _ = polys[:, 1::2].min(1)
-    xmax, _ = polys[:, ::2].max(1)
-    ymax, _ = polys[:, 1::2].max(1)
+    xmin = polys[:, ::2].min(1)
+    ymin = polys[:, 1::2].min(1)
+    xmax = polys[:, ::2].max(1)
+    ymax = polys[:, 1::2].max(1)
     return jt.stack([xmin, ymin, xmax, ymax], dim=1)
+    # return jt.stack([(xmin+xmax)/2, (ymin+ymax)/2, xmax-xmin, ymax-ymin], dim=1)
+
+def boxes_xywh_to_x0y0x1y1(boxes):
+    assert(boxes.shape[1] >= 4)
+    x = boxes[:, 0]
+    y = boxes[:, 1]
+    w = boxes[:, 2]
+    h = boxes[:, 3]
+    others = boxes[:, 4:]
+    return jt.concat([jt.stack([x - 0.5 * w, y - 0.5 * h, x + 0.5 * w, y + 0.5 * h], dim=1), others], dim=1)
+
+def boxes_x0y0x1y1_to_xywh(boxes):
+    assert(boxes.shape[1] >= 4)
+    x0 = boxes[:, 0]
+    y0 = boxes[:, 1]
+    x1 = boxes[:, 2]
+    y1 = boxes[:, 3]
+    others = boxes[:, 4:]
+    return jt.concat([jt.stack([(x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0], dim=1), others], dim=1)
