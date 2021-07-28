@@ -4,14 +4,14 @@ from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.devkits.result_merge import mergebypoly
 import os
+from tqdm import tqdm
 
 def prepare(result_pkl,save_path):
     check_dir(save_path)
     results = jt.load(result_pkl)
     data = {}
-    for result,target in results:
+    for result,target in tqdm(results):
         dets,labels = result
-        print(dets.shape)
         img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
         for det,label in zip(dets,labels):
             bbox = det[:5]
@@ -30,9 +30,10 @@ def prepare(result_pkl,save_path):
         f_out.close()
 
 def test():
-    result_pkl = "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota/test/test_12.pkl"
-    save_path = "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota/submit/before_nms"
-    final_path = "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota/submit/after_nms"
+    model_name = "s2anet_r50_fpn_1x_dota_bs2_epoch14"
+    result_pkl = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/test/test_15.pkl"
+    save_path = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/submit_12/before_nms"
+    final_path = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/submit_12/after_nms"
     prepare(result_pkl,save_path)
     check_dir(final_path)
     mergebypoly(save_path,final_path)

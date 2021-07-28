@@ -179,7 +179,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         rb = jt.minimum(bboxes1[..., :, None, 2:],
                        bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
 
-        wh = (rb - lt).clamp(min=0)  # [B, rows, cols, 2]
+        wh = (rb - lt).clamp(min_v=0)  # [B, rows, cols, 2]
         overlap = wh[..., 0] * wh[..., 1]
 
         if mode in ['iou', 'giou']:
@@ -192,7 +192,6 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             enclosed_rb = jt.maximum(bboxes1[..., :, None, 2:],
                                     bboxes2[..., None, :, 2:])
 
-    eps = union.new_tensor([eps])
     union = jt.maximum(union, eps)
     ious = overlap / union
     if mode in ['iou', 'iof']:
