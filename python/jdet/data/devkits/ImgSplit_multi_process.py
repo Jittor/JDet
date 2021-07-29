@@ -106,7 +106,6 @@ class splitbase():
         self.padding = padding
         self.num_process = num_process
         self.pool = Pool(num_process)
-        print('padding:', padding)
 
         # pdb.set_trace()
         if not os.path.isdir(self.outpath):
@@ -244,7 +243,6 @@ class splitbase():
         :return:
         """
         img = cv2.imread(os.path.join(self.imagepath, name + extent))
-        print(os.path.join(self.imagepath, name + extent))
         if np.shape(img) == ():
             return
         if (self.process_label):
@@ -312,17 +310,7 @@ class splitbase():
         self.__dict__.update(state)
 
 def process(src_path, target_path, gap=200, subsize=1024, rates=[1.]):
-    # example usage of ImgSplit
-    # start = time.clock()
-    # split = splitbase(r'/data/dj/dota/val',
-    #                    r'/data/dj/dota/val_1024_debugmulti-process_refactor') # time cost 19s
-    # # split.splitdata(1)
-    # # split.splitdata(2)
-    # split.splitdata(0.4)
-    #
-    # elapsed = (time.clock() - start)
-    # print("Time used:", elapsed)
-    target_path = target_path + '_' + str(subsize) + '_' + str(gap)
+    target_path = target_path + '_' + str(subsize) + '_' + str(gap) + '_' + '-'.join([str(rate) for  rate in rates])
     if (not os.path.exists(target_path)):
         os.makedirs(target_path)
 
@@ -332,18 +320,9 @@ def process(src_path, target_path, gap=200, subsize=1024, rates=[1.]):
                       subsize=subsize,
                       num_process=32
                       )
-    print(src_path,
-                      target_path)
     for rate in rates:
         split.splitdata(rate)
-    image_names = []
-    print("generate list")
-    for root, dirs, files in os.walk(os.path.join(target_path, "images")):
-        for name in files:
-            if (name.endswith(".png") or name.endswith(".jpg") or name.endswith(".jpeg")):
-                image_names.append(name)
-    import pickle as pk
-    pk.dump(image_names, open(os.path.join(target_path, "image_names.pkl"), "wb"))
+    return target_path
 
 
 # main('/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/trainval', '/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval', gap=150, subsize=600)
