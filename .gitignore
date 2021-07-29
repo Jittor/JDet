@@ -15,6 +15,7 @@ coco128
 exp*
 python/jdet/data/devkits/polyiou
 
+test.py
 eggs/
 .eggs/
 *.egg-info/
