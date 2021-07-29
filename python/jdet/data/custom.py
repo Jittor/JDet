@@ -23,7 +23,7 @@ class CustomDataset(Dataset):
                 'bboxes': <np.ndarray> (n, 5),
                 'labels': <np.ndarray> (n, ),
                 'bboxes_ignore': <np.ndarray> (k, 5), (optional field)
-                'labels_ignore': <np.ndarray> (k, 4) (optional field)
+                'labels_ignore': <np.ndarray> (k, 5) (optional field)
             }
         },
         ...
@@ -64,11 +64,11 @@ class CustomDataset(Dataset):
         hboxes_ignore,polys_ignore = rotated_box_to_bbox_np(anno["bboxes_ignore"])
 
         ann = dict(
-            bboxes=anno['bboxes'].astype(np.float32),
+            rboxes=anno['bboxes'].astype(np.float32),
             hboxes=hboxes.astype(np.float32),
             polys =polys.astype(np.float32),
             labels=anno['labels'].astype(np.int32),
-            bboxes_ignore=anno['bboxes_ignore'].astype(np.float32),
+            rboxes_ignore=anno['bboxes_ignore'].astype(np.float32),
             hboxes_ignore=hboxes_ignore,
             polys_ignore = polys_ignore,
             classes=self.CLASSES,

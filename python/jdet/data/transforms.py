@@ -32,20 +32,20 @@ class RandomRotateAug:
         self.random_rotate_on = random_rotate_on
     
     def _rotate_boxes_90(self,target):
-        for key in ["bboxes","rboxes","polygons"]:
+        for key in["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
             width,height = target["img_size"] 
 
-            if key=="rboxes":
+            if "rboxes" in key:
                 bboxes  = rotated_box_to_poly_np(bboxes)
 
             new_bboxes = np.zeros_like(bboxes)
             new_bboxes[:,0::2] = bboxes[:,1::2]
             new_bboxes[:,1::2] = w-bboxes[:,0::2]
 
-            if key=="rboxes":
+            if "rboxes" in key:
                 new_bboxes = poly_to_rotated_box_np(new_bboxes)
 
             target[key]=new_bboxes
@@ -101,7 +101,7 @@ class Resize:
         return (oh, ow),oh/h
 
     def _resize_boxes(self,target,size):
-        for key in ["bboxes","rboxes","polygons"]:
+        for key in ["bboxes","polys"]:
             if key not in target:
                 continue
             bboxes = target[key]
@@ -132,13 +132,15 @@ class Resize:
 class RotatedResize(Resize):
 
     def _resize_boxes(self, target,size):
-        for key in ["bboxes","rboxes","polygons","bboxes_ignore"]:
+        for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
-            if bboxes.ndim!=2:
+            if bboxes is None or bboxes.ndim!=2:
                 continue
-            bboxes = rotated_box_to_poly_np(bboxes)
+            
+            if "rboxes" in key:
+                bboxes = rotated_box_to_poly_np(bboxes)
 
             width,height = target["img_size"]
             new_w,new_h = size
@@ -149,8 +151,9 @@ class RotatedResize(Resize):
             # clip to border
             bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, new_w - 1)
             bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, new_h - 1)
-
-            bboxes = poly_to_rotated_box_np(bboxes)
+            
+            if "rboxes" in key:
+                bboxes = poly_to_rotated_box_np(bboxes)
             target[key]=bboxes
 
 
@@ -163,7 +166,7 @@ class RandomFlip:
 
     def _flip_boxes(self,target,size):
         w,h = target["img_size"] 
-        for key in ["bboxes","rboxes"]:
+        for key in ["bboxes","polys"]:
             if key not in target:
                 continue
             bboxes = target[key]
@@ -196,24 +199,34 @@ class RandomFlip:
             image = self._flip_image(image)
             if target is not None:
                 self._flip_boxes(target,image.size)
+            target["flip"]=self.direction
         return image, target
 
 @TRANSFORMS.register_module()
 class RotatedRandomFlip(RandomFlip):
     def _flip_boxes(self,target,size):
         w,h = target["img_size"] 
-        for key in ["bboxes","rboxes","bboxes_ignore"]:
+        for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
+            if "rboxes" in key:
+                bboxes = rotated_box_to_poly_np(bboxes)
             flipped = bboxes.copy()
             if self.direction == 'horizontal':
-                flipped[..., 0::5] = w - flipped[..., 0::5] - 1
-                flipped[..., 4::5] = norm_angle(np.pi - flipped[..., 4::5])
+                flipped[..., 0::4] = w - bboxes[..., 2::4]
+                flipped[..., 2::4] = w - bboxes[..., 0::4]
             elif self.direction == 'vertical':
-                assert False
+                flipped[..., 1::4] = h - bboxes[..., 3::4]
+                flipped[..., 3::4] = h - bboxes[..., 1::4]
             elif self.direction == 'diagonal':
-                assert False
+                flipped[..., 0::4] = w - bboxes[..., 2::4]
+                flipped[..., 1::4] = h - bboxes[..., 3::4]
+                flipped[..., 2::4] = w - bboxes[..., 0::4]
+                flipped[..., 3::4] = h - bboxes[..., 1::4]
+            
+            if "rboxes" in key:
+                flipped = poly_to_rotated_box_np(flipped)
             target[key] = flipped
 
 @TRANSFORMS.register_module()

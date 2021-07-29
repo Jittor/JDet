@@ -607,9 +607,9 @@ class S2ANetHead(nn.Module):
 
         for target in targets:
             if is_train:
-                gt_bboxes.append(target["bboxes"])
+                gt_bboxes.append(target["rboxes"])
                 gt_labels.append(target["labels"])
-                gt_bboxes_ignore.append(target["bboxes_ignore"])
+                gt_bboxes_ignore.append(target["rboxes_ignore"])
             img_metas.append(dict(
                 img_shape=target["img_size"][::-1],
                 scale_factor=target["scale_factor"],
