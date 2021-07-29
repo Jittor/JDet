@@ -26,8 +26,8 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        anno_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        image_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -68,8 +68,8 @@ dataset = dict(
     # ),
     test=dict(
         type="ImageDataset",
-        img_files='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
-        img_prefix='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        images_file='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",

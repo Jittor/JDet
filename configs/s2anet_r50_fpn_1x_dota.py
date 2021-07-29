@@ -162,7 +162,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 
 logger = dict(
