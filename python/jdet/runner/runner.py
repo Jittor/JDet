@@ -77,33 +77,11 @@ class Runner:
 
     def train(self):
         self.model.train()
-        # import torch
-        # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
-        # self.model.load_state_dict(torch.load("/home/lxl/workspace/s2anet/init_weight.pth"))
-        # TODO : remove thiss
-        self.model.backbone.train()
-        # from jittor_utils import auto_diff
-        # hook = auto_diff.Hook("s2anet",rtol=1e-4, atol=1e-4)
-        # hook.hook_module(self.model)
 
         start_time = time.time()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
-            # tmp_loss = losses["loss_odm_cls"]
             all_loss,losses = parse_losses(losses)
-            # all_loss = losses['loss_rpn_cls']+losses["loss_rpn_bbox"]
-            # print(all_loss)
-            # loss_fam_bbox,loss_odm_cls,loss_odm_bbox
-            # all_loss = tmp_loss[-1]
-            # print(all_loss)
-            # data = {}
-            # for p in self.model.parameters():
-            #     if p.dtype!="float32":
-            #         continue
-            #     grad = jt.grad(all_loss,p)
-            #     data[p.name()]=(p.numpy(),grad.numpy())
-            # jt.save(data,"jt_grad.pkl") 
-            # exit()
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
 

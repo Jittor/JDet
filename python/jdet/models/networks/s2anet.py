@@ -14,11 +14,14 @@ class S2ANet(nn.Module):
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
         self.bbox_head = build_from_cfg(bbox_head,HEADS)
-        self.init_weights()
 
     def init_weights(self):
         import torch 
         self.load_parameters(torch.load("/home/lxl/workspace/s2anet/init_weight.pth"))
+
+    def train(self):
+        super().train()
+        self.backbone.train()
 
     def execute(self,images,targets):
         '''
