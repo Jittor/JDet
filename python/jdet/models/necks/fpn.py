@@ -143,7 +143,6 @@ class FPN(nn.Module):
 
     def init_weights(self):
         for m in self.modules():
-            print(type(m),isinstance(m,nn.Conv2d))
             if isinstance(m, nn.Conv2d):
                 xavier_init(m, distribution='uniform')
 
