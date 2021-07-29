@@ -10,6 +10,9 @@ from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses
+from jdet.data.devkits.dota_merge import dota_merge
+import os
+import shutil
 
 class Runner:
     def __init__(self):
@@ -93,6 +96,7 @@ class Runner:
                 start_time = time.time()
                 remain = (self.total_iter-self.iter) * batch_size / fps
                 data = dict(
+                    name = self.cfg.name,
                     lr = self.optimizer.cur_lr(),
                     iter = self.iter,
                     epoch = self.epoch,
@@ -164,6 +168,21 @@ class Runner:
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
 
+            # merge results
+            result_pkl = os.path.join(self.work_dir, f"test/test_{self.epoch}.pkl")
+            save_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/before_nms")
+            final_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/after_nms")
+            zip_path = os.path.join("submit_zips", self.cfg.name + ".zip")
+            if (os.path.exists(save_path)):
+                shutil.rmtree(save_path)
+            if (os.path.exists(final_path)):
+                shutil.rmtree(final_path)
+            if (os.path.exists(zip_path)):
+                os.remove(zip_path)
+            if not os.path.exists("submit_zips"):
+                os.makedirs("submit_zips")
+            dota_merge(result_pkl, save_path, final_path)
+            os.system(f"zip -rj {zip_path} {os.path.join(final_path,'*')}")
 
     @jt.single_process_scope()
     def save(self):
