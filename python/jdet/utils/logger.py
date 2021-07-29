@@ -4,6 +4,7 @@ import time
 import os
 import logging
 from tensorboardX import SummaryWriter
+from jdet.config import get_cfg
 
 @HOOKS.register_module()
 class TextLogger:
@@ -20,8 +21,15 @@ class TextLogger:
 @HOOKS.register_module()
 class TensorboardLogger:
     def __init__(self,work_dir):
+        self.cfg = get_cfg()
         tensorboard_dir = os.path.join(work_dir,"tensorboard")
         self.writer = SummaryWriter(tensorboard_dir)
+        ln_path = os.path.join("tfrecord_logs", self.cfg.name)
+        if (not os.path.exists("tfrecord_logs")):
+            os.makedirs("tfrecord_logs")
+        if (os.path.exists(ln_path) or os.path.islink(ln_path)):
+            os.remove(ln_path)
+        os.system(f"ln -s {os.path.abspath(tensorboard_dir)} {ln_path}")
 
     def log(self,data):
         step = data["iter"]
