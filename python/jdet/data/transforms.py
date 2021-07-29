@@ -26,27 +26,39 @@ class Compose:
         
         return image, target
 
-class RandomRotate90:
-    def __init__(self, prob=0.5):
-        self.prob = prob
-
-    def __call__(self, image, target=None):
-        if target is not None and random.random() < self.prob:
-            image = F.rotate( image, 90, expand=True )
-            target = target.rotate90()
-        return image, target
-
-# (0, 90, 180, or 270)
+@TRANSFORMS.register_module()
 class RandomRotateAug:
-    def __init__(self, random_rotate_on):
+    def __init__(self, random_rotate_on=False):
         self.random_rotate_on = random_rotate_on
+    
+    def _rotate_boxes_90(self,target):
+        for key in ["bboxes","rboxes","polygons"]:
+            if key not in target:
+                continue
+            bboxes = target[key]
+            width,height = target["img_size"] 
+
+            if key=="rboxes":
+                bboxes  = rotated_box_to_poly_np(bboxes)
+
+            new_bboxes = np.zeros_like(bboxes)
+            new_bboxes[:,0::2] = bboxes[:,1::2]
+            new_bboxes[:,1::2] = w-bboxes[:,0::2]
+
+            if key=="rboxes":
+                new_bboxes = poly_to_rotated_box_np(new_bboxes)
+
+            target[key]=new_bboxes
 
     def __call__( self, image, target=None ):
-        if target is not None and self.random_rotate_on:
+        # (0, 90, 180, or 270)
+        if self.random_rotate_on:
             indx = int(random.random() * 100) // 25
-            image = F.rotate( image, 90 * indx, expand=True )
+            # anticlockwise
+            image = image.rotate(90 * indx,expand=True)
             for _ in range(indx):
-                target = target.rotate90()
+                self._rotate_boxes_90(target)
+            target["rotate_angle"]=90*indx
         return image, target
 
 @TRANSFORMS.register_module()
@@ -141,49 +153,6 @@ class RotatedResize(Resize):
             bboxes = poly_to_rotated_box_np(bboxes)
             target[key]=bboxes
 
-# The image must be a square as we do not expand the image
-class RandomSquareRotate( object ):
-    def __init__( self, do=True ):
-        self.do = do
-
-    def __call__( self, image, target=None ):
-        if target is None or not self.do:
-            return image, target
-
-        w, h = image.size
-        assert w == h
-
-        cx = w / 2
-        cy = cx
-
-        degree = random.uniform(0, 360)
-        radian = degree * math.pi / 180
-
-        new_image = image.rotate( -degree )
-
-        sin = math.sin( radian )
-        cos = math.cos( radian )
-
-        masks = target.get_field( "masks" )
-        polygons = list( map( lambda x: x.polygons[0], masks.instances.polygons ) )
-        polygons = torch.stack( polygons, 0 ).reshape( (-1, 2) ).t()
-
-        M = torch.Tensor([[cos, -sin], [sin, cos]])
-        b = torch.Tensor([[(1 - cos) * cx + cy * sin], [(1 - cos) * cy - cx * sin]])
-        new_points = M.mm( polygons ) + b
-        new_points = new_points.t().reshape( (-1, 8) )
-        xmins, _ = torch.min( new_points[:,  ::2], 1 )
-        ymins, _ = torch.min( new_points[:, 1::2], 1 )
-        xmaxs, _ = torch.max( new_points[:,  ::2], 1 )
-        ymaxs, _ = torch.max( new_points[:, 1::2], 1 )
-        boxes = torch.stack( [xmins, ymins, xmaxs, ymaxs], 1 ).reshape((-1, 4))
-
-        new_target = BoxList( boxes, image.size, mode="xyxy" )
-        new_target._copy_extra_fields( target )
-        new_masks = SegmentationMask( new_points.reshape((-1, 1, 8)).tolist(), image.size, mode='poly' )
-        new_target.add_field( "masks", new_masks )
-
-        return new_image, new_target
 
 @TRANSFORMS.register_module()
 class RandomFlip:
@@ -270,68 +239,6 @@ class Pad:
         
         return new_image,target
     
-
-
-class SortForQuad( object ):
-    def __init__( self, do=True ):
-        self.do=do
-
-    @staticmethod
-    def choose_best_pointorder_fit_another(poly1):
-        x1 = poly1[0]
-        y1 = poly1[1]
-        x2 = poly1[2]
-        y2 = poly1[3]
-        x3 = poly1[4]
-        y3 = poly1[5]
-        x4 = poly1[6]
-        y4 = poly1[7]
-
-        xmin = min( x1, x2, x3, x4 )
-        ymin = min( y1, y2, y3, y4 )
-        xmax = max( x1, x2, x3, x4 )
-        ymax = max( y1, y2, y3, y4 )
-        poly2 = [xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax]
-
-        combinate = [np.array([x1, y1, x2, y2, x3, y3, x4, y4]), np.array([x2, y2, x3, y3, x4, y4, x1, y1]),
-                     np.array([x3, y3, x4, y4, x1, y1, x2, y2]), np.array([x4, y4, x1, y1, x2, y2, x3, y3])]
-        dst_coordinate = np.array(poly2)
-        distances = np.array([np.sum((coord - dst_coordinate)**2) for coord in combinate])
-        sorted = distances.argsort()
-        return combinate[sorted[0]].tolist()
-
-    def __call__( self, image, target=None ):
-        if target == None:
-            return image
-        if not self.do:
-            return image, target
-
-        masks = target.get_field( "masks" )
-        polygons = list( map( lambda x: x.polygons[0].numpy(), masks.instances.polygons ) )
-        polygons = np.stack( polygons, axis=0 ).reshape( (-1, 8) )
-
-        new_polygons = []
-        for polygon in polygons:
-            new_polygon = self.choose_best_pointorder_fit_another( polygon )
-            new_polygons.append( [new_polygon] )
-
-        new_masks = SegmentationMask( new_polygons, image.size, mode='poly' )
-        target.add_field( "masks", new_masks )
-
-        return image, target
-
-
-class RandomCrop( object ):
-    def __init__( self, size ):
-        self.crop_size = size
-
-    def __call__( self, image, target ):
-        width, height = image.size
-        i = random.choice( np.arange( 0, height - self.crop_size[0] ) )
-        j = random.choice( np.arange( 0, width - self.crop_size[1] ) )
-        image = F.crop( image, i, j, self.crop_size[0], self.crop_size[1] ) #image[i:i+width,j+height,:]
-        target_ = target.crop( ( j, i, j + self.crop_size[1], i + self.crop_size[0]) )
-        return image, target_
 
 @TRANSFORMS.register_module()
 class Normalize:
