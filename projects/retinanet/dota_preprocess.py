@@ -3,14 +3,18 @@ import argparse
 import os
 from jdet.config import init_cfg, get_cfg
 from jdet.data.devkits.ImgSplit_multi_process import process
+from jdet.data.devkits.convert_dota_to_mmdet import convert_dota_to_mmdet
 
 def clear(cfg):
     os.system(f"rm -rf {os.path.join(cfg.source_dataset_path, 'trainval')}")
+    os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
 
 def run(cfg):
     for task in cfg.tasks:
         label = task.label
         cfg_ = task.config
+        print('==============')
+        print("processing", label)
 
         subimage_size=600 if cfg_.subimage_size is None else cfg_.subimage_size
         overlap_size=150 if cfg_.overlap_size is None else cfg_.overlap_size
@@ -34,8 +38,10 @@ def run(cfg):
             os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'images', '*')} {out_img_path}")
             os.system(f"cp {os.path.join(cfg.source_dataset_path, 'train', 'labelTxt', '*')} {out_label_path}")
             os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'labelTxt', '*')} {out_label_path}")
-        process(in_path, out_path, subsize=subimage_size, gap=overlap_size, rates=multi_scale)
-
+        target_path = process(in_path, out_path, subsize=subimage_size, gap=overlap_size, rates=multi_scale)
+        if (label != "test"):
+            print("converting to mmdet format...")
+            convert_dota_to_mmdet(target_path, os.path.join(target_path, 'labels.pkl'))
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor DOTA data preprocess")
