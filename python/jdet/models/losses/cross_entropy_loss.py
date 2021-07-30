@@ -100,3 +100,4 @@ class CrossEntropyLoss(nn.Module):
             weight,
             reduction=reduction,
             avg_factor=avg_factor)
+        return loss_bbox
