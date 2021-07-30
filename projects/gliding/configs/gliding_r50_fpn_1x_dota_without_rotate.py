@@ -95,9 +95,9 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(
-                type='RotatedRandomFlip', 
-                prob=0.5),
+            # dict(
+            #     type='RotatedRandomFlip', 
+            #     prob=0.0),
             # dict(
             #     type="RandomRotateAug",
             #     random_rotate_on=True,
@@ -184,4 +184,4 @@ eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
 work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_norotate"
-resume_path = f"{work_dir}/checkpoints/ckpt_12.pkl"
+# resume_path = f"{work_dir}/checkpoints/ckpt_12.pkl"

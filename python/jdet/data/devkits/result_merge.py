@@ -18,7 +18,7 @@ from multiprocessing import Pool
 from functools import partial
 
 ## the thresh for nms when merge image
-nms_threshold_type = 1
+nms_threshold_type = 0
 nms_threshold_0 = 0.1
 nms_threshold_1 = {'roundabout': 0.1, 'tennis-court': 0.3, 'swimming-pool': 0.1, 'storage-tank': 0.2,
                 'soccer-ball-field': 0.3, 'small-vehicle': 0.2, 'ship': 0.2, 'plane': 0.3,
