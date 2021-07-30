@@ -33,7 +33,7 @@ class RetinaNet(nn.Module):
             images (jt.Var): image tensors, shape is [N,C,H,W]
             targets (list[dict]): targets for each image
         Rets:
-            results: detections
+            results: detections, #((x0,y0,x1,y1,a(pi),score), type)
             losses (dict): losses
         '''
         if ("bboxes" in targets[0]):
