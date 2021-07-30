@@ -89,8 +89,8 @@ class Runner:
 
             if check_interval(self.iter,self.log_interval):
                 ptime = time.time()-start_time
-                fps = batch_size*self.iter/ptime
-                eta_time = (self.total_iter-self.iter)*ptime/(self.iter+1)
+                fps = batch_size*(batch_idx+1)/ptime
+                eta_time = (self.total_iter-self.iter)*ptime/(batch_idx+1)
                 eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     lr = self.optimizer.cur_lr(),

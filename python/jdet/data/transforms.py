@@ -208,6 +208,17 @@ class RandomFlip:
 
 @TRANSFORMS.register_module()
 class RotatedRandomFlip(RandomFlip):
+    def _flip_rboxes(self,bboxes,w):
+        flipped = bboxes.copy()
+        if self.direction == 'horizontal':
+            flipped[..., 0::5] = w - flipped[..., 0::5] - 1
+            flipped[..., 4::5] = norm_angle(np.pi - flipped[..., 4::5])
+        elif self.direction == 'vertical':
+            assert False
+        elif self.direction == 'diagonal':
+            assert False
+        return flipped
+
     def _flip_boxes(self,target,size):
         w,h = target["img_size"] 
         for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
@@ -215,7 +226,8 @@ class RotatedRandomFlip(RandomFlip):
                 continue
             bboxes = target[key]
             if "rboxes" in key:
-                bboxes = rotated_box_to_poly_np(bboxes)
+                target[key] = self._flip_rboxes(bboxes,w)
+                continue 
             flipped = bboxes.copy()
             if self.direction == 'horizontal':
                 flipped[..., 0::4] = w - bboxes[..., 2::4]
@@ -228,9 +240,7 @@ class RotatedRandomFlip(RandomFlip):
                 flipped[..., 1::4] = h - bboxes[..., 3::4]
                 flipped[..., 2::4] = w - bboxes[..., 0::4]
                 flipped[..., 3::4] = h - bboxes[..., 1::4]
-            
-            if "rboxes" in key:
-                flipped = poly_to_rotated_box_np(flipped)
+
             target[key] = flipped
 
 @TRANSFORMS.register_module()
