@@ -1,5 +1,4 @@
 import jittor as jt
-from numpy.lib.arraysetops import isin 
 from jdet.utils.registry import BOXES,build_from_cfg
 
 class AssignResult:
