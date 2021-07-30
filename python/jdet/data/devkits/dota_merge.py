@@ -30,8 +30,8 @@ def prepare(result_pkl,save_path):
         f_out.close()
 
 def test():
-    model_name = "s2anet_r50_fpn_1x_dota_bs2_epoch14"
-    result_pkl = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/test/test_15.pkl"
+    model_name = "s2anet_r50_fpn_1x_dota_with_torch_pretrained"
+    result_pkl = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/test/test_12.pkl"
     save_path = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/submit_12/before_nms"
     final_path = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/submit_12/after_nms"
     prepare(result_pkl,save_path)

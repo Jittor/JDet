@@ -31,12 +31,15 @@ class RandomRotateAug:
     def __init__(self, random_rotate_on=False):
         self.random_rotate_on = random_rotate_on
     
-    def _rotate_boxes_90(self,target):
+    def _rotate_boxes_90(self,target,size):
         for key in["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
-            width,height = target["img_size"] 
+            if bboxes.ndim<2:
+                continue
+
+            w,h = size
 
             if "rboxes" in key:
                 bboxes  = rotated_box_to_poly_np(bboxes)
@@ -55,10 +58,11 @@ class RandomRotateAug:
         if self.random_rotate_on:
             indx = int(random.random() * 100) // 25
             # anticlockwise
-            image = image.rotate(90 * indx,expand=True)
             for _ in range(indx):
-                self._rotate_boxes_90(target)
+                self._rotate_boxes_90(target,image.size)
+                image = image.rotate(90,expand=True)
             target["rotate_angle"]=90*indx
+
         return image, target
 
 @TRANSFORMS.register_module()

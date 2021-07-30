@@ -21,7 +21,7 @@ model = dict(
         feat_channels=256,
         anchor_generator=dict(
             type='AnchorGenerator',
-            scales=[4, 8, 16, 32],
+            scales=[8],
             ratios=[0.5, 1.0, 2.0],
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
@@ -95,7 +95,13 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.0),
+            dict(
+                type='RotatedRandomFlip', 
+                prob=0.5),
+            dict(
+                type="RandomRotateAug",
+                random_rotate_on=True,
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -155,17 +161,17 @@ optimizer = dict(
     type='SGD', 
     lr=0.01/4.,#0.01*(1/8.), 
     momentum=0.9, 
-    weight_decay=0.0001,
-    grad_clip=dict(
-        max_norm=35, 
-        norm_type=2))
+    weight_decay=0.0001,)
+    # grad_clip=dict(
+    #     max_norm=35, 
+    #     norm_type=2))
 
 scheduler = dict(
     type='StepLR',
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 
 logger = dict(
@@ -176,4 +182,4 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr"
+work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_rotate"

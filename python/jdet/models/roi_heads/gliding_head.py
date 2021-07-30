@@ -460,6 +460,9 @@ def draw_rboxes(img_file,boxes,scores,labels,classnames):
 
 def handle_ratio_prediction(hboxes,rboxes,ratios,scores,labels):
 
+    if rboxes.numel()==0:
+        return rboxes, scores, labels
+
     h_idx = jt.where(ratios > 0.8)[0]
     h = hboxes[h_idx]
     hboxes_vtx = jt.concat([h[:, 0:1], h[:, 1:2], h[:, 2:3], h[:, 1:2], h[:, 2:3], h[:, 3:4], h[:, 0:1], h[:, 3:4]],dim=1)
