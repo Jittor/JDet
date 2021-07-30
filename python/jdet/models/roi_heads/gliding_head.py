@@ -495,7 +495,8 @@ def polygons2ratios(rbox):
     rbox = rbox.view( (-1, 4, 2) )
 
     polygon_areas = list( map( polygon_area, rbox ) )
-    polygon_areas = jt.array( polygon_areas )
+    polygon_areas = jt.concat( polygon_areas )
+
     hbox_areas = ( max_y_ - min_y_ + 1 ) * ( max_x_ - min_x_ + 1 )
     ratio_gt = polygon_areas / hbox_areas
 

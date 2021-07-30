@@ -40,5 +40,5 @@ def check_init(jt_pkl,torch_pkl):
 
     
 
-check_init("jittor_init_weight.pkl","torch_init_weight.pkl")
+# check_init("jittor_init_weight.pkl","torch_init_weight.pkl")
 

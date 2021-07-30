@@ -98,10 +98,10 @@ dataset = dict(
             dict(
                 type='RotatedRandomFlip', 
                 prob=0.5),
-            # dict(
-            #     type="RandomRotateAug",
-            #     random_rotate_on=True,
-            # ),
+            dict(
+                type="RandomRotateAug",
+                random_rotate_on=True,
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),

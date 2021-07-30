@@ -32,14 +32,21 @@ class RandomRotateAug:
         self.random_rotate_on = random_rotate_on
     
     def _rotate_boxes_90(self,target,size):
+        w,h = size
         for key in["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
             if bboxes.ndim<2:
                 continue
-
-            w,h = size
+            if "bboxes" in key or "hboxes" in key:
+                new_boxes = np.zeros_like(bboxes)
+                new_boxes[:,  ::2] = bboxes[:, 1::2] # x = y
+                # new_boxes[:, 1::2] = w - bboxes[:, -2::-2] # y = w - x
+                new_boxes[:, 1] = w - bboxes[:, 2] # y = w - x
+                new_boxes[:, 3] = w - bboxes[:, 0] # y = w - x
+                target[key] = new_boxes
+                continue
 
             if "rboxes" in key:
                 bboxes  = rotated_box_to_poly_np(bboxes)
@@ -59,9 +66,11 @@ class RandomRotateAug:
             indx = int(random.random() * 100) // 25
             # anticlockwise
             for _ in range(indx):
-                self._rotate_boxes_90(target,image.size)
+                if target is not None:
+                    self._rotate_boxes_90(target,image.size)
                 image = image.rotate(90,expand=True)
-            target["rotate_angle"]=90*indx
+            if target is not None:
+                target["rotate_angle"]=90*indx
 
         return image, target
 
@@ -208,7 +217,7 @@ class RandomFlip:
 
 @TRANSFORMS.register_module()
 class RotatedRandomFlip(RandomFlip):
-    def _flip_rboxes(self,bboxes,w):
+    def _flip_rboxes(self,bboxes,w,h):
         flipped = bboxes.copy()
         if self.direction == 'horizontal':
             flipped[..., 0::5] = w - flipped[..., 0::5] - 1
@@ -219,15 +228,30 @@ class RotatedRandomFlip(RandomFlip):
             assert False
         return flipped
 
+    def _flip_polys(self,bboxes,w,h):
+        flipped = bboxes.copy()
+        if self.direction == 'horizontal':
+            flipped[..., 0::2] = w - flipped[..., 0::2] - 1
+        elif self.direction == 'vertical':
+            flipped[..., 1::2] = h - flipped[..., 1::2] - 1
+        elif self.direction == 'diagonal':
+            flipped[..., 0::2] = w - flipped[..., 0::2] - 1
+            flipped[..., 1::2] = h - flipped[..., 1::2] - 1
+        return flipped 
+
+
     def _flip_boxes(self,target,size):
-        w,h = target["img_size"] 
+        w,h = size 
         for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
             if key not in target:
                 continue
             bboxes = target[key]
             if "rboxes" in key:
-                target[key] = self._flip_rboxes(bboxes,w)
+                target[key] = self._flip_rboxes(bboxes,w,h)
                 continue 
+            if "polys" in key:
+                target[key] = self._flip_polys(bboxes,w,h)
+                continue
             flipped = bboxes.copy()
             if self.direction == 'horizontal':
                 flipped[..., 0::4] = w - bboxes[..., 2::4]
@@ -240,7 +264,6 @@ class RotatedRandomFlip(RandomFlip):
                 flipped[..., 1::4] = h - bboxes[..., 3::4]
                 flipped[..., 2::4] = w - bboxes[..., 0::4]
                 flipped[..., 3::4] = h - bboxes[..., 1::4]
-
             target[key] = flipped
 
 @TRANSFORMS.register_module()

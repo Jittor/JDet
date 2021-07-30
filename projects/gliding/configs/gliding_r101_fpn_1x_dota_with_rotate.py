@@ -2,7 +2,7 @@
 model = dict(
     type='GlidingVertex',
     backbone=dict(
-        type='Resnet50',
+        type='Resnet101',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
@@ -98,10 +98,10 @@ dataset = dict(
             dict(
                 type='RotatedRandomFlip', 
                 prob=0.5),
-            # dict(
-            #     type="RandomRotateAug",
-            #     random_rotate_on=True,
-            # ),
+            dict(
+                type="RandomRotateAug",
+                random_rotate_on=True,
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -183,5 +183,4 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_norotate"
-# resume_path = f"{work_dir}/checkpoints/ckpt_12.pkl"
+work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r101_fpn_1x_dota_bs2_tobgr_steplr_rotate"
