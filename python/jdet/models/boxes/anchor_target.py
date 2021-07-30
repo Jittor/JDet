@@ -6,8 +6,8 @@ from jdet.utils.registry import build_from_cfg,BOXES
 
 
 def assign_and_sample(bboxes, gt_bboxes, gt_bboxes_ignore, gt_labels, cfg):
-    bbox_assigner = build_from_cfg(cfg.assigner,BOXES)
-    bbox_sampler = build_from_cfg(cfg.sampler,BOXES)
+    bbox_assigner = build_from_cfg(cfg.get('assigner', ''), BOXES)
+    bbox_sampler = build_from_cfg(cfg.get('sampler', ''), BOXES)
     assign_result = bbox_assigner.assign(bboxes, gt_bboxes, gt_bboxes_ignore,
                                          gt_labels)
     sampling_result = bbox_sampler.sample(assign_result, bboxes, gt_bboxes,
@@ -117,13 +117,13 @@ def anchor_target_single(flat_anchors,
     bbox_coder_cfg = cfg.get('bbox_coder', '')
     if bbox_coder_cfg == '':
         bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
-    bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
+    bbox_coder = build_from_cfg(bbox_coder_cfg, BOXES)
     # Set True to use IoULoss
     reg_decoded_bbox = cfg.get('reg_decoded_bbox', False)
 
     inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
                                        img_meta['img_shape'][:2],
-                                       cfg.allowed_border)
+                                       cfg.get('allowed_border', -1))
     if not inside_flags.any(0):
         return (None,) * 6
     # assign gt and sample anchors
@@ -133,7 +133,7 @@ def anchor_target_single(flat_anchors,
         assign_result, sampling_result = assign_and_sample(
             anchors, gt_bboxes, gt_bboxes_ignore, None, cfg)
     else:
-        bbox_assigner = build_from_cfg(cfg.assigner,BOXES)
+        bbox_assigner = build_from_cfg(cfg.get('assigner', ''), BOXES)
         assign_result = bbox_assigner.assign(anchors, gt_bboxes,
                                              gt_bboxes_ignore, gt_labels)
         bbox_sampler = PseudoSampler()
@@ -145,7 +145,8 @@ def anchor_target_single(flat_anchors,
     bbox_weights = jt.zeros_like(anchors)
     labels = jt.zeros(num_valid_anchors).int()
     label_weights = jt.zeros(num_valid_anchors).float()
-
+    # num_classes = 80
+    # labels = jt.full((num_valid_anchors,), num_classes)
     pos_inds = sampling_result.pos_inds
     neg_inds = sampling_result.neg_inds
     if len(pos_inds) > 0:
@@ -163,7 +164,7 @@ def anchor_target_single(flat_anchors,
         if cfg.pos_weight <= 0:
             label_weights[pos_inds] = 1.0
         else:
-            label_weights[pos_inds] = cfg.pos_weight
+            label_weights[pos_inds] = cfg.get('pos_weight', -1)
     if len(neg_inds) > 0:
         label_weights[neg_inds] = 1.0
 

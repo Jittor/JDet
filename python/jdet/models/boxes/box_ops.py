@@ -39,13 +39,13 @@ def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 
 
     dx = (cosa * coord[..., 0] + sina * coord[..., 1]) / proposals_widths
     dy = (-sina * coord[..., 0] + cosa * coord[..., 1]) / proposals_heights
-    dw = jt.log(gt_widths / proposals_widths)
-    dh = jt.log(gt_heights / proposals_heights)
+    dw = jt.safe_log(gt_widths / proposals_widths)
+    dh = jt.safe_log(gt_heights / proposals_heights)
     da = (gt_angle - proposals_angles)
     da = norm_angle(da) / np.pi
 
     deltas = jt.stack((dx, dy, dw, dh, da), -1)
-     
+
     means = jt.array(means)
     means = jt.array(means).unsqueeze(0)
     stds = jt.array(stds).unsqueeze(0)
@@ -150,8 +150,8 @@ def bbox2delta(proposals,
 
     dx = (gx - px) / pw
     dy = (gy - py) / ph
-    dw = jt.log(gw / pw)
-    dh = jt.log(gh / ph)
+    dw = jt.safe_log(gw / pw)
+    dh = jt.safe_log(gh / ph)
     deltas = jt.stack([dx, dy, dw, dh], dim=-1)
 
     means = jt.array(means).unsqueeze(0)
@@ -239,10 +239,10 @@ def delta2bbox(rois,
     x2 = gx + gw * 0.5
     y2 = gy + gh * 0.5
     if max_shape is not None:
-        x1 = x1.clamp(min_v=0, max_v=max_shape[0][1] - 1)
-        y1 = y1.clamp(min_v=0, max_v=max_shape[0][0] - 1)
-        x2 = x2.clamp(min_v=0, max_v=max_shape[0][1] - 1)
-        y2 = y2.clamp(min_v=0, max_v=max_shape[0][0] - 1)
+        x1 = x1.clamp(min_v=0, max_v=max_shape[1] - 1)
+        y1 = y1.clamp(min_v=0, max_v=max_shape[0] - 1)
+        x2 = x2.clamp(min_v=0, max_v=max_shape[1] - 1)
+        y2 = y2.clamp(min_v=0, max_v=max_shape[0] - 1)
     bboxes = jt.stack([x1, y1, x2, y2], dim=-1).view_as(deltas)
     return bboxes
 
@@ -378,7 +378,7 @@ def rotated_box_to_poly_single(rrect):
     poly = np.array([x0, y0, x1, y1, x2, y2, x3, y3], dtype=np.float32)
     poly = get_best_begin_point_single(poly)
     return poly
-    
+
 def rotated_box_to_poly_np(rrects):
     """
     rrect:[x_ctr,y_ctr,w,h,angle]

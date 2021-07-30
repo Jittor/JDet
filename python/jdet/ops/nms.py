@@ -21,8 +21,7 @@ def multiclass_nms(mlvl_bboxes, mlvl_scores, score_thr, nms, max_per_img):
     boxes = []
     scores = []
     labels = []
-
-    n_class = mlvl_scores.size(1) - 1
+    n_class = mlvl_scores.size(1)
     if mlvl_bboxes.shape[1] > 4:
         mlvl_bboxes = mlvl_bboxes.view(mlvl_bboxes.size(0), -1, 4)
     else:
@@ -31,7 +30,7 @@ def multiclass_nms(mlvl_bboxes, mlvl_scores, score_thr, nms, max_per_img):
             mlvl_bboxes.size(0), n_class, 4)
 
     mlvl_scores = mlvl_scores[:, :-1]
-    for j in range(0, n_class):
+    for j in range(1, n_class):
         bbox_j = mlvl_bboxes[:, j, :]
         score_j = mlvl_scores[:, j:j+1]
         mask = jt.where(score_j > score_thr)[0]
