@@ -38,8 +38,9 @@ def sigmoid_focal_loss(inputs,targets,weight=None, alpha = -1,gamma = 2,reductio
     targets = targets.broadcast(inputs,[1])
     targets = (targets.index(1)+1)==targets
     p = inputs.sigmoid()
-    assert(weight is None)
-    ce_loss = sigmoid_cross_entropy_with_logits(inputs, targets)
+    # assert(weight is None)
+    # ce_loss = sigmoid_cross_entropy_with_logits(inputs, targets)
+    ce_loss = binary_cross_entropy_with_logits(inputs, targets,weight, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
 
