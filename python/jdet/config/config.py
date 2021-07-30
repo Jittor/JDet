@@ -104,9 +104,10 @@ class Config(OrderedDict):
         cfg = Config._load_dict_from_file(filename)
         self.clear()
         self.update(self.dfs(cfg))
+        if (self.name is None):
+            self.name = os.path.splitext(os.path.basename(filename))[0]
         if self.work_dir is None:
-            file_name = os.path.splitext(os.path.basename(filename))[0]
-            self.work_dir = f"work_dirs/{file_name}"
+            self.work_dir = f"work_dirs/{self.name}"
     
     def dfs(self, cfg_other):
         if isinstance(cfg_other,dict):

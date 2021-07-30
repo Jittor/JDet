@@ -1,6 +1,11 @@
+#normal
+*.jpg
+*.pk
+submit_zips
+work_dirs
+
 weights
 share_outputs
 exps
-*.jpg
 cache_check
 logs

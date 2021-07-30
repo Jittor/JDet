@@ -33,24 +33,25 @@ class RetinaNet(nn.Module):
             images (jt.Var): image tensors, shape is [N,C,H,W]
             targets (list[dict]): targets for each image
         Rets:
-            results: detections
+            results: detections, #((x0,y0,x1,y1,a(pi),score), type)
             losses (dict): losses
         '''
-        # limit gt [-pi/4,pi*3/4] to [-pi/2,0) TODO: move to dataloader
-        for i in range(len(targets)):
-            gt_bbox = targets[i]["bboxes"].data#xywha
-            out_bbox = []
-            for j in range(gt_bbox.shape[0]):
-                box = gt_bbox[j]
-                x, y, w, h, a = box[0], box[1], box[2], box[3], box[4]
-                if (a >= 0):
-                    a -= np.pi
-                if (a < -np.pi / 2):
-                    a += np.pi / 2
-                    w, h = h, w
-                out_bbox.append(np.array([x, y, w, h, a])[np.newaxis, :])
-            out_bbox = np.concatenate(out_bbox, 0)
-            targets[i]["bboxes"] = jt.array(out_bbox)
+        if ("rboxes" in targets[0]):
+            # limit gt [-pi/4,pi*3/4] to [-pi/2,0) TODO: move to dataloader
+            for i in range(len(targets)):
+                gt_bbox = targets[i]["rboxes"].data#xywha
+                out_bbox = []
+                for j in range(gt_bbox.shape[0]):
+                    box = gt_bbox[j]
+                    x, y, w, h, a = box[0], box[1], box[2], box[3], box[4]
+                    if (a >= 0):
+                        a -= np.pi
+                    if (a < -np.pi / 2):
+                        a += np.pi / 2
+                        w, h = h, w
+                    out_bbox.append(np.array([x, y, w, h, a])[np.newaxis, :])
+                out_bbox = np.concatenate(out_bbox, 0)
+                targets[i]["rboxes"] = jt.array(out_bbox)
         features = self.backbone(images)
         if self.neck:
             features = self.neck(features)

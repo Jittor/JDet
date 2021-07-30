@@ -48,12 +48,8 @@ def prepare_gliding(result_pkl,save_path):
         f_out.writelines(lines)
         f_out.close()
 
-def test():
-    model_name = "s2anet_r50_fpn_1x_dota_without_torch_pretrained"
-    result_pkl = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/test/test_12.pkl"
-    save_path = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/submit_12/before_nms"
-    final_path = f"/mnt/disk/lxl/JDet/work_dirs/{model_name}/submit_12/after_nms"
-    if "gliding" in model_name:
+def dota_merge(result_pkl, save_path, final_path):
+    if "gliding" in result_pkl:
         prepare_gliding(result_pkl,save_path)
     else:
         prepare(result_pkl,save_path)
@@ -61,4 +57,7 @@ def test():
     mergebypoly(save_path,final_path)
 
 if __name__ == "__main__":
-    test()
+    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/test_30.pkl"
+    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/submit30/before_nms"
+    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/submit30/after_nms"
+    dota_merge(result_pkl, save_path, final_path)

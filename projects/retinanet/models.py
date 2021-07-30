@@ -290,7 +290,6 @@ def YangXuePrameterGroupsGenerator(named_params, model, conv_bias_grad_muyilpy=1
         if (freeze or isinstance(m, FrozenBatchNorm)):
             continue
 
-        #TODO dirty implementation
         if ((isinstance(m, jt.nn.Conv)) and (names[-1] == "bias")):
             conv_bias_group['params'].append(param)
             continue
