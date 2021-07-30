@@ -7,6 +7,7 @@ import numpy as np
 
 from jdet.utils.registry import DATASETS
 from .transforms import Compose
+import copy
 
 
 @DATASETS.register_module()
@@ -29,11 +30,18 @@ class CustomDataset(Dataset):
     ]
     '''
     CLASSES = None
-    def __init__(self,images_dir,annotations_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
+    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
         super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
-
-        self.images_dir = os.path.abspath(images_dir) 
-        self.annotations_file = os.path.abspath(annotations_file)
+        if (dataset_dir is not None):
+            assert(images_dir is None)
+            assert(annotations_file is None)
+            self.images_dir = os.path.abspath(os.path.join(dataset_dir, "images")) 
+            self.annotations_file = os.path.abspath(os.path.join(dataset_dir, "labels.pkl"))
+        else:
+            assert(images_dir is not None)
+            assert(annotations_file is not None)
+            self.images_dir = os.path.abspath(images_dir) 
+            self.annotations_file = os.path.abspath(annotations_file)
 
         self.transforms = Compose(transforms)
         
@@ -47,7 +55,7 @@ class CustomDataset(Dataset):
 
     def _read_ann_info(self,idx):
         img_info = self.img_infos[idx]
-        anno = img_info["ann"]
+        anno = copy.deepcopy(img_info["ann"])
 
         img_path = os.path.join(self.images_dir, img_info["filename"])
         image = Image.open(img_path).convert("RGB")
