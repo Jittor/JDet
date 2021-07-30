@@ -50,7 +50,7 @@ class SSDHead(nn.Module):
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.cls_out_channels = num_classes + 1  # add background class
-        self.anchor_generator = build_from_cfg(anchor_generator, MODELS)
+        self.anchor_generator = build_from_cfg(anchor_generator, BOXES)
         n_anchor = self.anchor_generator.num_base_anchors
 
         reg_convs = []

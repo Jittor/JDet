@@ -111,27 +111,12 @@ class Resize:
             else:
                 oh = size
                 ow = int(size * w / h)
+            assert np.abs(oh/h - ow/w)<1e-2
+            
         else:
             oh = self.min_size[0]
             ow = self.max_size
-
-        if max_size is not None:
-            min_original_size = float(min((w, h)))
-            max_original_size = float(max((w, h)))
-            if max_original_size / min_original_size * size > max_size:
-                size = int(round(max_size * min_original_size / max_original_size))
-
-        if (w <= h and w == size) or (h <= w and h == size):
-            return (h, w),1.
-
-        if w < h:
-            ow = size
-            oh = int(size * h / w)
-        else:
-            oh = size
-            ow = int(size * w / h)
         
-        assert np.abs(oh/h - ow/w)<1e-2
         return (oh, ow),oh/h
 
     def _resize_boxes(self,target,size):
