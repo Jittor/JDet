@@ -182,8 +182,8 @@ def bbox2loc(src_bbox,dst_bbox,mean=[0.,0.,0.,0.],std=[1.,1.,1.,1.]):
     dy = (base_center_y - center_y) / height
     dx = (base_center_x - center_x) / width
 
-    dw = jt.log(base_width / width)
-    dh = jt.log(base_height / height)
+    dw = jt.safe_log(base_width / width)
+    dh = jt.safe_log(base_height / height)
         
     loc = jt.contrib.concat([dx,dy,dw,dh],dim=1)
 

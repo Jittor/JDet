@@ -15,6 +15,7 @@ coco128
 exp*
 python/jdet/data/devkits/polyiou
 
+test.py
 eggs/
 .eggs/
 *.egg-info/
@@ -26,3 +27,6 @@ build/
 *.pth
 *.jpg
 .idea
+*.swp
+*.pkl
+test_configs

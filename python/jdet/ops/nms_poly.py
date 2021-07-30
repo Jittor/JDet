@@ -11,7 +11,7 @@ NMS_POLY_HEADER1 = r'''
 #include<cstdio>
 #include <vector>
 #define CeilDIV(a,b) ((a+b-1)/b)
-#define maxn 4
+#define maxn 10
 '''
 NMS_POLY_HEADER2 = r'''
 using namespace std;
@@ -61,7 +61,7 @@ HOST_DEVICE_INLINE int lineCross(Point<T> a,Point<T> b,Point<T> c,Point<T> d,Poi
 }
 
 template <typename T>
-HOST_DEVICE_INLINE void polygon_cut(Point<T>*p,int&n,Point<T> a,Point<T> b, Point<T>* pp){
+HOST_DEVICE_INLINE void polygon_cut(Point<T>*p,int &n,Point<T> a,Point<T> b, Point<T>* pp){
 //    static Point pp[maxn];
     int m=0;p[n]=p[0];
     for(int i=0;i<n;i++){
@@ -92,6 +92,7 @@ HOST_DEVICE_INLINE T intersectArea(Point<T> a,Point<T> b,Point<T> c,Point<T> d){
     polygon_cut<T>(p,n,o,c, pp);
     polygon_cut<T>(p,n,c,d, pp);
     polygon_cut<T>(p,n,d,o, pp);
+    
     T res=fabs(area<T>(p,n));
     if(s1*s2==-1) res=-res;
     return res;
@@ -125,6 +126,7 @@ HOST_DEVICE_INLINE T iou_poly(const T * p, const T *q) {
         ps2[i].x = q[i * 2];
         ps2[i].y = q[i * 2 + 1];
     }
+
     T inter_area = intersectArea<T>(ps1, n1, ps2, n2);
     T union_area = fabs(area<T>(ps1, n1)) + fabs(area<T>(ps2, n2)) - inter_area;
     T iou = inter_area / union_area;

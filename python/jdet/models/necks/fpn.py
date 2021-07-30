@@ -4,6 +4,7 @@ import warnings
 
 from jdet.utils.registry import NECKS
 from jdet.models.utils.modules import ConvModule
+from jdet.models.utils.weight_init import xavier_init
 
 @NECKS.register_module()
 class FPN(nn.Module):
@@ -95,7 +96,7 @@ class FPN(nn.Module):
         self.end_level = end_level
         self.add_extra_convs = add_extra_convs
         assert isinstance(add_extra_convs, (str, bool))
-        assert add_extra_convs in ('on_input', 'on_lateral', 'on_output')
+        assert not add_extra_convs or add_extra_convs in ('on_input', 'on_lateral', 'on_output')
 
         self.lateral_convs = nn.ModuleList()
         self.fpn_convs = nn.ModuleList()
@@ -138,6 +139,12 @@ class FPN(nn.Module):
                     norm_cfg=norm_cfg,
                     act_cfg=act_cfg)
                 self.fpn_convs.append(extra_fpn_conv)
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                xavier_init(m, distribution='uniform')
 
     def execute(self, inputs):
         """Forward function."""
