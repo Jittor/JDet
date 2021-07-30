@@ -29,8 +29,30 @@ def prepare(result_pkl,save_path):
         f_out.writelines(lines)
         f_out.close()
 
+def prepare_gliding(result_pkl,save_path):
+    check_dir(save_path)
+    results = jt.load(result_pkl)
+    data = {}
+    for result,target in tqdm(results):
+        img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
+        for bbox,score,label in zip(*result):
+            classname = DOTA1_CLASSES[label-1]
+            temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
+                        img_name, score, bbox[0], bbox[1], bbox[2], bbox[3], bbox[4],
+                        bbox[5], bbox[6], bbox[7])
+            if classname not in data:
+                data[classname] = []
+            data[classname].append(temp_txt)
+    for classname,lines in data.items():
+        f_out = open(os.path.join(save_path, classname + '.txt'), 'w')
+        f_out.writelines(lines)
+        f_out.close()
+
 def dota_merge(result_pkl, save_path, final_path):
-    prepare(result_pkl,save_path)
+    if "gliding" in result_pkl:
+        prepare_gliding(result_pkl,save_path)
+    else:
+        prepare(result_pkl,save_path)
     check_dir(final_path)
     mergebypoly(save_path,final_path)
 

@@ -23,13 +23,13 @@ def main():
         type=str,
     )
     parser.add_argument(
-        "--no_use_cuda",
+        "--no_cuda",
         action='store_true'
     )
     
     args = parser.parse_args()
 
-    if not args.no_use_cuda:
+    if not args.no_cuda:
         jt.flags.use_cuda=1
 
     assert args.task in ["train","val","test"],f"{args.task} not support, please choose [train,val,test]"

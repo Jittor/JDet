@@ -1,6 +1,6 @@
-from .rpn import *
-from .box_head import *
-from .retina_head import *
-from .s2anet_head import *
-from .ssd_head import *
+from . import retina_head
+from . import s2anet_head
+from . import rpn_head
+from . import gliding_head
+from . import ssd_head
 __all__ = []

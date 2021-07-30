@@ -15,6 +15,10 @@ class S2ANet(nn.Module):
         self.neck = build_from_cfg(neck,NECKS)
         self.bbox_head = build_from_cfg(bbox_head,HEADS)
 
+    def train(self):
+        super().train()
+        self.backbone.train()
+
     def execute(self,images,targets):
         '''
         Args:

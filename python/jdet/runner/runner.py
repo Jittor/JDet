@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import jdet
 import pickle
+import datetime
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
@@ -48,6 +49,7 @@ class Runner:
 
         self.iter = 0
         self.epoch = 0
+
         if self.max_epoch:
             self.total_iter = self.max_epoch * len(self.train_dataset)
         else:
@@ -72,17 +74,14 @@ class Runner:
             if check_interval(self.epoch,self.eval_interval) and False: #TODO val evaluation is not implemented
                 # TODO: need remove this
                 self.model.eval()
-                self.val()            
+                self.val()
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
         self.test()
 
     def train(self):
         self.model.train()
-        # import torch
-        # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
-        # TODO : remove thiss
-        self.model.backbone.train()
+
         start_time = time.time()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
@@ -97,9 +96,10 @@ class Runner:
             batch_size = len(targets)*jt.mpi.world_size()
 
             if check_interval(self.iter,self.log_interval):
-                fps = (self.log_interval * batch_size)/(time.time()-start_time)
-                start_time = time.time()
-                remain = (self.total_iter-self.iter) * batch_size / fps
+                ptime = time.time()-start_time
+                fps = batch_size*(batch_idx+1)/ptime
+                eta_time = (self.total_iter-self.iter)*ptime/(batch_idx+1)
+                eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     name = self.cfg.name,
                     lr = self.optimizer.cur_lr(),
@@ -109,7 +109,7 @@ class Runner:
                     batch_size = batch_size,
                     total_loss = all_loss,
                     fps=fps,
-                    remain_time=remain
+                    eta=eta_str
                 )
                 data.update(losses)
                 data = sync(data)
@@ -120,7 +120,6 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
-            
         self.epoch +=1
 
 
@@ -197,7 +196,7 @@ class Runner:
                         result[k][0] = jt.concat([result[k][0], out], 0)
                         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-            
+                
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
 

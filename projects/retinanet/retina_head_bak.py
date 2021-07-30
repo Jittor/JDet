@@ -425,7 +425,7 @@ class RetinaHead(nn.Module):
 
             for i,target in enumerate(targets):
                 if self.is_training():
-                    gt_bbox = target["bboxes"]#xywha
+                    gt_bbox = target["rboxes"]#xywha
                     # gt_bbox = get_var('gt_boxes_r')#TODO delete
                     # gt_bbox[:, 4] *= np.pi / 180#TODO delete
                     gt_label = target["labels"]

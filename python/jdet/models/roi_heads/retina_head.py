@@ -2,12 +2,12 @@ import math
 
 from jdet.models.losses.focal_loss import sigmoid_focal_loss
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
-from jdet.models.roi_heads.anchor_generator import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r, bbox2loc_r
+from jdet.models.boxes.box_ops import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r, bbox2loc_r
 from jdet.ops import box_iou_rotated
 from jdet.utils.registry import HEADS
 from jittor import nn,init 
 import jittor as jt
-from jdet.utils.registry import build_from_cfg,MODELS
+from jdet.utils.registry import build_from_cfg,BOXES
 import numpy as np
 import jdet
 from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh
@@ -61,7 +61,7 @@ class RetinaHead(nn.Module):
         self.max_dets = max_dets
         self.mode = mode
         
-        self.anchor_generator = build_from_cfg(anchor_generator, MODELS)
+        self.anchor_generator = build_from_cfg(anchor_generator, BOXES)
         self.anchor_mode = anchor_generator.mode
         n_anchor = self.anchor_generator.num_base_anchors[0]
 
@@ -327,7 +327,7 @@ class RetinaHead(nn.Module):
 
             for i,target in enumerate(targets):
                 if self.is_training():
-                    gt_bbox = target["bboxes"]#xywha
+                    gt_bbox = target["rboxes"]#xywha
                     # gt_bbox = get_var('gt_boxes_r')#TODO delete
                     # gt_bbox[:, 4] *= np.pi / 180#TODO delete
                     gt_label = target["labels"]

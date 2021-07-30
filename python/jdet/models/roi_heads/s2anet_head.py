@@ -8,12 +8,13 @@ from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 
 
-from jdet.ops.dcn_v2 import DeformConv
+# from jdet.ops.dcn_v2 import DeformConv
+from jdet.ops.dcn_v1 import DeformConv
 from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import delta2bbox_rotated
 from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
-from jdet.models.boxes.anchor_generator import AnchorGeneratorRotated, AnchorGeneratorRotatedS2ANet
+from jdet.models.boxes.anchor_generator import AnchorGeneratorRotatedS2ANet
 
 
 @HEADS.register_module()
@@ -606,9 +607,9 @@ class S2ANetHead(nn.Module):
 
         for target in targets:
             if is_train:
-                gt_bboxes.append(target["bboxes"])
+                gt_bboxes.append(target["rboxes"])
                 gt_labels.append(target["labels"])
-                gt_bboxes_ignore.append(target["bboxes_ignore"])
+                gt_bboxes_ignore.append(target["rboxes_ignore"])
             img_metas.append(dict(
                 img_shape=target["img_size"][::-1],
                 scale_factor=target["scale_factor"],

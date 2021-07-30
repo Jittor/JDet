@@ -7,9 +7,9 @@ def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=Non
     max_val = jt.clamp(-output,min_v=0)
     if pos_weight is not None:
         log_weight = (pos_weight-1)*target + 1
-        loss = (1-target)*output+(log_weight*(jt.log(jt.maximum((-max_val).exp()+(-output - max_val).exp(),1e-10))+max_val))
+        loss = (1-target)*output+(log_weight*(jt.safe_log(jt.maximum((-max_val).exp()+(-output - max_val).exp(),1e-10))+max_val))
     else:
-        loss = (1-target)*output+max_val+jt.log(jt.maximum((-max_val).exp()+(-output -max_val).exp(),1e-10))
+        loss = (1-target)*output+max_val+jt.safe_log(jt.maximum((-max_val).exp()+(-output -max_val).exp(),1e-10))
     if weight is not None:
         loss *=weight.broadcast(loss,[1])
 
@@ -33,8 +33,7 @@ def sigmoid_cross_entropy_with_logits(logits, labels):
     return relu_logits - logits * labels + jt.log((neg_abs_logits).exp() + 1)
 
 
-def sigmoid_focal_loss(inputs,targets,weight=None, alpha = -1,gamma = 2,reduction = "none",avg_factor=None):
-    
+def sigmoid_focal_loss(inputs,targets,weight=None, alpha = -1,gamma = 2,reduction = "none",avg_factor=None):    
     targets = targets.broadcast(inputs,[1])
     targets = (targets.index(1)+1)==targets
     p = inputs.sigmoid()
@@ -95,3 +94,5 @@ class FocalLoss(nn.Module):
         else:
             raise NotImplementedError
         return loss_cls
+
+

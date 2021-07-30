@@ -36,10 +36,10 @@ class RetinaNet(nn.Module):
             results: detections, #((x0,y0,x1,y1,a(pi),score), type)
             losses (dict): losses
         '''
-        if ("bboxes" in targets[0]):
+        if ("rboxes" in targets[0]):
             # limit gt [-pi/4,pi*3/4] to [-pi/2,0) TODO: move to dataloader
             for i in range(len(targets)):
-                gt_bbox = targets[i]["bboxes"].data#xywha
+                gt_bbox = targets[i]["rboxes"].data#xywha
                 out_bbox = []
                 for j in range(gt_bbox.shape[0]):
                     box = gt_bbox[j]
@@ -51,7 +51,7 @@ class RetinaNet(nn.Module):
                         w, h = h, w
                     out_bbox.append(np.array([x, y, w, h, a])[np.newaxis, :])
                 out_bbox = np.concatenate(out_bbox, 0)
-                targets[i]["bboxes"] = jt.array(out_bbox)
+                targets[i]["rboxes"] = jt.array(out_bbox)
         features = self.backbone(images)
         if self.neck:
             features = self.neck(features)
