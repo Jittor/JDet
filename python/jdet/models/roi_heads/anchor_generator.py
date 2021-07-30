@@ -554,8 +554,8 @@ class AnchorGenerator(object):
 
     def __init__(self, base_size, scales, ratios, scale_major=True, ctr=None):
         self.base_size = base_size
-        self.scales = jt.array(scales)
-        self.ratios = jt.array(ratios)
+        self.scales = jt.array(scales).float32()
+        self.ratios = jt.array(ratios).float32()
         self.scale_major = scale_major
         self.ctr = ctr
         self.base_anchors = self.gen_base_anchors()
@@ -589,7 +589,7 @@ class AnchorGenerator(object):
             ],
             dim=-1).round()
 
-        return base_anchors
+        return base_anchors.float32()
 
     def _meshgrid(self, x, y, row_major=True):
         xx = x.repeat(len(y))
