@@ -1,9 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import jittor as jt 
 import numpy as np
-
 from jdet.utils.registry import BOXES
-
 
 class SamplingResult:
 
@@ -69,7 +67,7 @@ class BaseSampler(metaclass=ABCMeta):
         Returns:
             :obj:`SamplingResult`: Sampling result.
         """
-#        gt_bboxes = gt_bboxes.to(bboxes)
+        gt_bboxes = gt_bboxes.cast(bboxes.dtype)
         if len(bboxes.shape) < 2:
             bboxes = bboxes[None, :]
 
@@ -121,7 +119,6 @@ class PseudoSampler(BaseSampler):
         gt_flags = jt.zeros((bboxes.shape[0],)).bool()
         sampling_result = SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes,assign_result, gt_flags)
         return sampling_result
-
 
 @BOXES.register_module()
 class RandomSampler(BaseSampler):

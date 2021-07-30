@@ -1,5 +1,12 @@
-import jittor as jt
+import jittor as jt 
 
+
+def nms(boxes,scores,thresh):
+    assert boxes.shape[-1]==4 and len(scores)==len(boxes)
+    if scores.ndim==1:
+        scores = scores.unsqueeze(-1)
+    dets = jt.concat([boxes,scores],dim=1)
+    return jt.nms(dets,thresh)
 
 def multiclass_nms(mlvl_bboxes, mlvl_scores, score_thr, nms, max_per_img):
     """NMS for multi-class bboxes.

@@ -4,6 +4,7 @@ import warnings
 
 from jdet.utils.registry import NECKS
 from jdet.models.utils.modules import ConvModule
+from jdet.models.utils.weight_init import xavier_init
 
 @NECKS.register_module()
 class FPN(nn.Module):
@@ -139,6 +140,12 @@ class FPN(nn.Module):
                     norm_cfg=norm_cfg,
                     act_cfg=act_cfg)
                 self.fpn_convs.append(extra_fpn_conv)
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                xavier_init(m, distribution='uniform')
 
     def execute(self, inputs):
         """Forward function."""

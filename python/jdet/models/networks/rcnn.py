@@ -13,12 +13,12 @@ class RCNN(nn.Module):
     3. Per-region feature extraction and prediction
     """
 
-    def __init__(self,backbone,neck=None,rpn=None,roi_heads=None):
+    def __init__(self,backbone,neck=None,rpn=None,bbox_head=None):
         super(RCNN,self).__init__()
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
         self.rpn = build_from_cfg(rpn,HEADS)
-        self.roi_heads = build_from_cfg(roi_heads,HEADS)
+        self.bbox_head = build_from_cfg(bbox_head,HEADS)
 
     def execute(self,images,targets):
         '''
@@ -35,17 +35,10 @@ class RCNN(nn.Module):
             features = self.neck(features)
         
         proposals,rpn_losses = self.rpn(features,targets)
-        
-        if self.roi_heads:
-            results,losses = self.roi_heads(features, proposals, targets)
-            losses.update(rpn_losses)
-        else:
-            results = proposals
-            losses = rpn_losses
+        output = self.bbox_head(features, proposals, targets)
         
         if self.is_training():
-            return losses 
-        else:
-            return results
+            output.update(rpn_losses)
+        return output
 
 

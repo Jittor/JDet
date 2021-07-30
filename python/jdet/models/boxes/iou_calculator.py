@@ -227,7 +227,6 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6, vers
             enclosed_rb = jt.maximum(bboxes1[..., :, 2:].unsqueeze(-2),
                                      bboxes2[..., :, 2:].unsqueeze(-3))
 
-    eps = jt.array(eps)
     union = jt.maximum(union, eps)
     ious = overlap / union
     if mode in ['iou', 'iof']:
