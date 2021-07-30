@@ -76,11 +76,12 @@ class RandomRotateAug:
 
 @TRANSFORMS.register_module()
 class Resize:
-    def __init__(self, min_size, max_size):
+    def __init__(self, min_size, max_size, keep_ratio=True):
         if not isinstance(min_size, (list, tuple)):
             min_size = (min_size,)
         self.min_size = min_size
         self.max_size = max_size
+        self.keep_ratio = keep_ratio
 
     # modified from torchvision to add support for max size
     def get_size(self, image_size):
@@ -88,11 +89,31 @@ class Resize:
         size = random.choice(self.min_size)
         max_size = self.max_size
 
-        # NOTE Mingtao
-        if w <= h:
-          size = np.clip( size, int(w / 1.5), int(w * 1.5) )
+        if self.keep_ratio:
+            # NOTE Mingtao
+            if w <= h:
+              size = np.clip( size, int(w / 1.5), int(w * 1.5) )
+            else:
+              size = np.clip( size, int(h / 1.5), int(h * 1.5) )
+
+            if max_size is not None:
+                min_original_size = float(min((w, h)))
+                max_original_size = float(max((w, h)))
+                if max_original_size / min_original_size * size > max_size:
+                    size = int(round(max_size * min_original_size / max_original_size))
+
+            if (w <= h and w == size) or (h <= w and h == size):
+                return (h, w),1.
+
+            if w < h:
+                ow = size
+                oh = int(size * h / w)
+            else:
+                oh = size
+                ow = int(size * w / h)
         else:
-          size = np.clip( size, int(h / 1.5), int(h * 1.5) )
+            oh = self.min_size[0]
+            ow = self.max_size
 
         if max_size is not None:
             min_original_size = float(min((w, h)))
@@ -137,8 +158,10 @@ class Resize:
         image = image.resize(size[::-1],Image.BILINEAR)
         if target is not None:
             self._resize_boxes(target,image.size)
-            target["img_size"]=image.size
-            target["scale_factor"]=scale_factor
+            target["img_size"] = image.size
+            target["scale_factor"] = scale_factor
+            target["pad_shape"] = image.size
+            target["keep_ratio"] = self.keep_ratio
         return image, target
 
 @TRANSFORMS.register_module()

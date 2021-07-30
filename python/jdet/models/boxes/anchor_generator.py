@@ -691,7 +691,7 @@ class AnchorGeneratorYangXue(AnchorGeneratorRotated):
                  x_ctr + 0.5 * ws, y_ctr + 0.5 * hs, angles], dim=-1)
         return base_anchors
 
-
+@MODELS.register_module()
 class SSDAnchorGenerator(AnchorGeneratorRotated):
     def __init__(self,
                  strides,
