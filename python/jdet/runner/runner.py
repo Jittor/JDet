@@ -18,6 +18,7 @@ class Runner:
     def __init__(self):
         cfg = get_cfg()
         self.cfg = cfg
+        self.flip_test = [] if cfg.flip_test is None else cfg.flip_test
         self.work_dir = cfg.work_dir
 
         self.max_epoch = cfg.max_epoch 
@@ -85,6 +86,10 @@ class Runner:
         start_time = time.time()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
+            if (self.cfg.test_mode):
+                print(losses)
+                if (batch_idx > 10):
+                    exit(0)
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
@@ -151,6 +156,19 @@ class Runner:
 
             self.logger.log(eval_results,iter=self.iter)
 
+    def flip_result(self, results, mode, target):
+        assert(False) #TODO not finished
+        #input: [n, 6]; (x0(w),y0(h),x1,y1,a(pi),score)
+        if (mode == 'HV'):
+            return self.flip_result(self.flip_result(results, 'H', target), 'V', target)
+        w = target['ori_img_size'][0].data[0]
+        h = target['ori_img_size'][1].data[0]
+        print(w, h)
+        print(target)
+        # out = results.copy()
+        # if (mode == 'H'):
+        #     out[:, [0,2]] = 
+
 
     @jt.no_grad()
     @jt.single_process_scope()
@@ -163,12 +181,27 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
+                for mode in self.flip_test:
+                    images_flip = images.copy()
+                    if (mode == 'H'):
+                        images_flip = images_flip[:, :, :, ::-1]
+                    elif (mode == 'V'):
+                        images_flip = images_flip[:, :, ::-1, :]
+                    elif (mode == 'HV'):
+                        images_flip = images_flip[:, :, ::-1, ::-1]
+                    else:
+                        assert(False)
+                    result_ = self.model(images_flip,targets)
+                    for k in range(len(targets)):
+                        out = self.flip_result(result_[k], mode, targets[k])
+                        result[k][0] = jt.concat([result[k][0], out], 0)
+                        result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
             
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
 
-            # merge results
+            print("Merge results...")
             result_pkl = os.path.join(self.work_dir, f"test/test_{self.epoch}.pkl")
             save_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/before_nms")
             final_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/after_nms")
