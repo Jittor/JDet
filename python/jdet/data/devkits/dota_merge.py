@@ -4,15 +4,13 @@ from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.devkits.result_merge import mergebypoly
 import os
+from tqdm import tqdm
 
 def prepare(result_pkl,save_path):
     check_dir(save_path)
     results = jt.load(result_pkl)
     data = {}
-    cnt = 0
-    for result,target in results:
-        cnt += 1
-        print(cnt, len(results))
+    for result,target in tqdm(results):
         dets,labels = result
         img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
         for det,label in zip(dets,labels):
@@ -31,13 +29,13 @@ def prepare(result_pkl,save_path):
         f_out.writelines(lines)
         f_out.close()
 
-def test():
-    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_15/test/test_29.pkl"
-    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_15/test/submit29/before_nms"
-    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_15/test/submit29/after_nms"
+def dota_merge(result_pkl, save_path, final_path):
     prepare(result_pkl,save_path)
     check_dir(final_path)
     mergebypoly(save_path,final_path)
 
 if __name__ == "__main__":
-    test()
+    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/test_30.pkl"
+    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/submit30/before_nms"
+    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/submit30/after_nms"
+    dota_merge(result_pkl, save_path, final_path)
