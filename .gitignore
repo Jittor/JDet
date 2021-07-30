@@ -24,6 +24,5 @@ develop-eggs/
 build/
 
 *.pth
-*.pt
 *.jpg
 .idea
