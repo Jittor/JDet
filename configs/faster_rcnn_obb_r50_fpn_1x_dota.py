@@ -1,12 +1,6 @@
-import torch
-import jittor as jt
-
-from jdet.models.networks import FasterRCNN
-from jdet.models.losses import CrossEntropyLoss
-from jdet.utils.registry import build_from_cfg, HEADS, LOSSES, MODELS
-
-model_cfg=dict(
-    type='FasterRCNN',
+# model settings
+model = dict(
+    type='FasterRCNNOBB',
     pretrained='modelzoo://resnet50',
     backbone=dict(
         type='Resnet50',
@@ -17,9 +11,8 @@ model_cfg=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        #Not sure
         start_level=0,
-        add_extra_convs="on_input",
+        add_extra_convs=False,
         num_outs=5),
     rpn_head=dict(
         type='RPNHead',
@@ -35,23 +28,25 @@ model_cfg=dict(
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
-        roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2),
+        roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
         out_channels=256,
         featmap_strides=[4, 8, 16, 32]),
     bbox_head=dict(
-        type='SharedFCBBoxHead',
+        type='SharedFCBBoxHeadRbbox',
         num_fcs=2,
         in_channels=256,
         fc_out_channels=1024,
         roi_feat_size=7,
         num_classes=16,
-        target_means=[0., 0., 0., 0.],
-        target_stds=[0.1, 0.1, 0.2, 0.2],
+        target_means=[0., 0., 0., 0., 0.],
+        target_stds=[0.1, 0.1, 0.2, 0.2, 0.1],
         reg_class_agnostic=False,
+        with_module=False,
+        hbb_trans='hbbpolyobb',
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
-    # model training and testing settings
+# model training and testing settings
     train_cfg = dict(
         rpn=dict(
             assigner=dict(
@@ -59,7 +54,8 @@ model_cfg=dict(
                 pos_iou_thr=0.7,
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
-                ignore_iof_thr=-1),
+                ignore_iof_thr=-1,
+                iou_calculator=dict(type='BboxOverlaps2D_v1')),
             sampler=dict(
                 type='RandomSampler',
                 num=256,
@@ -101,26 +97,91 @@ model_cfg=dict(
             min_bbox_size=0),
         rcnn=dict(
             # score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=1000)
-        score_thr = 0.05, nms = dict(type='nms', iou_thr=0.5), max_per_img = 2000)
+        score_thr = 0.05, nms = dict(type='py_cpu_nms_poly_fast', iou_thr=0.1), max_per_img = 2000)
     # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
     )
-
 )
-model = build_from_cfg(model_cfg, MODELS)
-#print(model)
-model.load('fake_rcnn.pth')
-input = torch.load('two_stage_input.pt')
-img=jt.array(input['img'].cpu().detach().numpy())
-img_meta=input['img_meta']
-gt_bboxes=[]
-for box in input['gt_bboxes']:
-    gt_bboxes.append(jt.array(box.cpu().detach().numpy()))
-gt_labels=[]
-for label in input['gt_labels']:
-    gt_labels.append(jt.array(label.cpu().detach().numpy()))
-gt_bboxes_ignore=[]
-for ignore in input['gt_bboxes_ignore']:
-    gt_bboxes_ignore.append(jt.array(ignore.cpu().detach().numpy()))
+# dataset settings
+dataset_type = 'DOTARCNNDataset'
+data_root = '/mnt/disk/zwy/dota1_1024/'
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+dataset = dict(
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
+    train=dict(
+        type=dataset_type,
+        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
+        root=data_root + 'trainval1024/images/',
+        transforms=[
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=True),
+        ],
+        shuffle=True,
+        batch_size=2,
+        ),
+    val=dict(
+        type=dataset_type,
+        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
+        root=data_root + 'trainval1024/images/',
+        transforms=[
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=True),
+        ],
+        ),
+    test=dict(
+        type=dataset_type,
+        anno_file=data_root + 'test1024/DOTA_test1024.json',
+        root=data_root + 'test1024/images',
+        transforms=[
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=True),
+        ],
+    )
+)
+# optimizer
+optimizer = dict(
+    type='SGD', 
+    lr=0.01, 
+    momentum=0.9, 
+    weight_decay=0.0001,
+    grad_clip=dict(
+        max_norm=35, 
+        norm_type=2))
 
-losses = model.execute_train(img, img_meta, gt_bboxes, gt_labels, gt_bboxes_ignore)
+# learning policy
+scheduler = dict(
+    type='StepLR',
+    warmup='linear',
+    warmup_iters=500,
+    warmup_ratio=1.0 / 3,
+    milestones=[8, 11])
+
+# yapf:disable
+logger = dict(
+    type="RunLogger")
+# yapf:enable
+# runtime settings
+max_epoch = 12
+eval_interval = 1
+checkpoint_interval = 1
+log_interval = 20
