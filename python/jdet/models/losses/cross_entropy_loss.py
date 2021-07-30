@@ -32,10 +32,10 @@ def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):
         size_average=False)[None] / avg_factor).squeeze(0)          #squeeze(not sure)
 
 @LOSSES.register_module()
-class CrossEntropyLoss(nn.Module):
+class CrossEntropyLossForRcnn(nn.Module):
 
     def __init__(self, use_sigmoid=False, use_mask=False, loss_weight=1.0):
-        super(CrossEntropyLoss, self).__init__()
+        super(CrossEntropyLossForRcnn, self).__init__()
         assert (use_sigmoid is False) or (use_mask is False)
         self.use_sigmoid = use_sigmoid
         self.use_mask = use_mask
@@ -53,3 +53,50 @@ class CrossEntropyLoss(nn.Module):
         loss_cls = self.loss_weight * self.cls_criterion(
             cls_score, label, label_weight, *args, **kwargs)
         return loss_cls
+
+def cross_entropy_loss(pred,target,weight=None,avg_factor=None,reduction="mean"):
+    target = target.reshape((-1, ))
+    
+    target = target.broadcast(pred, [1])
+    target = target.index(1) == target
+    
+    output = pred - pred.max([1], keepdims=True)
+    logsum = output.exp().sum(1).safe_log()
+    loss = (logsum - (output*target).sum(1))
+
+    if weight is not None:
+        loss *= weight
+
+    if avg_factor is None:
+        avg_factor = max(loss.shape[0],1)
+
+    if reduction == "mean":
+        loss = loss.sum()/avg_factor
+    elif reduction == "sum":
+        loss = loss.sum()
+
+    return loss 
+
+@LOSSES.register_module()
+class CrossEntropyLoss(nn.Module):
+
+    def __init__(self,reduction='mean', loss_weight=1.0):
+        super(CrossEntropyLoss, self).__init__()
+        self.reduction = reduction
+        self.loss_weight = loss_weight
+
+    def execute(self,
+                pred,
+                target,
+                weight=None,
+                avg_factor=None,
+                reduction_override=None):
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+        loss_bbox = self.loss_weight * cross_entropy_loss(
+            pred,
+            target,
+            weight,
+            reduction=reduction,
+            avg_factor=avg_factor)
