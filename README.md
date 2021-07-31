@@ -1,11 +1,12 @@
 # JDet
 ## Introduction
-JDet is Object Detection System  based on [Jittor](https://github.com/Jittor/jittor). 
+JDet is Object Detection Framework  based on [Jittor](https://github.com/Jittor/jittor). 
 
 **Features**
 - Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
 - 
 
+Framework details are avaliable in the [framework.md](docs/framework.md)
 ## Install
 JDet environment requirements:
 
@@ -44,6 +45,10 @@ source .bashrc
 
 ## Getting Started
 
+### Data
+DOTA Dataset documents are avaliable in the [dota.md](docs/dota.md)
+### Config
+Config documents are avaliable in the [config.md](docs/config.md)
 ### Train
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=train
@@ -97,20 +102,6 @@ YOLO
 R3Det
 
 
-
-## Reference
-1. [Jittor](https://github.com/Jittor/jittor)
-2. [Detectron2](https://github.com/facebookresearch/detectron2)
-3. [mmdetection](https://github.com/open-mmlab/mmdetection)
-4. [maskrcnn_benchmark](https://github.com/facebookresearch/maskrcnn-benchmark)
-5. [RotationDetection](https://github.com/yangxue0827/RotationDetection)
-6. [s2anet](https://github.com/csuhan/s2anet)
-7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
-8. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
-9. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
-
-
-
 ## Contact Us
 
 
@@ -145,3 +136,16 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
   year={2020}
 }
 ```
+
+## Reference
+1. [Jittor](https://github.com/Jittor/jittor)
+2. [Detectron2](https://github.com/facebookresearch/detectron2)
+3. [mmdetection](https://github.com/open-mmlab/mmdetection)
+4. [maskrcnn_benchmark](https://github.com/facebookresearch/maskrcnn-benchmark)
+5. [RotationDetection](https://github.com/yangxue0827/RotationDetection)
+6. [s2anet](https://github.com/csuhan/s2anet)
+7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
+8. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
+9. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
+
+
