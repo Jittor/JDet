@@ -76,7 +76,9 @@ def dota_merge_result(result_pkl,work_dir,epoch,name):
 
 
 if __name__ == "__main__":
-    result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/test_30.pkl"
-    save_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/submit30/before_nms"
-    final_path = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/submit30/after_nms"
+    work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_norotate_ms"
+    epoch = 12
+    result_pkl = f"{work_dir}/test/test_{epoch}.pkl"
+    save_path = f"{work_dir}/test/submit_{epoch}/before_nms"
+    final_path = f"{work_dir}/test/submit_{epoch}/after_nms"
     dota_merge(result_pkl, save_path, final_path)
