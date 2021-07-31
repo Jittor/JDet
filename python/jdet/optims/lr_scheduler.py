@@ -25,6 +25,7 @@ class WarmUpLR(object):
         self.warmup = warmup
         self.base_lr = optimizer.lr
         self.base_lr_pg = [pg.get("lr", optimizer.lr) for pg in optimizer.param_groups]
+        self.step(0, 0)
     
     def get_warmup_lr(self,lr,cur_iters):
         if self.warmup == 'constant':

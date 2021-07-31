@@ -22,8 +22,8 @@ def main():
     optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=params)
     scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=optimizer)
 
-    std_roi_cls_losses = [1.1876051,1.213222,1.1627599,1.156189,1.2110083,1.1543972,1.164568,1.1559218,1.2017323,1.1426077,1.1537755,1.1491635]
-    std_roi_loc_losses = [0.27317095,0.4550915,0.29411379,0.33598003,0.3730816,0.5620489,0.31406635,0.21403852,0.5257297,0.3200497,0.49014392,0.23513089]
+    std_roi_cls_losses = [1.1876216,1.2137866,1.1632628,1.156801,1.21125,1.1542095,1.1644664,1.1560789,1.201098,1.1427929,1.1542232,1.1491848]
+    std_roi_loc_losses = [0.27317086,0.4552248,0.29419816,0.33686405,0.37411553,0.5635785,0.31424987,0.21355802,0.5266197,0.32028162,0.4911972,0.23555271]
     model.train()
     for batch_idx,(images,targets) in enumerate(train_dataset):
         losses = model(images,targets)
