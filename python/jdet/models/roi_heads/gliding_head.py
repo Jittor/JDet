@@ -467,11 +467,11 @@ def handle_ratio_prediction(hboxes,rboxes,ratios,scores,labels):
     h = hboxes[h_idx]
     hboxes_vtx = jt.concat([h[:, 0:1], h[:, 1:2], h[:, 2:3], h[:, 1:2], h[:, 2:3], h[:, 3:4], h[:, 0:1], h[:, 3:4]],dim=1)
     rboxes[h_idx] = hboxes_vtx
-    keep = nms_poly(rboxes,scores, 0.1 )
+    # keep = nms_poly(rboxes,scores, 0.1 )
 
-    rboxes = rboxes[keep]
-    scores = scores[keep]
-    labels = labels[keep]
+    # rboxes = rboxes[keep]
+    # scores = scores[keep]
+    # labels = labels[keep]
 
     return rboxes, scores, labels
 

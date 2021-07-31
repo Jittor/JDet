@@ -14,5 +14,3 @@ python3.7 setup_dev.py install  # for developer, run and reopen the terminal
 
 ### Contact
 QQ Group: 761222083
-**Mails:**
-Li Xiangli: lixl19@mails.tsinghua.edu.cn

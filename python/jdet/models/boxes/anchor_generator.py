@@ -2,7 +2,7 @@ from calendar import c
 import jittor as jt
 import numpy as np
 from jittor.misc import _pair
-from jdet.utils.registry import BOXES 
+from jdet.utils.registry import BOXES
 
 @BOXES.register_module()
 class AnchorGeneratorRotatedS2ANet:
@@ -642,8 +642,8 @@ class AnchorGeneratorRotated:
         valid_y[:valid_h] = 1
         valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)
         valid = valid_xx & valid_yy
-        valid = valid[:, None].expand(
-            valid.size(0), num_base_anchors).view(-1)
+        valid = valid[:, None].expand((
+            valid.size(0), num_base_anchors)).view(-1)
         return valid
 
 
@@ -691,7 +691,7 @@ class AnchorGeneratorYangXue(AnchorGeneratorRotated):
                  x_ctr + 0.5 * ws, y_ctr + 0.5 * hs, angles], dim=-1)
         return base_anchors
 
-
+@BOXES.register_module()
 class SSDAnchorGenerator(AnchorGeneratorRotated):
     def __init__(self,
                  strides,

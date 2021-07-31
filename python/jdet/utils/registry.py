@@ -58,4 +58,5 @@ SCHEDULERS = Registry()
 BOXES = Registry()
 HOOKS = Registry()
 
-
+ROI_EXTRACTORS = Registry()
+SHARED_HEADS = Registry()

@@ -10,7 +10,7 @@ from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
-from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses
+from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.dota_merge import dota_merge
 import os
 import shutil
@@ -57,8 +57,13 @@ class Runner:
 
         if (cfg.pretrained_weights):
             self.model.load(cfg.pretrained_weights)
+        
+        if self.resume_path is None:
+            self.resume_path = search_ckpt(self.work_dir)
+            
         if check_file(self.resume_path):
             self.resume()
+
 
     @property
     def finish(self):

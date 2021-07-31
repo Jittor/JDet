@@ -172,7 +172,7 @@ def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 
     da = norm_angle(da) / np.pi
 
     deltas = jt.stack((dx, dy, dw, dh, da), -1)
-     
+
     means = jt.array(means)
     means = jt.array(means).unsqueeze(0)
     stds = jt.array(stds).unsqueeze(0)
@@ -519,7 +519,7 @@ def rotated_box_to_poly_single(rrect):
     poly = np.array([x0, y0, x1, y1, x2, y2, x3, y3], dtype=np.float32)
     poly = get_best_begin_point_single(poly)
     return poly
-    
+
 def rotated_box_to_poly_np(rrects):
     """
     rrect:[x_ctr,y_ctr,w,h,angle]

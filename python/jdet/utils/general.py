@@ -4,6 +4,7 @@ import warnings
 import numpy as np 
 import random
 import os 
+import glob
 from functools import partial
 from six.moves import map, zip
 
@@ -134,3 +135,10 @@ def list_images(img_dir):
         img_d = os.path.abspath(img_d)
         img_files.extend([f for f in list_files(img_d) if is_img(f)])
     return img_files
+
+def search_ckpt(work_dir):
+    files = glob.glob(os.path.join(work_dir,"checkpoints/ckpt_*.pkl"))
+    if len(files)==0:
+        return None
+    files = sorted(files,key=lambda x:int(x.split("_")[-1].split(".pkl")[0]))
+    return files[-1]  

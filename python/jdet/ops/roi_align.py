@@ -104,11 +104,17 @@ __global__ void RoIAlignForward(const int nthreads, const float* bottom_data,
     // Do not using rounding; this implementation detail is critical
     auto roi_start_w = offset_bottom_rois[1] * spatial_scale;
     auto roi_start_h = offset_bottom_rois[2] * spatial_scale;
+    #if ROI_ALIGN_VERSION == 1
+    auto roi_end_w = (offset_bottom_rois[3] + 1) * spatial_scale;
+    auto roi_end_h = (offset_bottom_rois[4] + 1) * spatial_scale;
+    auto roi_width = fmaxf(roi_end_w - roi_start_w, 0.);
+    auto roi_height = fmaxf(roi_end_h - roi_start_h, 0.);
+    #else
     auto roi_end_w = offset_bottom_rois[3] * spatial_scale;
     auto roi_end_h = offset_bottom_rois[4] * spatial_scale;
-    // Force malformed ROIs to be 1x1
-    auto roi_width = max(roi_end_w - roi_start_w, 1.);
-    auto roi_height = max(roi_end_h - roi_start_h, 1.);
+    auto roi_width = fmaxf(roi_end_w - roi_start_w, 1.);
+    auto roi_height = fmaxf(roi_end_h - roi_start_h, 1.);
+    #endif
     auto bin_size_h = static_cast<float>(roi_height) / static_cast<float>(pooled_height);
     auto bin_size_w = static_cast<float>(roi_width) / static_cast<float>(pooled_width);
     const float* offset_bottom_data = bottom_data + (roi_batch_ind * channels + c) * height * width;
@@ -146,15 +152,21 @@ __global__ void RoIAlignBackwardFeature(const int nthreads, const float* top_dif
     // Do not using rounding; this implementation detail is critical
     float roi_start_w = offset_bottom_rois[1] * spatial_scale;
     float roi_start_h = offset_bottom_rois[2] * spatial_scale;
+    #if ROI_ALIGN_VERSION == 1
+    float roi_end_w = (offset_bottom_rois[3] + 1) * spatial_scale;
+    float roi_end_h = (offset_bottom_rois[4] + 1) * spatial_scale;
+    float roi_width = fmaxf(roi_end_w - roi_start_w, (float)0.);
+    float roi_height = fmaxf(roi_end_h - roi_start_h, (float)0.);
+    #else
     float roi_end_w = offset_bottom_rois[3] * spatial_scale;
     float roi_end_h = offset_bottom_rois[4] * spatial_scale;
+    float roi_width = fmaxf(roi_end_w - roi_start_w, (float)1.);
+    float roi_height = fmaxf(roi_end_h - roi_start_h, (float)1.);
+    #endif
     // float roi_start_w = round(offset_bottom_rois[1] * spatial_scale);
     // float roi_start_h = round(offset_bottom_rois[2] * spatial_scale);
     // float roi_end_w = round(offset_bottom_rois[3] * spatial_scale);
     // float roi_end_h = round(offset_bottom_rois[4] * spatial_scale);
-    // Force malformed ROIs to be 1x1
-    float roi_width = max(roi_end_w - roi_start_w, (float)1.);
-    float roi_height = max(roi_end_h - roi_start_h, (float)1.);
     float bin_size_h = static_cast<float>(roi_height) / static_cast<float>(pooled_height);
     float bin_size_w = static_cast<float>(roi_width) / static_cast<float>(pooled_width);
     float* offset_bottom_diff = bottom_diff + (roi_batch_ind * channels + c) * height * width;
@@ -195,69 +207,76 @@ __global__ void RoIAlignBackwardFeature(const int nthreads, const float* top_dif
 } // RoIAlignBackward
 '''
 class _ROIAlign(jt.Function):
-    def execute(self,input, rois, output_size, spatial_scale, sampling_ratio):
+    def execute(self,input, rois, output_size, spatial_scale, sampling_ratio, version=0):
         self.input = input 
         self.rois = rois 
         self.spatial_scale = spatial_scale
         self.sampling_ratio = sampling_ratio
         output_shapes = (rois.shape[0], input.shape[1], output_size[0], output_size[1])
-        return jt.code(output_shapes,input.dtype,[input,rois],cuda_header=CUDA_HEADER,
-                          cuda_src=f'''
-                            @alias(input,in0);
-                            @alias(rois,in1);
-                            @alias(output,out0);
-                            const float spatial_scale = {spatial_scale};
-                            const float  sampling_ratio = {sampling_ratio};
-                            auto num_rois = rois_shape0;
-                            auto channels = input_shape1;
-                            auto height = input_shape2;
-                            auto width = input_shape3;
-                            auto pooled_height = output_shape2;
-                            auto pooled_width = output_shape3;
-                            auto output_size = num_rois * pooled_height * pooled_width * channels;
-                            const int total_count = in1_shape0 * out0_shape2 * out0_shape3 * in0_shape1;
-                            const int thread_per_block = 512L;
-                            const int block_count = (total_count + thread_per_block - 1) / thread_per_block;
-                            RoIAlignForward<<<block_count, thread_per_block>>>(output_size,input_p,channels,height, width,pooled_height,pooled_width,rois_p,output_p,spatial_scale,sampling_ratio);
-                            ''')
+        self.version = version
+        return jt.code(output_shapes,input.dtype,[input,rois],cuda_header=f"""
+              #define ROI_ALIGN_VERSION {self.version}
+              {CUDA_HEADER}""",
+            cuda_src=f'''
+              @alias(input,in0);
+              @alias(rois,in1);
+              @alias(output,out0);
+              const float spatial_scale = {spatial_scale};
+              const float  sampling_ratio = {sampling_ratio};
+              auto num_rois = rois_shape0;
+              auto channels = input_shape1;
+              auto height = input_shape2;
+              auto width = input_shape3;
+              auto pooled_height = output_shape2;
+              auto pooled_width = output_shape3;
+              auto output_size = num_rois * pooled_height * pooled_width * channels;
+              const int total_count = in1_shape0 * out0_shape2 * out0_shape3 * in0_shape1;
+              const int thread_per_block = 512L;
+              const int block_count = (total_count + thread_per_block - 1) / thread_per_block;
+              RoIAlignForward<<<block_count, thread_per_block>>>(output_size,input_p,channels,height, width,pooled_height,pooled_width,rois_p,output_p,spatial_scale,sampling_ratio);
+              ''')
     def grad(self,output_grad):
         input,rois = self.input,self.rois
         input_grad =  jt.code(input.shape,input.dtype,[input,rois,output_grad],
-                      cuda_header=CUDA_HEADER,
+                      cuda_header=f"""
+                        #define ROI_ALIGN_VERSION {self.version}
+                        {CUDA_HEADER}""",
                       cuda_src=f'''
-                            @alias(input,in0)
-                            @alias(rois,in1)
-                            @alias(grad,in2)
-                            @alias(grad_input,out0)
-                            const float spatial_scale = {self.spatial_scale};
-                            const float  sampling_ratio = {self.sampling_ratio};
-                            auto num_rois = rois_shape0;
-                            auto channels = input_shape1;
-                            auto height = input_shape2;
-                            auto width = input_shape3;
-                            auto pooled_height = grad_shape2;
-                            auto pooled_width = grad_shape3;
-                            auto output_size = num_rois * pooled_height * pooled_width * channels;
-                            cudaMemsetAsync(grad_input_p,0,grad_input->size);
-                            const int total_count = rois_shape0 * grad_shape2 * grad_shape3 * input_shape1;
-                            const int thread_per_block = 512;
-                            const int block_count = (total_count + thread_per_block - 1) / thread_per_block;
-                            RoIAlignBackwardFeature<<<block_count, thread_per_block>>>(output_size,grad_p,num_rois,channels,height,width,pooled_height,pooled_width,grad_input_p,rois_p,spatial_scale,sampling_ratio);
-                            ''')
+                        @alias(input,in0)
+                        @alias(rois,in1)
+                        @alias(grad,in2)
+                        @alias(grad_input,out0)
+                        const float spatial_scale = {self.spatial_scale};
+                        const float  sampling_ratio = {self.sampling_ratio};
+                        auto num_rois = rois_shape0;
+                        auto channels = input_shape1;
+                        auto height = input_shape2;
+                        auto width = input_shape3;
+                        auto pooled_height = grad_shape2;
+                        auto pooled_width = grad_shape3;
+                        auto output_size = num_rois * pooled_height * pooled_width * channels;
+                        cudaMemsetAsync(grad_input_p,0,grad_input->size);
+                        const int total_count = rois_shape0 * grad_shape2 * grad_shape3 * input_shape1;
+                        const int thread_per_block = 512;
+                        const int block_count = (total_count + thread_per_block - 1) / thread_per_block;
+                        RoIAlignBackwardFeature<<<block_count, thread_per_block>>>(output_size,grad_p,num_rois,channels,height,width,pooled_height,pooled_width,grad_input_p,rois_p,spatial_scale,sampling_ratio);
+                        ''')
         return input_grad,None
 
 roi_align = _ROIAlign.apply
 
 class ROIAlign(nn.Module):
-    def __init__(self, output_size, spatial_scale, sampling_ratio=0):
+    def __init__(self, output_size, spatial_scale, sampling_ratio=0, version=0):
         super(ROIAlign, self).__init__()
         self.output_size = _pair(output_size)
         self.spatial_scale = spatial_scale
         self.sampling_ratio = sampling_ratio
+        self.version = version
 
     def execute(self, input, rois):
+        # breakpoint()
         return roi_align(
-            input, rois, self.output_size, self.spatial_scale, self.sampling_ratio
+            input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.version
         )
 
     def __repr__(self):
@@ -265,6 +284,7 @@ class ROIAlign(nn.Module):
         tmpstr += "output_size=" + str(self.output_size)
         tmpstr += ", spatial_scale=" + str(self.spatial_scale)
         tmpstr += ", sampling_ratio=" + str(self.sampling_ratio)
+        tmpstr += ", version=" + str(self.version)
         tmpstr += ")"
         return tmpstr
 

@@ -1,12 +1,13 @@
-import jittor as jt 
+import jittor as jt
 from jdet.ops import box_iou_rotated
 from jdet.utils.registry import BOXES
+
 
 @BOXES.register_module()
 class BboxOverlaps2D:
     """2D Overlaps (e.g. IoUs, GIoUs) Calculator."""
 
-    def __call__(self, bboxes1, bboxes2, mode='iou', is_aligned=False):
+    def __call__(self, bboxes1, bboxes2, mode='iou', is_aligned=False, version=0):
         """Calculate IoU between 2D bboxes.
 
         Args:
@@ -31,12 +32,49 @@ class BboxOverlaps2D:
             bboxes2 = bboxes2[..., :4]
         if bboxes1.size(-1) == 5:
             bboxes1 = bboxes1[..., :4]
-        return bbox_overlaps(bboxes1, bboxes2, mode, is_aligned)
+        return bbox_overlaps(bboxes1, bboxes2, mode, is_aligned, version=version)
 
     def __repr__(self):
         """str: a string describing the module"""
         repr_str = self.__class__.__name__ + '()'
         return repr_str
+
+@BOXES.register_module()
+class BboxOverlaps2D_v1:
+    """2D Overlaps (e.g. IoUs, GIoUs) Calculator."""
+
+    def __call__(self, bboxes1, bboxes2, mode='iou', is_aligned=False, version=1):
+        """Calculate IoU between 2D bboxes.
+
+        Args:
+            bboxes1 (Tensor): bboxes have shape (m, 4) in <x1, y1, x2, y2>
+                format, or shape (m, 5) in <x1, y1, x2, y2, score> format.
+            bboxes2 (Tensor): bboxes have shape (m, 4) in <x1, y1, x2, y2>
+                format, shape (m, 5) in <x1, y1, x2, y2, score> format, or be
+                empty. If ``is_aligned `` is ``True``, then m and n must be
+                equal.
+            mode (str): "iou" (intersection over union), "iof" (intersection
+                over foreground), or "giou" (generalized intersection over
+                union).
+            is_aligned (bool, optional): If True, then m and n must be equal.
+                Default False.
+
+        Returns:
+            Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
+        """
+        assert bboxes1.size(-1) in [0, 4, 5]
+        assert bboxes2.size(-1) in [0, 4, 5]
+        if bboxes2.size(-1) == 5:
+            bboxes2 = bboxes2[..., :4]
+        if bboxes1.size(-1) == 5:
+            bboxes1 = bboxes1[..., :4]
+        return bbox_overlaps(bboxes1, bboxes2, mode, is_aligned, version=version)
+
+    def __repr__(self):
+        """str: a string describing the module"""
+        repr_str = self.__class__.__name__ + '()'
+        return repr_str
+
 
 @BOXES.register_module()
 class BboxOverlaps2D_rotated:
@@ -67,8 +105,8 @@ class BboxOverlaps2D_rotated:
             bboxes2 = bboxes2[..., :5]
         if bboxes1.size(-1) == 6:
             bboxes1 = bboxes1[..., :5]
-        
-        assert mode=="iou" and is_aligned==False
+
+        assert mode == "iou" and is_aligned == False
         # TODO: add giou....
         return bbox_overlaps_rotated(bboxes1, bboxes2)
 
@@ -83,7 +121,7 @@ def bbox_overlaps_rotated(rboxes1, rboxes2):
     return ious
 
 
-def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
+def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6, version=0):
     """Calculate overlap between two set of bboxes.
 
     If ``is_aligned `` is ``False``, then calculate the overlaps between each
@@ -129,14 +167,10 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         >>> assert tuple(bbox_overlaps(nonempty, empty).shape) == (1, 0)
         >>> assert tuple(bbox_overlaps(empty, empty).shape) == (0, 0)
     """
-
     assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
     # Either the boxes are empty or the length of boxes's last dimenstion is 4
     assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
     assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
-
-    # to make sure the same type of tensor
-    bboxes2 = bboxes2.cast(bboxes1.dtype)
 
     # Batch dim must be the same
     # Batch dim: (B1, B2, ... Bn)
@@ -150,20 +184,20 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
     if rows * cols == 0:
         if is_aligned:
-            return jt.zeros(batch_shape + (rows,),bboxes1.dtype)
+            return jt.zeros(batch_shape + (rows,), bboxes1.dtype)
         else:
-            return jt.zeros(batch_shape + (rows, cols),bboxes1.dtype)
+            return jt.zeros(batch_shape + (rows, cols), bboxes1.dtype)
 
-    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
-            bboxes1[..., 3] - bboxes1[..., 1])
-    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
-            bboxes2[..., 3] - bboxes2[..., 1])
+    area1 = (bboxes1[..., 2] - bboxes1[..., 0] + version) * (
+        bboxes1[..., 3] - bboxes1[..., 1] + version)
+    area2 = (bboxes2[..., 2] - bboxes2[..., 0] + version) * (
+        bboxes2[..., 3] - bboxes2[..., 1] + version)
 
     if is_aligned:
         lt = jt.maximum(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]
         rb = jt.minimum(bboxes1[..., 2:], bboxes2[..., 2:])  # [B, rows, 2]
 
-        wh = (rb - lt).clamp(min_v=0)  # [B, rows, 2]
+        wh = (rb - lt + version).clamp(min_v=0)  # [B, rows, 2]
         overlap = wh[..., 0] * wh[..., 1]
 
         if mode in ['iou', 'giou']:
@@ -174,30 +208,31 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             enclosed_lt = jt.minimum(bboxes1[..., :2], bboxes2[..., :2])
             enclosed_rb = jt.maximum(bboxes1[..., 2:], bboxes2[..., 2:])
     else:
-        lt = jt.maximum(bboxes1[..., :, None, :2],
-                       bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
-        rb = jt.minimum(bboxes1[..., :, None, 2:],
-                       bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
+        lt = jt.maximum(bboxes1[..., :, :2].unsqueeze(-2),
+                        bboxes2[..., :, :2].unsqueeze(-3))  # [B, rows, cols, 2]
+        rb = jt.minimum(bboxes1[..., :, 2:].unsqueeze(-2),
+                        bboxes2[..., :, 2:].unsqueeze(-3))  # [B, rows, cols, 2]
 
-        wh = (rb - lt).clamp(min_v=0)  # [B, rows, cols, 2]
+        wh = (rb - lt + version).clamp(min_v=0)  # [B, rows, cols, 2]
+        
         overlap = wh[..., 0] * wh[..., 1]
 
         if mode in ['iou', 'giou']:
-            union = area1[..., None] + area2[..., None, :] - overlap
+            union = area1.unsqueeze(-1) + area2.unsqueeze(-2) - overlap
         else:
-            union = area1[..., None]
+            union = area1.unsqueeze(-1)
         if mode == 'giou':
-            enclosed_lt = jt.minimum(bboxes1[..., :, None, :2],
-                                    bboxes2[..., None, :, :2])
-            enclosed_rb = jt.maximum(bboxes1[..., :, None, 2:],
-                                    bboxes2[..., None, :, 2:])
+            enclosed_lt = jt.minimum(bboxes1[..., :, :2].unsqueeze(-2),
+                                     bboxes2[..., :, :2].unsqueeze(-3))
+            enclosed_rb = jt.maximum(bboxes1[..., :, 2:].unsqueeze(-2),
+                                     bboxes2[..., :, 2:].unsqueeze(-3))
 
     union = jt.maximum(union, eps)
     ious = overlap / union
     if mode in ['iou', 'iof']:
         return ious
     # calculate gious
-    enclose_wh = (enclosed_rb - enclosed_lt).clamp(min=0)
+    enclose_wh = (enclosed_rb - enclosed_lt).clamp(min_v=0)
     enclose_area = enclose_wh[..., 0] * enclose_wh[..., 1]
     enclose_area = jt.maximum(enclose_area, eps)
     gious = ious - (enclose_area - union) / enclose_area
