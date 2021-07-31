@@ -128,6 +128,7 @@ eval_interval = 1
 log_interval = 50
 checkpoint_interval = 1
 pretrained_weights="weights/pretrained.pk_jt.pk"
+merge_nms_threshold_type = 1
 
 parameter_groups_generator = dict(
     type = "YangXuePrameterGroupsGenerator",

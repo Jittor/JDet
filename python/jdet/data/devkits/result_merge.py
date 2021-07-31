@@ -16,9 +16,9 @@ import pdb
 import math
 from multiprocessing import Pool
 from functools import partial
+from jdet.config import get_cfg
 
 ## the thresh for nms when merge image
-nms_threshold_type = 0
 nms_threshold_0 = 0.1
 nms_threshold_1 = {'roundabout': 0.1, 'tennis-court': 0.3, 'swimming-pool': 0.1, 'storage-tank': 0.2,
                 'soccer-ball-field': 0.3, 'small-vehicle': 0.2, 'ship': 0.2, 'plane': 0.3,
@@ -190,6 +190,11 @@ def poly2origpoly(poly, x, y, rate):
 
 
 def mergesingle(dstpath, nms, fullname):
+    cfg = get_cfg()
+    if (cfg.merge_nms_threshold_type):
+        nms_threshold_type = cfg.merge_nms_threshold_type
+    else:
+        nms_threshold_type = 0
     name = util.custombasename(fullname)
     dstname = os.path.join(dstpath, name + '.txt')
     print(dstname)
