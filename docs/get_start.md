@@ -35,6 +35,11 @@ You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into 
 source .bashrc
 ```
 
+## Tutorial
+
+### Configs
+
+
 
 
 

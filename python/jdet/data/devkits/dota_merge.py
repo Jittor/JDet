@@ -1,9 +1,11 @@
+import shutil
 import jittor as jt 
 from jdet.config.constant import DOTA1_CLASSES
 from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.devkits.result_merge import mergebypoly
 import os
+import shutil
 from tqdm import tqdm
 
 def prepare(result_pkl,save_path):
@@ -55,6 +57,23 @@ def dota_merge(result_pkl, save_path, final_path):
         prepare(result_pkl,save_path)
     check_dir(final_path)
     mergebypoly(save_path,final_path)
+
+def dota_merge_result(result_pkl,work_dir,epoch,name):
+    print("Merge results...")
+    save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")
+    final_path = os.path.join(work_dir, f"test/submit_{epoch}/after_nms")
+    zip_path = os.path.join("submit_zips", name + ".zip")
+    if (os.path.exists(save_path)):
+        shutil.rmtree(save_path)
+    if (os.path.exists(final_path)):
+        shutil.rmtree(final_path)
+    if (os.path.exists(zip_path)):
+        os.remove(zip_path)
+    if not os.path.exists("submit_zips"):
+        os.makedirs("submit_zips")
+    dota_merge(result_pkl, save_path, final_path)
+    os.system(f"zip -rj {zip_path} {os.path.join(final_path,'*')}")
+
 
 if __name__ == "__main__":
     result_pkl = "/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_20/test/test_30.pkl"

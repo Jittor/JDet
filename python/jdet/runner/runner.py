@@ -1,5 +1,6 @@
 from genericpath import isfile
 import time
+from jdet.models.boxes.box_ops import flip_result
 import jittor as jt
 from tqdm import tqdm
 import numpy as np
@@ -11,7 +12,7 @@ from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
-from jdet.data.devkits.dota_merge import dota_merge
+from jdet.data.devkits.dota_merge import dota_merge, dota_merge_result
 import os
 import shutil
 
@@ -154,24 +155,9 @@ class Runner:
                 result = self.model(images,targets)
                 results.extend(sync(result))
 
-            
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
             self.logger.log(eval_results,iter=self.iter)
-
-    def flip_result(self, results, mode, target):
-        assert(False) #TODO not finished
-        #input: [n, 6]; (x0(w),y0(h),x1,y1,a(pi),score)
-        if (mode == 'HV'):
-            return self.flip_result(self.flip_result(results, 'H', target), 'V', target)
-        w = target['ori_img_size'][0].data[0]
-        h = target['ori_img_size'][1].data[0]
-        print(w, h)
-        print(target)
-        # out = results.copy()
-        # if (mode == 'H'):
-        #     out[:, [0,2]] = 
-
 
     @jt.no_grad()
     @jt.single_process_scope()
@@ -184,41 +170,27 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
-                for mode in self.flip_test:
-                    images_flip = images.copy()
-                    if (mode == 'H'):
-                        images_flip = images_flip[:, :, :, ::-1]
-                    elif (mode == 'V'):
-                        images_flip = images_flip[:, :, ::-1, :]
-                    elif (mode == 'HV'):
-                        images_flip = images_flip[:, :, ::-1, ::-1]
-                    else:
-                        assert(False)
-                    result_ = self.model(images_flip,targets)
-                    for k in range(len(targets)):
-                        out = self.flip_result(result_[k], mode, targets[k])
-                        result[k][0] = jt.concat([result[k][0], out], 0)
-                        result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
+                # for mode in self.flip_test:
+                #     images_flip = images.copy()
+                #     if (mode == 'H'):
+                #         images_flip = images_flip[:, :, :, ::-1]
+                #     elif (mode == 'V'):
+                #         images_flip = images_flip[:, :, ::-1, :]
+                #     elif (mode == 'HV'):
+                #         images_flip = images_flip[:, :, ::-1, ::-1]
+                #     else:
+                #         assert(False)
+                #     result_ = self.model(images_flip,targets)
+                #     for k in range(len(targets)):
+                #         out = flip_result(result_[k], mode, targets[k])
+                #         result[k][0] = jt.concat([result[k][0], out], 0)
+                #         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
+
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
                 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
-
-            print("Merge results...")
-            result_pkl = os.path.join(self.work_dir, f"test/test_{self.epoch}.pkl")
-            save_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/before_nms")
-            final_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/after_nms")
-            zip_path = os.path.join("submit_zips", self.cfg.name + ".zip")
-            if (os.path.exists(save_path)):
-                shutil.rmtree(save_path)
-            if (os.path.exists(final_path)):
-                shutil.rmtree(final_path)
-            if (os.path.exists(zip_path)):
-                os.remove(zip_path)
-            if not os.path.exists("submit_zips"):
-                os.makedirs("submit_zips")
-            dota_merge(result_pkl, save_path, final_path)
-            os.system(f"zip -rj {zip_path} {os.path.join(final_path,'*')}")
+            dota_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name)
 
     @jt.single_process_scope()
     def save(self):
