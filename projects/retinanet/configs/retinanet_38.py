@@ -6,7 +6,7 @@ scheduler = dict(
     milestones= [27])
 
 optimizer = dict(
-    lr=6 * 5e-4
+    lr=3 * 5e-4
 )
 
 model = dict(
