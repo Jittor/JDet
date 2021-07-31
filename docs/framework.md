@@ -1,6 +1,6 @@
 # JDet Framework
 ## 1. Config
-It has two part: config & constant, config is the global args,please refer to [configs.md](docs/configs.md) for details. Constant includes some classnames.
+It has two part: config & constant, config is the global args,please refer to [config.md](config.md) for details. Constant includes some classnames.
 
 ## 2. Ops
 This section includes some useful ops with CUDA & C++.

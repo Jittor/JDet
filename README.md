@@ -98,9 +98,10 @@ python run_net.py --config-file=configs/base.py --task=test
 5. 1x : 12 epochs
 
 ### Incoming Models
-YOLO
-R3Det
-
+| Model | Paper | Status|
+| :---: | :---: | :---: |
+| YOLO | - | Doing|
+| R3Det| - | Doing|
 
 ## Contact Us
 
