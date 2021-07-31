@@ -11,7 +11,7 @@ from jdet.utils.registry import build_from_cfg,BOXES
 import numpy as np
 import jdet
 from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh
-# from my_utils import get_var
+# from  import get_var
 
 @HEADS.register_module()
 class RetinaHead(nn.Module):
