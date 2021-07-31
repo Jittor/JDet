@@ -30,7 +30,9 @@ def solve_xml(src, tar):
         print(ss,file=file)
     file.close()
 
-os.makedirs("fair_DOTA")
+os.makedirs("fair_DOTA", exist_ok=True)
+os.makedirs("fair_DOTA/images", exist_ok=True)
+os.makedirs("fair_DOTA/labelTxt", exist_ok=True)
 
 for root, dirs, files in os.walk("fair/images"):
     for f in files:
