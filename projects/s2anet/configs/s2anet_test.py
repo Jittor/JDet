@@ -91,7 +91,7 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5),
+            # dict(type='RotatedRandomFlip', prob=0.0),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -103,9 +103,8 @@ dataset = dict(
             
         ],
         batch_size=2,
-        num_workers=4,
-        shuffle=True,
-        filter_empty_gt=False
+        num_workers=0,
+        shuffle=False,
     ),
     # val=dict(
     #     type="DOTADataset",
@@ -173,5 +172,4 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "work_dirs/s2anet_r50_fpn_1x_dota"
 

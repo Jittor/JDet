@@ -38,6 +38,7 @@ def build_from_cfg(cfg,registry,**kwargs):
 
         return module
     elif isinstance(cfg,list):
+        from jittor import nn
         return nn.Sequential([build_from_cfg(c,registry,**kwargs) for c in cfg])
     elif cfg is None:
         return None
