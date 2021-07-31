@@ -4,8 +4,6 @@ from jdet.utils.registry import BOXES, MODELS, build_from_cfg, BACKBONES, HEADS,
 from jdet.ops.bbox_transfomrs import bbox2roi
 import jittor as jt
 from jdet.utils.general import parse_losses
-
-from jdet.hook import hook
 @MODELS.register_module()
 class FasterRCNNOBB(nn.Module):
 

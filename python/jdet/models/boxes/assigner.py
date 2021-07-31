@@ -1,4 +1,4 @@
-import jittor as jt
+import jittor as jt 
 from jdet.utils.registry import BOXES,build_from_cfg
 
 class AssignResult:
@@ -86,20 +86,17 @@ class MaxIoUAssigner:
         if bboxes.shape[0] == 0 or gt_bboxes.shape[0] == 0:
             raise ValueError('No gt or bboxes')
 
-        overlaps = self.iou_calculator(gt_bboxes.unsqueeze(0), bboxes.unsqueeze(0))
-        overlaps = overlaps.squeeze(0)
+        overlaps = self.iou_calculator(gt_bboxes, bboxes)
 
-        if (self.ignore_iof_thr > 0 and gt_bboxes_ignore is not None and
-                gt_bboxes_ignore.numel() > 0 and bboxes.numel() > 0):
+        if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
+                gt_bboxes_ignore.numel() > 0):
             if self.ignore_wrt_candidates:
                 ignore_overlaps = self.iou_calculator(
-                    bboxes.unsqueeze(0), gt_bboxes_ignore.unsqueeze(0), mode='iof')
-                ignore_overlaps.squeeze(0)
+                    bboxes, gt_bboxes_ignore, mode='iof')
                 ignore_max_overlaps= ignore_overlaps.max(dim=1)
             else:
                 ignore_overlaps = self.iou_calculator(
-                    gt_bboxes_ignore.unsqueeze(0), bboxes.unsqueeze(0), mode='iof')
-                ignore_overlaps.squeeze(0)
+                    gt_bboxes_ignore, bboxes, mode='iof')
                 ignore_max_overlaps = ignore_overlaps.max(dim=0)
             overlaps[:, ignore_max_overlaps > self.ignore_iof_thr] = -1
 
@@ -163,8 +160,3 @@ class MaxIoUAssigner:
             assigned_labels = None
 
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
-
-@BOXES.register_module()
-class MaxIoUAssignerCy(MaxIoUAssigner):
-    def __init__(self, *args, **kwargs):
-        super(MaxIoUAssignerCy, self).__init__(*args, **kwargs)
