@@ -14,7 +14,7 @@ from terminaltables import AsciiTable
 
 from jdet.utils.registry import DATASETS
 from jdet.config import COCO_CLASSES
-from .transforms import Compose
+from jdet.data.transforms import Compose
 
 @DATASETS.register_module()
 class COCODataset(Dataset):
@@ -237,6 +237,7 @@ class COCODataset(Dataset):
             dict[str, float]: COCO style evaluation metric.
         """
         save_file = build_file(work_dir,prefix=f"detections/val_{epoch}.json")
+        
         self.save_results(results,save_file)
         metrics = metric if isinstance(metric, list) else [metric]
         allowed_metrics = ['bbox', 'segm', 'proposal', 'proposal_fast']
@@ -258,7 +259,7 @@ class COCODataset(Dataset):
                 logger.print_log(msg)
 
             iou_type = metric
-            predictions = json.load(open(results_file))
+            predictions = json.load(open(save_file))
             if iou_type == 'segm':
                 # Refer to https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/coco.py#L331  # noqa
                 # When evaluating mask AP, if the results contain bbox,
@@ -374,3 +375,13 @@ class COCODataset(Dataset):
                     f'{ap[0]:.3f} {ap[1]:.3f} {ap[2]:.3f} {ap[3]:.3f} '
                     f'{ap[4]:.3f} {ap[5]:.3f}')
         return eval_results
+
+
+def test_cocodataset():
+    dataset = COCODataset(root="/mnt/disk/lxl/dataset/coco/images/val2017",anno_file="/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json")
+    print(len(dataset.CLASSES))
+    print(len(dataset.cat_ids))
+
+
+if __name__ == "__main__":
+    test_cocodataset()

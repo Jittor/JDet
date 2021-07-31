@@ -182,8 +182,8 @@ def bbox2loc(src_bbox,dst_bbox,mean=[0.,0.,0.,0.],std=[1.,1.,1.,1.]):
     dy = (base_center_y - center_y) / height
     dx = (base_center_x - center_x) / width
 
-    dw = jt.log(base_width / width)
-    dh = jt.log(base_height / height)
+    dw = jt.safe_log(base_width / width)
+    dh = jt.safe_log(base_height / height)
         
     loc = jt.contrib.concat([dx,dy,dw,dh],dim=1)
 
@@ -546,3 +546,87 @@ class ProposalTargetCreator(nn.Module):
         gt_roi_loc = bbox2loc(sample_roi, bbox[gt_assignment[keep_index]])
 
         return sample_roi, gt_roi_loc, gt_roi_label
+
+
+
+# TODO: delete this class using above functions.
+class AnchorGenerator(object):
+
+    def __init__(self, base_size, scales, ratios, scale_major=True, ctr=None):
+        self.base_size = base_size
+        self.scales = jt.array(scales).float32()
+        self.ratios = jt.array(ratios).float32()
+        self.scale_major = scale_major
+        self.ctr = ctr
+        self.base_anchors = self.gen_base_anchors()
+
+    @property
+    def num_base_anchors(self):
+        return self.base_anchors.size(0)
+
+    def gen_base_anchors(self):
+        w = self.base_size
+        h = self.base_size
+        if self.ctr is None:
+            x_ctr = 0.5 * (w - 1)
+            y_ctr = 0.5 * (h - 1)
+        else:
+            x_ctr, y_ctr = self.ctr
+
+        h_ratios = jt.sqrt(self.ratios)
+        w_ratios = 1 / h_ratios
+        if self.scale_major:
+            ws = (w * w_ratios[:, None] * self.scales[None, :]).view(-1)
+            hs = (h * h_ratios[:, None] * self.scales[None, :]).view(-1)
+        else:
+            ws = (w * self.scales[:, None] * w_ratios[None, :]).view(-1)
+            hs = (h * self.scales[:, None] * h_ratios[None, :]).view(-1)
+
+        base_anchors = jt.stack(
+            [
+                x_ctr - 0.5 * (ws - 1), y_ctr - 0.5 * (hs - 1),
+                x_ctr + 0.5 * (ws - 1), y_ctr + 0.5 * (hs - 1)
+            ],
+            dim=-1).round()
+
+        return base_anchors.float32()
+
+    def _meshgrid(self, x, y, row_major=True):
+        xx = x.repeat(len(y))
+        yy = y.view(-1, 1).repeat(1, len(x)).view(-1)
+        if row_major:
+            return xx, yy
+        else:
+            return yy, xx
+
+    def grid_anchors(self, featmap_size, stride=16):
+        base_anchors = self.base_anchors
+
+        feat_h, feat_w = featmap_size
+        shift_x = jt.arange(0, feat_w) * stride
+        shift_y = jt.arange(0, feat_h) * stride
+        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
+        shifts = jt.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        shifts = shifts.type_as(base_anchors)
+        # first feat_w elements correspond to the first row of shifts
+        # add A anchors (1, A, 4) to K shifts (K, 1, 4) to get
+        # shifted anchors (K, A, 4), reshape to (K*A, 4)
+
+        all_anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        all_anchors = all_anchors.view(-1, 4)
+        # first A rows correspond to A anchors of (0, 0) in feature map,
+        # then (0, 1), (0, 2), ...
+        return all_anchors
+
+    def valid_flags(self, featmap_size, valid_size):
+        feat_h, feat_w = featmap_size
+        valid_h, valid_w = valid_size
+        assert valid_h <= feat_h and valid_w <= feat_w
+        valid_x = jt.zeros(feat_w, dtype=jt.bool)
+        valid_y = jt.zeros(feat_h, dtype=jt.bool)
+        valid_x[:valid_w] = 1
+        valid_y[:valid_h] = 1
+        valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)
+        valid = valid_xx & valid_yy
+        valid = valid[:, None].expand((valid.shape[0], self.num_base_anchors)).view(-1)
+        return valid

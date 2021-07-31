@@ -2,8 +2,135 @@ import jittor as jt
 import numpy as np 
 import math 
 
-def norm_angle(angle, range=[-np.pi / 4, np.pi]):
-    return (angle - range[0]) % range[1] + range[0]
+def loc2bbox(src_bbox,loc,mean=[0.,0.,0.,0.],std=[1.,1.,1.,1.]):
+    if src_bbox.shape[0] == 0:
+        return jt.zeros((0, 4), dtype=loc.dtype)
+    
+
+    mean = jt.array(mean)
+    std = jt.array(std)
+    loc = loc*std+mean 
+
+    src_width = src_bbox[:, 2:3] - src_bbox[:, 0:1]
+    src_height = src_bbox[:, 3:4] - src_bbox[:, 1:2]
+    src_center_x = src_bbox[:, 0:1] + 0.5 * src_width
+    src_center_y = src_bbox[:, 1:2] + 0.5 * src_height
+
+    dx = loc[:, 0:1]
+    dy = loc[:, 1:2]
+    dw = loc[:, 2:3]
+    dh = loc[:, 3:4]
+
+    center_x = dx*src_width+src_center_x
+    center_y = dy*src_height+src_center_y
+        
+    w = jt.exp(dw) * src_width
+    h = jt.exp(dh) * src_height
+        
+    x1,y1,x2,y2 = center_x-0.5*w, center_y-0.5*h, center_x+0.5*w, center_y+0.5*h
+        
+    dst_bbox = jt.contrib.concat([x1,y1,x2,y2],dim=1)
+
+    return dst_bbox
+
+def loc2bbox_r(src_bbox,loc,mean=[0.,0.,0.,0.,0.],std=[1.,1.,1.,1.,1.]):
+    if src_bbox.shape[0] == 0:
+        return jt.zeros((0, 4), dtype=loc.dtype)
+    
+
+    mean = jt.array(mean)
+    std = jt.array(std)
+    loc = loc*std+mean 
+
+    src_center_x = src_bbox[:, 0:1]
+    src_center_y = src_bbox[:, 1:2]
+    src_width = src_bbox[:, 2:3]
+    src_height = src_bbox[:, 3:4]
+
+    dx = loc[:, 0:1]
+    dy = loc[:, 1:2]
+    dw = loc[:, 2:3]
+    dh = loc[:, 3:4]
+
+    center_x = dx*src_width+src_center_x
+    center_y = dy*src_height+src_center_y
+        
+    w = jt.exp(dw) * src_width
+    h = jt.exp(dh) * src_height
+        
+    x1,y1,x2,y2 = center_x-0.5*w, center_y-0.5*h, center_x+0.5*w, center_y+0.5*h
+    theta = loc[:, 4:5] + src_bbox[:, 4:5]
+    dst_bbox = jt.contrib.concat([(x1+x2)/2,(y1+y2)/2,x2-x1,y2-y1,theta],dim=1)
+    return dst_bbox
+    
+def bbox2loc_r(src_bbox,dst_bbox,mean=[0.,0.,0.,0.,0.],std=[1.,1.,1.,1.,1.]):        
+    center_x, center_y, width, height = src_bbox[:, 0:1], src_bbox[:, 1:2], src_bbox[:, 2:3], src_bbox[:, 3:4]
+    base_center_x, base_center_y, base_width, base_height = dst_bbox[:, 0:1], dst_bbox[:, 1:2], dst_bbox[:, 2:3], dst_bbox[:, 3:4]
+
+    eps = 1e-5
+
+    dx = (base_center_x - center_x) / (width + 1)
+    dy = (base_center_y - center_y) / (height + 1)
+
+    dw = jt.log(base_width / (width + 1) + eps)
+    dh = jt.log(base_height / (height + 1) + eps)
+
+    da = dst_bbox[:, 4:5] - src_bbox[:, 4:5]
+        
+    loc = jt.contrib.concat([dx,dy,dw,dh,da],dim=1)
+
+    mean = jt.array(mean)
+    std = jt.array(std)
+    loc = (loc-mean)/std 
+
+    return loc
+    
+def bbox2loc(src_bbox,dst_bbox,mean=[0.,0.,0.,0.],std=[1.,1.,1.,1.]):        
+    width = src_bbox[:, 2:3] - src_bbox[:, 0:1]
+    height = src_bbox[:, 3:4] - src_bbox[:, 1:2]
+    center_x = src_bbox[:, 0:1] + 0.5 * width
+    center_y = src_bbox[:, 1:2] + 0.5 * height
+
+    base_width = dst_bbox[:, 2:3] - dst_bbox[:, 0:1]
+    base_height = dst_bbox[:, 3:4] - dst_bbox[:, 1:2]
+    base_center_x = dst_bbox[:, 0:1] + 0.5 * base_width
+    base_center_y = dst_bbox[:, 1:2] + 0.5 * base_height
+
+    eps = 1e-5
+    height = jt.maximum(height, eps)
+    width = jt.maximum(width, eps)
+
+    dy = (base_center_y - center_y) / height
+    dx = (base_center_x - center_x) / width
+
+    dw = jt.safe_log(base_width / width)
+    dh = jt.safe_log(base_height / height)
+        
+    loc = jt.contrib.concat([dx,dy,dw,dh],dim=1)
+
+    mean = jt.array(mean)
+    std = jt.array(std)
+    loc = (loc-mean)/std 
+
+    return loc
+    
+def bbox_iou(bbox_a, bbox_b):
+    assert bbox_a.shape[1]==4 and bbox_b.shape[1]==4
+    if bbox_a.numel()==0 or bbox_b.numel()==0:
+        return jt.zeros((bbox_a.shape[0],bbox_b.shape[0]))
+    # top left
+    tl = jt.maximum(bbox_a[:, :2].unsqueeze(1), bbox_b[:, :2])
+    # bottom right
+    br = jt.minimum(bbox_a[:,2:].unsqueeze(1), bbox_b[:, 2:])
+
+    area_i = jt.prod(br - tl, dim=2) * (tl < br).all(dim=2)
+    area_a = jt.prod(bbox_a[:, 2:] - bbox_a[:, :2], dim=1)
+    area_b = jt.prod(bbox_b[:, 2:] - bbox_b[:, :2], dim=1)
+    return area_i / (area_a.unsqueeze(1) + area_b - area_i)
+
+def norm_angle(angle, range=[float(-np.pi / 4), float(np.pi)]):
+    ret = (angle - range[0]) % range[1] + range[0]
+    return ret
 
 def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1., 1., 1.)):
     """Compute deltas of proposals w.r.t. gt.
@@ -39,13 +166,13 @@ def bbox2delta_rotated(proposals, gt, means=(0., 0., 0., 0., 0.), stds=(1., 1., 
 
     dx = (cosa * coord[..., 0] + sina * coord[..., 1]) / proposals_widths
     dy = (-sina * coord[..., 0] + cosa * coord[..., 1]) / proposals_heights
-    dw = jt.log(gt_widths / proposals_widths)
-    dh = jt.log(gt_heights / proposals_heights)
+    dw = jt.safe_log(gt_widths / proposals_widths)
+    dh = jt.safe_log(gt_heights / proposals_heights)
     da = (gt_angle - proposals_angles)
     da = norm_angle(da) / np.pi
 
     deltas = jt.stack((dx, dy, dw, dh, da), -1)
-     
+
     means = jt.array(means)
     means = jt.array(means).unsqueeze(0)
     stds = jt.array(stds).unsqueeze(0)
@@ -115,8 +242,9 @@ def delta2bbox_rotated(rois, deltas, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1
 
 def bbox2delta(proposals,
                gt,
-               means=(0., 0., 0., 0.),
-               stds=(1., 1., 1., 1.)):
+               means=None,
+               stds=None,
+               weights = None):
     """Compute deltas of proposals w.r.t. gt in the MMDet V1.x manner.
 
     We usually compute the deltas of x, y, w, h of proposals w.r.t ground
@@ -150,22 +278,29 @@ def bbox2delta(proposals,
 
     dx = (gx - px) / pw
     dy = (gy - py) / ph
-    dw = jt.log(gw / pw)
-    dh = jt.log(gh / ph)
+    dw = jt.safe_log(gw / pw)
+    dh = jt.safe_log(gh / ph)
     deltas = jt.stack([dx, dy, dw, dh], dim=-1)
 
-    means = jt.array(means).unsqueeze(0)
-    stds = jt.array(stds).unsqueeze(0)
-    deltas = (deltas-means)/stds
+    if means is not None and stds is not None:
+        means = jt.array(means).unsqueeze(0)
+        stds = jt.array(stds).unsqueeze(0)
+        deltas = (deltas-means)/stds
+    
+    if weights is not None:
+        assert deltas.shape[-1] == weights.shape[-1]
+        weights = jt.array(weights)
+        deltas*=weights
 
     return deltas
 
 def delta2bbox(rois,
                deltas,
-               means=(0., 0., 0., 0.),
-               stds=(1., 1., 1., 1.),
+               means=None,
+               stds=None,
                max_shape=None,
-               wh_ratio_clip=16 / 1000):
+               wh_ratio_clip=16 / 1000,
+               weights = None,):
     """Apply deltas to shift/scale base boxes in the MMDet V1.x manner.
 
     Typically the rois are anchor or proposed bounding boxes and the deltas are
@@ -205,13 +340,19 @@ def delta2bbox(rois,
                 [0.0000, 0.1321, 7.8891, 0.8679],
                 [5.3967, 2.4251, 6.0033, 3.7749]])
     """
-    means = jt.array(means).view(1, -1).repeat(1, deltas.size(-1) // 4)
-    stds = jt.array(stds).view(1, -1).repeat(1, deltas.size(-1) // 4)
-    denorm_deltas = deltas * stds + means
-    dx = denorm_deltas[..., 0::4]
-    dy = denorm_deltas[..., 1::4]
-    dw = denorm_deltas[..., 2::4]
-    dh = denorm_deltas[..., 3::4]
+    if weights is not None:
+        assert deltas.shape[-1] == len(weights)
+        weights = jt.array(weights)
+        deltas /= weights
+
+    if means is not None and stds is not None:
+        means = jt.array(means).repeat(1, deltas.size(1) // 4)
+        stds = jt.array(stds).repeat(1, deltas.size(1) // 4)
+        deltas = deltas * stds + means
+    dx = deltas[..., 0::4]
+    dy = deltas[..., 1::4]
+    dw = deltas[..., 2::4]
+    dh = deltas[..., 3::4]
     max_ratio = np.abs(np.log(wh_ratio_clip))
     dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
     dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
@@ -239,10 +380,10 @@ def delta2bbox(rois,
     x2 = gx + gw * 0.5
     y2 = gy + gh * 0.5
     if max_shape is not None:
-        x1 = x1.clamp(min_v=0, max_v=max_shape[0][1] - 1)
-        y1 = y1.clamp(min_v=0, max_v=max_shape[0][0] - 1)
-        x2 = x2.clamp(min_v=0, max_v=max_shape[0][1] - 1)
-        y2 = y2.clamp(min_v=0, max_v=max_shape[0][0] - 1)
+        x1 = x1.clamp(min_v=0, max_v=max_shape[1] - 1)
+        y1 = y1.clamp(min_v=0, max_v=max_shape[0] - 1)
+        x2 = x2.clamp(min_v=0, max_v=max_shape[1] - 1)
+        y2 = y2.clamp(min_v=0, max_v=max_shape[0] - 1)
     bboxes = jt.stack([x1, y1, x2, y2], dim=-1).view_as(deltas)
     return bboxes
 
@@ -378,7 +519,7 @@ def rotated_box_to_poly_single(rrect):
     poly = np.array([x0, y0, x1, y1, x2, y2, x3, y3], dtype=np.float32)
     poly = get_best_begin_point_single(poly)
     return poly
-    
+
 def rotated_box_to_poly_np(rrects):
     """
     rrect:[x_ctr,y_ctr,w,h,angle]
@@ -411,12 +552,38 @@ def rotated_box_to_poly(rrects):
     return jt.array(rotated_box_to_poly_np(rrects.data))
 
 def rotated_box_to_bbox_np(rotatex_boxes):
+    if rotatex_boxes.shape[0]==0:
+        return np.zeros((0,4)),np.zeros((0,8))
     polys = rotated_box_to_poly_np(rotatex_boxes)
     xmin = polys[:, ::2].min(1, keepdims=True)
     ymin = polys[:, 1::2].min(1, keepdims=True)
     xmax = polys[:, ::2].max(1, keepdims=True)
     ymax = polys[:, 1::2].max(1, keepdims=True)
-    return np.concatenate([xmin, ymin, xmax, ymax], axis=1)
+    return np.concatenate([xmin, ymin, xmax, ymax], axis=1),polys
+
+# def rotated_box_to_poly(rboxes):
+#     """
+#     rrect:[x_ctr,y_ctr,w,h,angle]
+#     to
+#     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
+#     """
+#     N = rboxes.shape[0]
+#     x_ctr, y_ctr, width, height, angle = rboxes.select(1, 0), rboxes.select(
+#         1, 1), rboxes.select(1, 2), rboxes.select(1, 3), rboxes.select(1, 4)
+#     tl_x, tl_y, br_x, br_y = -width * 0.5, -height * 0.5, width * 0.5, height * 0.5
+
+#     rects = jt.stack([tl_x, br_x, br_x, tl_x, tl_y, tl_y,
+#                          br_y, br_y], dim=0).reshape(2, 4, N).permute(2, 0, 1)
+
+#     sin, cos = jt.sin(angle), jt.cos(angle)
+#     # M.shape=[N,2,2]
+#     M = jt.stack([cos, -sin, sin, cos],dim=0).reshape(2, 2, N).permute(2, 0, 1)
+#     # polys:[N,8]
+#     polys = jt.matmul(M,rects).permute(2, 1, 0).reshape(-1, N).transpose(1, 0)
+#     polys[:, ::2] += x_ctr.unsqueeze(1)
+#     polys[:, 1::2] += y_ctr.unsqueeze(1)
+
+#     return polys
 
 def rotated_box_to_bbox(rotatex_boxes):
     polys = rotated_box_to_poly(rotatex_boxes)

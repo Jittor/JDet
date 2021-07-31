@@ -91,7 +91,7 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.0),
+            dict(type='RotatedRandomFlip', prob=0.5),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -102,9 +102,10 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=1,
+        batch_size=2,
         num_workers=4,
-        shuffle=False
+        shuffle=True,
+        filter_empty_gt=False
     ),
     # val=dict(
     #     type="DOTADataset",
@@ -149,7 +150,7 @@ dataset = dict(
 
 optimizer = dict(
     type='SGD', 
-    lr=0.0,#0.01*(1/8.), 
+    lr=0.01/4., #0.0,#0.01*(1/8.), 
     momentum=0.9, 
     weight_decay=0.0001,
     grad_clip=dict(
@@ -161,7 +162,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 
 logger = dict(
@@ -172,4 +173,4 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-# resume_path = "/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth"
+work_dir = "work_dirs/s2anet_r50_fpn_1x_dota_bs2_test"

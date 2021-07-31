@@ -43,8 +43,8 @@ model = dict(
 dataset = dict(
     val=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
-        images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/images/',
+        annotations_file='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -63,8 +63,8 @@ dataset = dict(
     ),
     train=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
-        images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/trainval_600_150/images/',
+        annotations_file='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/images/',
         # annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/trainval.pkl',
         # images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/images/',
         transforms=[
@@ -90,7 +90,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir= "/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/splits/test_600_150/images/",
+      images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/test_600_150/images/",
       transforms= [
         dict(
           type= "RotatedResize",
@@ -123,12 +123,12 @@ scheduler = dict(
 logger = dict(
     type= "RunLogger")
 
-work_dir = "./exp/retinanet"
 max_epoch = 26
 eval_interval = 1
 log_interval = 50
 checkpoint_interval = 1
 pretrained_weights="weights/pretrained.pk_jt.pk"
+merge_nms_threshold_type = 1
 
 parameter_groups_generator = dict(
     type = "YangXuePrameterGroupsGenerator",

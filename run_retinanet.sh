@@ -1,1 +1,0 @@
-PYTHONPATH=$PYTHONPATH:./python log_silent=1 python3 tools/run_net.py --config-file=configs/retinanet.yaml --use_cuda --task=train

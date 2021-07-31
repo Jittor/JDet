@@ -4,6 +4,7 @@ import time
 import os
 import logging
 from tensorboardX import SummaryWriter
+from jdet.config import get_cfg
 
 @HOOKS.register_module()
 class TextLogger:
@@ -20,6 +21,7 @@ class TextLogger:
 @HOOKS.register_module()
 class TensorboardLogger:
     def __init__(self,work_dir):
+        self.cfg = get_cfg()
         tensorboard_dir = os.path.join(work_dir,"tensorboard")
         self.writer = SummaryWriter(tensorboard_dir)
 

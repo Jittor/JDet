@@ -5,16 +5,21 @@ from tqdm import tqdm
 import numpy as np
 import jdet
 import pickle
+import datetime
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
-from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses
+from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
+from jdet.data.devkits.dota_merge import dota_merge
+import os
+import shutil
 
 class Runner:
     def __init__(self):
         cfg = get_cfg()
         self.cfg = cfg
+        self.flip_test = [] if cfg.flip_test is None else cfg.flip_test
         self.work_dir = cfg.work_dir
 
         self.max_epoch = cfg.max_epoch 
@@ -28,7 +33,7 @@ class Runner:
     
         self.model = build_from_cfg(cfg.model,MODELS)
         if (cfg.parameter_groups_generator):
-            params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=self.model.named_parameters())
+            params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=self.model.named_parameters(), model=self.model)
         else:
             params = self.model.parameters()
         self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=params)
@@ -44,6 +49,7 @@ class Runner:
 
         self.iter = 0
         self.epoch = 0
+
         if self.max_epoch:
             self.total_iter = self.max_epoch * len(self.train_dataset)
         else:
@@ -51,8 +57,13 @@ class Runner:
 
         if (cfg.pretrained_weights):
             self.model.load(cfg.pretrained_weights)
+        
+        if self.resume_path is None:
+            self.resume_path = search_ckpt(self.work_dir)
+            
         if check_file(self.resume_path):
             self.resume()
+
 
     @property
     def finish(self):
@@ -68,20 +79,21 @@ class Runner:
             if check_interval(self.epoch,self.eval_interval) and False: #TODO val evaluation is not implemented
                 # TODO: need remove this
                 self.model.eval()
-                self.val()            
+                self.val()
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
         self.test()
 
     def train(self):
         self.model.train()
-        # import torch
-        # self.model.load_state_dict(torch.load("/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth")["state_dict"])
-        # TODO : remove thiss
-        self.model.backbone.train()
+
         start_time = time.time()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
+            if (self.cfg.test_mode):
+                print(losses)
+                if (batch_idx > 10):
+                    exit(0)
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
@@ -89,10 +101,12 @@ class Runner:
             batch_size = len(targets)*jt.mpi.world_size()
 
             if check_interval(self.iter,self.log_interval):
-                fps = (self.log_interval * batch_size)/(time.time()-start_time)
-                start_time = time.time()
-                remain = (self.total_iter-self.iter) * batch_size / fps
+                ptime = time.time()-start_time
+                fps = batch_size*(batch_idx+1)/ptime
+                eta_time = (self.total_iter-self.iter)*ptime/(batch_idx+1)
+                eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
+                    name = self.cfg.name,
                     lr = self.optimizer.cur_lr(),
                     iter = self.iter,
                     epoch = self.epoch,
@@ -100,7 +114,7 @@ class Runner:
                     batch_size = batch_size,
                     total_loss = all_loss,
                     fps=fps,
-                    remain_time=remain
+                    eta=eta_str
                 )
                 data.update(losses)
                 data = sync(data)
@@ -111,7 +125,6 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
-            
         self.epoch +=1
 
 
@@ -147,6 +160,19 @@ class Runner:
 
             self.logger.log(eval_results,iter=self.iter)
 
+    def flip_result(self, results, mode, target):
+        assert(False) #TODO not finished
+        #input: [n, 6]; (x0(w),y0(h),x1,y1,a(pi),score)
+        if (mode == 'HV'):
+            return self.flip_result(self.flip_result(results, 'H', target), 'V', target)
+        w = target['ori_img_size'][0].data[0]
+        h = target['ori_img_size'][1].data[0]
+        print(w, h)
+        print(target)
+        # out = results.copy()
+        # if (mode == 'H'):
+        #     out[:, [0,2]] = 
+
 
     @jt.no_grad()
     @jt.single_process_scope()
@@ -159,11 +185,41 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
+                for mode in self.flip_test:
+                    images_flip = images.copy()
+                    if (mode == 'H'):
+                        images_flip = images_flip[:, :, :, ::-1]
+                    elif (mode == 'V'):
+                        images_flip = images_flip[:, :, ::-1, :]
+                    elif (mode == 'HV'):
+                        images_flip = images_flip[:, :, ::-1, ::-1]
+                    else:
+                        assert(False)
+                    result_ = self.model(images_flip,targets)
+                    for k in range(len(targets)):
+                        out = self.flip_result(result_[k], mode, targets[k])
+                        result[k][0] = jt.concat([result[k][0], out], 0)
+                        result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-            
+                
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
 
+            print("Merge results...")
+            result_pkl = os.path.join(self.work_dir, f"test/test_{self.epoch}.pkl")
+            save_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/before_nms")
+            final_path = os.path.join(self.work_dir, f"test/submit_{self.epoch}/after_nms")
+            zip_path = os.path.join("submit_zips", self.cfg.name + ".zip")
+            if (os.path.exists(save_path)):
+                shutil.rmtree(save_path)
+            if (os.path.exists(final_path)):
+                shutil.rmtree(final_path)
+            if (os.path.exists(zip_path)):
+                os.remove(zip_path)
+            if not os.path.exists("submit_zips"):
+                os.makedirs("submit_zips")
+            dota_merge(result_pkl, save_path, final_path)
+            os.system(f"zip -rj {zip_path} {os.path.join(final_path,'*')}")
 
     @jt.single_process_scope()
     def save(self):

@@ -1,5 +1,12 @@
-import jittor as jt
+import jittor as jt 
 
+
+def nms(boxes,scores,thresh):
+    assert boxes.shape[-1]==4 and len(scores)==len(boxes)
+    if scores.ndim==1:
+        scores = scores.unsqueeze(-1)
+    dets = jt.concat([boxes,scores],dim=1)
+    return jt.nms(dets,thresh)
 
 def multiclass_nms(mlvl_bboxes, mlvl_scores, score_thr, nms, max_per_img):
     """NMS for multi-class bboxes.
@@ -21,17 +28,15 @@ def multiclass_nms(mlvl_bboxes, mlvl_scores, score_thr, nms, max_per_img):
     boxes = []
     scores = []
     labels = []
-
-    n_class = mlvl_scores.size(1) - 1
+    n_class = mlvl_scores.size(1)
     if mlvl_bboxes.shape[1] > 4:
         mlvl_bboxes = mlvl_bboxes.view(mlvl_bboxes.size(0), -1, 4)
     else:
         mlvl_bboxes = mlvl_bboxes.unsqueeze(1)
-        mlvl_bboxes = mlvl_bboxes.expand(
-            mlvl_bboxes.size(0), n_class, 4)
+        mlvl_bboxes = mlvl_bboxes.expand((mlvl_bboxes.size(0), n_class, 4))
 
     mlvl_scores = mlvl_scores[:, :-1]
-    for j in range(0, n_class):
+    for j in range(1, n_class):
         bbox_j = mlvl_bboxes[:, j, :]
         score_j = mlvl_scores[:, j:j+1]
         mask = jt.where(score_j > score_thr)[0]
