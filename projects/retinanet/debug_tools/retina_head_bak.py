@@ -237,7 +237,7 @@ class RetinaHead(nn.Module):
     def cvt2_w_greater_than_h(self, boxes, reverse_hw=True):
         # h = boxes[:, 2:3] - boxes[:, 0:1]
         # w = boxes[:, 3:4] - boxes[:, 1:2]
-        if (reverse_hw): #TODO: yangxue?
+        if (reverse_hw): #TODO: yxe?
             x, y, w, h, a = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3], boxes[:, 4]
             boxes = jt.stack([x, y, h, w, a], dim=1)
 
@@ -266,7 +266,7 @@ class RetinaHead(nn.Module):
             else:
                 proposals = boxes_x0y0x1y1_to_xywh(proposals_[i])
                 proposals = self.cvt2_w_greater_than_h(proposals)
-                proposals[:, 4] += 0.5 * np.pi#TODO: yangxue?
+                proposals[:, 4] += 0.5 * np.pi#TODO: yxe?
 
                 # h = proposals[:, 2:3] - proposals[:, 0:1]
                 # w = proposals[:, 3:4] - proposals[:, 1:2]
@@ -412,7 +412,7 @@ class RetinaHead(nn.Module):
             bbox_pred, cls_score = self.execute_single(x)
             anchor = anchors[id] #x0,y0,x1,y1
 
-            # #yangxue
+            # #yxe
             # x_c = (anchor[:, 2] + anchor[:, 0]) / 2
             # y_c = (anchor[:, 3] + anchor[:, 1]) / 2
             # h = anchor[:, 2] - anchor[:, 0]
@@ -429,7 +429,7 @@ class RetinaHead(nn.Module):
                     # gt_bbox = get_var('gt_boxes_r')#TODO delete
                     # gt_bbox[:, 4] *= np.pi / 180#TODO delete
                     gt_label = target["labels"]
-                    gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yangxue?
+                    gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yxe?
 
                     # from jdet.models.boxes.box_ops import rotated_box_to_poly_single
                     # from jdet.utils.visualization import draw_poly
