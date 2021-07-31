@@ -38,9 +38,9 @@ class Runner:
             params = self.model.parameters()
         self.optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=params)
         self.scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=self.optimizer)
-        self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
-        self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS) if cfg.dataset.val else None
-        self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS) if cfg.dataset.test else None
+        self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
+        self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
+        self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
         
         self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
@@ -60,7 +60,6 @@ class Runner:
         
         if self.resume_path is None:
             self.resume_path = search_ckpt(self.work_dir)
-            
         if check_file(self.resume_path):
             self.resume()
 
