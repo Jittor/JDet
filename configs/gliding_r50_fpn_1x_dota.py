@@ -10,8 +10,6 @@ model = dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        start_level=1,
-        add_extra_convs="on_input",
         num_outs=5),
     rpn = dict(
         type = "RPNHead",
@@ -23,9 +21,9 @@ model = dict(
         feat_channels=256,
         anchor_generator=dict(
             type='AnchorGenerator',
-            scales=[4, 8, 16, 32],
+            scales=[8],
             ratios=[0.5, 1.0, 2.0],
-            strides=[8, 16, 32, 64,128]),
+            strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
             target_means=(.0, .0, .0, .0),
@@ -54,7 +52,7 @@ model = dict(
         in_channels=256,
         representation_dim = 1024,
         pooler_resolution =  7, 
-        pooler_scales = [1/8., 1/16., 1/32., 1/64.,1/128.],
+        pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
         pooler_sampling_ratio = 0,
         score_thresh=0.05,
         nms_thresh=0.5,
@@ -97,7 +95,13 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.0),
+            dict(
+                type='RotatedRandomFlip', 
+                prob=0.5),
+            dict(
+                type="RandomRotateAug",
+                random_rotate_on=True,
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -110,7 +114,9 @@ dataset = dict(
         ],
         batch_size=2,
         num_workers=4,
-        shuffle=False
+        shuffle=True,
+        filter_empty_gt=False,
+        balance_category=True
     ),
     # val=dict(
     #     type="DOTADataset",
@@ -157,17 +163,17 @@ optimizer = dict(
     type='SGD', 
     lr=0.01/4.,#0.01*(1/8.), 
     momentum=0.9, 
-    weight_decay=0.0001,
-    grad_clip=dict(
-        max_norm=35, 
-        norm_type=2))
+    weight_decay=0.0001,)
+    # grad_clip=dict(
+    #     max_norm=35, 
+    #     norm_type=2))
 
 scheduler = dict(
     type='StepLR',
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 
 logger = dict(
@@ -178,4 +184,4 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr"
+work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_rotate_balance"
