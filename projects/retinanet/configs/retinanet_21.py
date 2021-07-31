@@ -14,16 +14,16 @@ optimizer = dict(
 checkpoint_interval = 30
 dataset = dict(
     val=dict(
-        dataset_dir="/mnt/disk/cxjyxx_me/JAD/datasets/test/processed_DOTA/trainval_600_150_1.0-1.5",
+        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/test/processed_DOTA/trainval_600_150_1.0-1.5",
         annotations_file=None,
         images_dir=None,
     ),
     train=dict(
-        dataset_dir="/mnt/disk/cxjyxx_me/JAD/datasets/test/processed_DOTA/trainval_600_150_1.0-1.5",
+        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/test/processed_DOTA/trainval_600_150_1.0-1.5",
         annotations_file=None,
         images_dir=None,
     ),
     test = dict(
-      images_dir= "/mnt/disk/cxjyxx_me/JAD/datasets/test/processed_DOTA/test_600_150_1.0/images/")
+      images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/test/processed_DOTA/test_600_150_1.0/images/")
 )
-resume_path="/mnt/disk/cxjyxx_me/JAD/JDet/projects/retinanet/exp/retinanet_21/checkpoints/ckpt_30.pkl"
+resume_path="/home/cxjyxx_me/workspace/JAD/JDet/projects/retinanet/work_dirs/retinanet_21/checkpoints/ckpt_30.pkl"
