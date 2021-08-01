@@ -185,7 +185,7 @@ class Runner:
                 #         out = flip_result(result_[k], mode, targets[k])
                 #         result[k][0] = jt.concat([result[k][0], out], 0)
                 #         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
-
+                        
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
                 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
