@@ -55,7 +55,7 @@ python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=t
 ```
 
 ### Test
-if you want to test the pretrained models,please set ```resume_path={you_checkpointspath}``` in config files.
+If you want to test the downloaded trained models, please set ```resume_path={you_checkpointspath}``` in the last line of the config file.
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=test
 ```
@@ -83,9 +83,7 @@ python run_net.py --config-file=configs/base.py --task=test
 | S2ANet-R50-FPN | DOTA1.0| Flip|-|  SGD   |   1x    | 74.33   | [arxiv](https://arxiv.org/abs/2008.09397)| [config]() | [model]() [log]() |
 | S2ANet-R101-FPN |DOTA1.0|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config]() | [model]() [log]() |
 | Gliding-R50-FPN |DOTA1.0|-|-|  SGD   |   1x    | 74.0   | [arxiv]()| [config]() | [model]() [log]() |
-| RetinaNet-R50-FPN |DOTA1.0|-|-|  SGD   |   1x    | 74.0   | [arxiv]()| [config]() | [model]() [log]() |
-| RetinaNet-R50-FPN |DOTA1.0|-|-|  SGD   |   1x    | 74.0   | [arxiv]()| [config]() | [model]() [log]() |
-| RetinaNet-R50-FPN |DOTA1.0|-|-|  SGD   |   1x    | 74.0   | [arxiv]()| [config]() | [model]() [log]() |
+| RetinaNet-R50-FPN |DOTA1.0|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) |
 | SSD |COCO |-|-|  SGD   |   1x    | 74.0   | [arxiv]()| [config]() | [model]() [log]() |
 
 
