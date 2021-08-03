@@ -1,4 +1,3 @@
-import torch
 import jittor as jt 
 import numpy as np
 

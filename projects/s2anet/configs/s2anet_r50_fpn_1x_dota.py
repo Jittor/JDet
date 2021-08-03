@@ -107,23 +107,29 @@ dataset = dict(
         shuffle=True,
         filter_empty_gt=False
     ),
-    # val=dict(
-    #     type="DOTADataset",
-    #     anno_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-    #     image_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-    #     transforms=[
-    #         dict(
-    #             type = "Pad",
-    #             size_divisor=32),
-    #         dict(
-    #             type = "Normalize",
-    #             mean =  [123.675, 116.28, 103.53],
-    #             std = [58.395, 57.12, 57.375]),
-    #     ],
-    #     batch_size=2,
-    #     num_workers=4,
-    #     shuffle=False
-    # ),
+    val=dict(
+        type="DOTADataset",
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        transforms=[
+            dict(
+                type="RotatedResize",
+                min_size=1024,
+                max_size=1024
+            ),
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=False),
+        ],
+        batch_size=2,
+        num_workers=4,
+        shuffle=False
+    ),
     test=dict(
         type="ImageDataset",
         images_file='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
@@ -170,8 +176,12 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 1
+# eval_interval : epoch interval
+eval_interval = 2
+# ckpt_interval : epoch interval
 checkpoint_interval = 1
+# log_interval : iter interval
 log_interval = 50
 work_dir = "work_dirs/s2anet_r50_fpn_1x_dota"
+pretrained_weights = "/mnt/disk/lxl/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance/checkpoints/ckpt_12.pkl"
 

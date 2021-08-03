@@ -1,7 +1,7 @@
 import os
 import os.path as osp
 
-import mmcv
+import pickle
 import numpy as np
 from PIL import Image
 
@@ -74,4 +74,4 @@ def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
             img_info['ann'] = ann
         data_dict.append(img_info)
     print("left images:", len(data_dict))
-    mmcv.dump(data_dict, out_path)
+    pickle.dump(data_dict, out_path)

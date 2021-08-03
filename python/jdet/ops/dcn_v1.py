@@ -1,4 +1,3 @@
-import torch
 import jittor as jt
 from jittor import  nn
 from jittor.misc import _pair
@@ -716,7 +715,7 @@ class DeformConv(nn.Module):
 def test_dcn():
     import numpy as np
     dcn = DeformConv(256, 256, (3, 3), (1, 1), padding=(1, 1), dilation=(1, 1), groups=1, deformable_groups=1)
-    dcn.load_state_dict(torch.load("/home/lxl/workspace/s2anet/dcn_init.pth"))
+    dcn.load_state_dict(jt.load("/home/lxl/workspace/s2anet/dcn_init.pth"))
     # x,offset = jt.load("/home/lxl/workspace/JDet/test_dcn1.pkl")
     x,offset,out = jt.load("/home/lxl/workspace/JDet/test_dcn_final.pkl")
     x = jt.array(x)
