@@ -91,9 +91,9 @@ class Runner:
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
-            self.scheduler.step(self.iter,self.epoch,by_epoch=True)
             self.optimizer.step(all_loss)
-
+            self.scheduler.step(self.iter,self.epoch,by_epoch=True)
+    
             batch_size = len(targets)*jt.mpi.world_size()
 
             if check_interval(self.iter,self.log_interval):
