@@ -95,8 +95,8 @@ class Runner:
                 if (batch_idx > 10):
                     exit(0)
             all_loss,losses = parse_losses(losses)
-            self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
+            self.optimizer.step(all_loss)
 
             batch_size = len(targets)*jt.mpi.world_size()
 
@@ -187,7 +187,7 @@ class Runner:
                 #         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
 
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-                
+
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
             dota_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name)

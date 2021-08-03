@@ -3,7 +3,9 @@ import jittor.nn as nn
 
 from jdet.utils.registry import HEADS, LOSSES, build_from_cfg
 from jdet.utils.general import multi_apply
-from jdet.ops.bbox_transfomrs import bbox2delta, mask2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3
+from jdet.ops.bbox_transfomrs import bbox2delta, mask2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3
+from jdet.ops.nms_rotated import multiclass_nms_rotated
+from jdet.models.boxes.box_ops import rotated_box_to_poly
 
 def bbox_target_rbbox(pos_bboxes_list,
                 neg_bboxes_list,
@@ -77,6 +79,62 @@ def bbox_target_rbbox_single(pos_bboxes,
         else:
             pos_bbox_targets = dbbox2delta_v3(pos_ext_bboxes, pos_gt_obbs, target_means,
                                               target_stds)
+        bbox_targets[:num_pos, :] = pos_bbox_targets
+        bbox_weights[:num_pos, :] = 1
+    if num_neg > 0:
+        label_weights[-num_neg:] = 1.0
+
+    return labels, label_weights, bbox_targets, bbox_weights
+
+def rbbox_target_rbbox(pos_rbboxes_list,
+                         neg_rbboxes_list,
+                         pos_gt_rbboxes_list,
+                         pos_gt_labels_list,
+                         cfg,
+                         reg_classes=1,
+                         target_means=[.0, .0, .0, .0, 0],
+                         target_stds=[1.0, 1.0, 1.0, 1.0, 1.0],
+                         concat=True):
+    labels, label_weights, bbox_targets, bbox_weights = multi_apply(
+        rbbox_target_rbbox_single,
+        pos_rbboxes_list,
+        neg_rbboxes_list,
+        pos_gt_rbboxes_list,
+        pos_gt_labels_list,
+        cfg=cfg,
+        reg_classes=reg_classes,
+        target_means=target_means,
+        target_stds=target_stds)
+
+    if concat:
+        labels = jt.contrib.concat(labels, 0)
+        label_weights = jt.contrib.concat(label_weights, 0)
+        bbox_targets = jt.contrib.concat(bbox_targets, 0)
+        bbox_weights = jt.contrib.concat(bbox_weights, 0)
+    return labels, label_weights, bbox_targets, bbox_weights
+
+def rbbox_target_rbbox_single(pos_rbboxes,
+                       neg_rbboxes,
+                       pos_gt_rbboxes,
+                       pos_gt_labels,
+                       cfg,
+                       reg_classes=1,
+                       target_means=[.0, .0, .0, .0, .0],
+                       target_stds=[1.0, 1.0, 1.0, 1.0, 1.0]):
+    assert pos_rbboxes.size(1) == 5
+    num_pos = pos_rbboxes.size(0)
+    num_neg = neg_rbboxes.size(0)
+    num_samples = num_pos + num_neg
+    labels = jt.zeros(num_samples, dtype=jt.int)        #origin: torch.long
+    label_weights = jt.zeros(num_samples)
+    bbox_targets = jt.zeros((num_samples, 5))
+    bbox_weights = jt.zeros((num_samples, 5))
+
+    if num_pos > 0:
+        labels[:num_pos] = pos_gt_labels
+        pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
+        label_weights[:num_pos] = pos_weight
+        pos_bbox_targets = best_match_dbbox2delta(pos_rbboxes, pos_gt_rbboxes, target_means, target_stds)
         bbox_targets[:num_pos, :] = pos_bbox_targets
         bbox_weights[:num_pos, :] = 1
     if num_neg > 0:
@@ -199,6 +257,68 @@ class BBoxHeadRbbox(nn.Module):
             with_module=self.with_module,
             hbb_trans=self.hbb_trans)
         return cls_reg_targets
+
+    def get_target_rbbox(self, sampling_results, gt_bboxes, gt_labels,
+                   rcnn_train_cfg):
+        pos_proposals = [res.pos_bboxes for res in sampling_results]
+        neg_proposals = [res.neg_bboxes for res in sampling_results]
+        pos_gt_bboxes = [res.pos_gt_bboxes for res in sampling_results]
+        pos_gt_labels = [res.pos_gt_labels for res in sampling_results]
+        reg_classes = 1 if self.reg_class_agnostic else self.num_classes
+        cls_reg_targets = rbbox_target_rbbox(
+            pos_proposals,
+            neg_proposals,
+            pos_gt_bboxes,
+            pos_gt_labels,
+            rcnn_train_cfg,
+            reg_classes,
+            target_means=self.target_means,
+            target_stds=self.target_stds)
+        return cls_reg_targets
+
+    def get_det_bboxes(self,
+                       rois,
+                       cls_score,
+                       bbox_pred,
+                       img_shape,
+                       scale_factor,
+                       rescale=False,
+                       cfg=None):
+        if isinstance(cls_score, list):
+            cls_score = sum(cls_score) / float(len(cls_score))
+        scores = nn.softmax(cls_score, dim=1) if cls_score is not None else None
+
+        if rois.size(1) == 5:
+            obbs = hbb2obb_v2(rois[:, 1:])
+        elif rois.size(1) == 6:
+            obbs = rois[:, 1:]
+        else:
+            print('strange size')
+            import pdb
+            pdb.set_trace()
+        hook.record('obbs', obbs)
+        hook.record('bbox_pred', bbox_pred)
+        hook.record('scores', scores)
+        if bbox_pred is not None:
+            dbboxes = delta2dbbox_v3(obbs, bbox_pred, self.target_means,
+                                    self.target_stds, img_shape)
+        else:
+            dbboxes = obbs
+
+        if rescale:
+            dbboxes[:, 0::5] /= scale_factor
+            dbboxes[:, 1::5] /= scale_factor
+            dbboxes[:, 2::5] /= scale_factor
+            dbboxes[:, 3::5] /= scale_factor
+        hook.record('dbboxes', dbboxes)
+        hook.record('scores', scores)
+        det_bboxes, det_labels = multiclass_nms_rotated(dbboxes, scores,
+                                                cfg.score_thr, cfg.nms,
+                                                cfg.max_per_img)
+        det_bboxes = jt.contrib.concat([rotated_box_to_poly(det_bboxes), det_bboxes[:,-1:]], -1)
+        hook.record('det_bboxes', det_bboxes)
+        hook.record('det_labels', det_labels)
+        return det_bboxes, det_labels
 
     def loss(self,
              cls_score,

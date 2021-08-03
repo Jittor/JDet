@@ -50,7 +50,7 @@ model = dict(
     train_cfg = dict(
         rpn=dict(
             assigner=dict(
-                type='MaxIoUAssignerCy',
+                type='MaxIoUAssigner',
                 pos_iou_thr=0.7,
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
@@ -74,11 +74,12 @@ model = dict(
             min_bbox_size=0),
         rcnn=dict(
             assigner=dict(
-                type='MaxIoUAssignerCy',
+                type='MaxIoUAssigner',
                 pos_iou_thr=0.5,
                 neg_iou_thr=0.5,
                 min_pos_iou=0.5,
-                ignore_iof_thr=-1),
+                ignore_iof_thr=-1,
+                iou_calculator=dict(type='BboxOverlaps2D_v1')),
             sampler=dict(
                 type='RandomSampler',
                 num=512,
@@ -101,15 +102,11 @@ model = dict(
     # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
     )
-)
+);
 # dataset settings
 dataset_type = 'DOTARCNNDataset'
 data_root = '/mnt/disk/zwy/dota1_1024/'
-img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 dataset = dict(
-    imgs_per_gpu=2,
-    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
@@ -122,7 +119,7 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True),
+                to_bgr=False),
         ],
         shuffle=True,
         batch_size=2,
@@ -139,7 +136,7 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True),
+                to_bgr=False),
         ],
         ),
     test=dict(
@@ -154,8 +151,9 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True),
+                to_bgr=False),
         ],
+        test_mode=True
     )
 )
 # optimizer
@@ -174,7 +172,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 # yapf:disable
 logger = dict(
