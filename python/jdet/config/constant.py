@@ -80,3 +80,12 @@ FAIR_CLASSES = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919',
         'other-vehicle', 'Basketball Court', 'Tennis Court', 'Football Field', 
         'Baseball Field', 'Intersection', 'Roundabout', 'Bridge'
     ]
+
+FAIR_CLASSES_ = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919', 
+        'A220', 'A321', 'A330', 'A350', 'ARJ21', 'other-airplane', 'Passenger_Ship', 
+        'Motorboat', 'Fishing_Boat', 'Tugboat', 'Engineering_Ship', 'Liquid_Cargo_Ship', 
+        'Dry_Cargo_Ship', 'Warship', 'other-ship', 'Small_Car', 'Bus', 'Cargo_Truck', 
+        'Dump_Truck', 'Van', 'Trailer', 'Tractor', 'Excavator', 'Truck_Tractor', 
+        'other-vehicle', 'Basketball_Court', 'Tennis_Court', 'Football_Field', 
+        'Baseball_Field', 'Intersection', 'Roundabout', 'Bridge'
+    ]

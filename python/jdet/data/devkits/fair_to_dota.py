@@ -1,7 +1,8 @@
-import pickle
 import os
 import cv2
 from xml.dom.minidom import parse
+from tqdm import tqdm
+import sys
 
 def solve_xml(src, tar):
     domTree = parse(src)
@@ -35,27 +36,31 @@ def solve_xml(src, tar):
 def fair_to_dota(in_path, out_path):
     os.makedirs(out_path, exist_ok=True)
     os.makedirs(os.path.join(out_path, "images"), exist_ok=True)
-    os.makedirs(os.path.join(out_path, "labelTxt"), exist_ok=True)
 
+    tasks = []
     for root, dirs, files in os.walk(os.path.join(in_path, "images")):
         for f in files:
             src=os.path.join(root, f)
-            print("src",src)
             tar="P"+f[:-4].zfill(4)+".png"
             tar=os.path.join(out_path,"images", tar)
-            print("tar",tar)
+            tasks.append((src, tar))
+    print("processing images")
+    for task in tqdm(tasks):
+        file = cv2.imread(task[0], 1)
+        cv2.imwrite(task[1], file)
 
-            file = cv2.imread(src, 1)
-            cv2.imwrite(tar, file)
-
-    for root, dirs, files in os.walk(os.path.join(in_path, "labelXmls")):
-        for f in files:
-            src=os.path.join(root, f)
-            print("src",src)
-            tar="P"+f[:-4].zfill(4)+".txt"
-            tar=os.path.join(out_path,"labelTxt", tar)
-            print("tar",tar)
-            solve_xml(src, tar)
+    if (os.path.exists(os.path.join(in_path, "labelXmls"))):
+        os.makedirs(os.path.join(out_path, "labelTxt"), exist_ok=True)
+        tasks = []
+        for root, dirs, files in os.walk(os.path.join(in_path, "labelXmls")):
+            for f in files:
+                src=os.path.join(root, f)
+                tar="P"+f[:-4].zfill(4)+".txt"
+                tar=os.path.join(out_path,"labelTxt", tar)
+                tasks.append((src, tar))
+        print("processing labels")
+        for task in tqdm(tasks):
+            solve_xml(task[0], task[1])
 
 if __name__ == '__main__':
     src = sys.argv[1]

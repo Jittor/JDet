@@ -37,20 +37,14 @@ def main():
         init_cfg(args.config_file)
     
     cfg = get_cfg()
-    if (cfg.test_mode):
-        jt.set_global_seed(666)
-        jdet.utils.general.set_random_seed(666)
 
     runner = Runner()
 
     if args.task == "train":
-        # runner.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
         runner.run()
     elif args.task == "val":
         runner.val()
     elif args.task == "test":
-        # runner.model.load("weights/RetinaNet_DOTA_2x_20200915_DOTA_702000model.pk_jt.pk")
-        runner.load("exp/retinanet_15/checkpoints/ckpt_29.pkl")
         runner.test()
 
 if __name__ == "__main__":
