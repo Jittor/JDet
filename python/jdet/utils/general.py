@@ -22,7 +22,7 @@ def sync(data,reduce_mode="mean",to_numpy=True):
                 data = data.mpi_all_reduce(reduce_mode)
             if to_numpy:
                 data = data.numpy()
-        elif not isinstance(data,(int,float,str)):
+        elif not isinstance(data,(int,float,str,np.ndarray)):
             raise ValueError(f"{type(data)} is not supported")
         return data
     

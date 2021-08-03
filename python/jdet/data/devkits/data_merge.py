@@ -7,6 +7,7 @@ from jdet.data.devkits.result_merge import mergebypoly
 import os
 import shutil
 from tqdm import tqdm
+import numpy as np
 from jdet.data.devkits.dota_to_fair import dota_to_fair
 
 def prepare(result_pkl,save_path, classes):
@@ -51,8 +52,29 @@ def prepare_gliding(result_pkl,save_path, classes):
         f_out.writelines(lines)
         f_out.close()
 
+def prepare_fasterrcnn(result_pkl,save_path, classes):
+    check_dir(save_path)
+    results = jt.load(result_pkl)
+    data = {}
+    for result,target in tqdm(results):
+        img_name = os.path.splitext(os.path.split(target['img_meta'][0]["img_file"])[-1])[0]
+        for idx, res in enumerate(result):
+            for i in range(res.shape[0]):
+                bbox = res[i]
+                classname = classes[idx]
+                temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
+                            img_name, bbox[-1], bbox[0], bbox[1], bbox[2], bbox[3], bbox[4],
+                            bbox[5], bbox[6], bbox[7])
+                if classname not in data:
+                    data[classname] = []
+                data[classname].append(temp_txt)
+    for classname,lines in data.items():
+        f_out = open(os.path.join(save_path, classname + '.txt'), 'w')
+        f_out.writelines(lines)
+        f_out.close()
+
 def data_merge(result_pkl, save_path, final_path,dataset_type):
-    if (dataset_type == 'DOTADataset'):
+    if (dataset_type == 'DOTADataset' or dataset_type == 'DOTARCNNDataset'):
         classes = DOTA1_CLASSES
     elif (dataset_type == 'FAIRDataset'):
         classes = FAIR_CLASSES_
@@ -60,6 +82,8 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
         assert(False)
     if "gliding" in result_pkl:
         prepare_gliding(result_pkl,save_path, classes)
+    elif "faster_rcnn" in result_pkl:
+        prepare_fasterrcnn(result_pkl,save_path, classes)
     else:
         prepare(result_pkl,save_path, classes)
     check_dir(final_path)

@@ -20,11 +20,13 @@ from .transforms import Compose
 class DOTARCNNDataset(Dataset):
     CLASSES = DOTA1_CLASSES
 
-    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=True,drop_last=False,filter_empty_gt=True,use_anno_cats=False):
+    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,use_anno_cats=False,test_mode=False,keep_flip=True):
         super().__init__()
         print('init DOTARCNNDataset')
         self.root = root 
         self.coco = COCO(anno_file)
+        self.keep_flip = keep_flip
+        self.test_mode = test_mode
         
         if isinstance(transforms,list):
             transforms = Compose(transforms)
@@ -46,45 +48,29 @@ class DOTARCNNDataset(Dataset):
             info['filename'] = info['file_name']
             self.img_infos.append(info)
 
-        if filter_empty_gt:
-            self.img_ids = self._filter_imgs()
+        if not self.test_mode:
+            if filter_empty_gt:
+                valid_inds = self._filter_imgs()
+                self.img_infos = [self.img_infos[i] for i in valid_inds]
+                self.img_ids = [self.img_ids[i] for i in valid_inds]
 
         self.total_len = len(self.img_ids)
+
+        if not self.test_mode:
+            self._set_group_flag()
+        
         self.set_attrs(batch_size = batch_size, total_len = self.total_len, shuffle = shuffle, drop_last = drop_last, keep_numpy_array=1)
 
-    def _filter_imgs(self):
-        """Filter images without ground truths."""
-        # reference mmdetection
-        # obtain images that contain annotation
+    def _filter_imgs(self, min_size=32):
+        """Filter images too small or without ground truths."""
+        valid_inds = []
         ids_with_ann = set(_['image_id'] for _ in self.coco.anns.values())
-        # obtain images that contain annotations of the required categories
-        ids_in_cat = set()
-        for i, class_id in enumerate(self.cat_ids):
-            ids_in_cat |= set(self.coco.catToImgs[class_id])
-        # merge the image id sets of the two conditions and use the merged set
-        ids_in_cat &= ids_with_ann
-
-        tmp_img_ids = [img_id for img_id in self.img_ids if img_id in ids_in_cat]
-
-        img_ids = []
-        for img_id in tmp_img_ids:
-            ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
-            anno = self.coco.loadAnns(ann_ids)
-
-            # remove ignored or crowd box
-            anno = [obj for obj in anno if ("is_crowd" not in obj or obj["iscrowd"] == 0) and ("ignore" not in obj or obj["ignore"] == 0) ]
-            # if it's empty, there is no annotation
-            if len(anno) == 0:
+        for i, img_info in enumerate(self.img_infos):
+            if self.img_ids[i] not in ids_with_ann:
                 continue
-            # if all boxes have close to zero area, there is no annotation
-            if all(any(o <= 1 for o in obj["bbox"][2:]) for obj in anno):
-                continue
-            img_ids.append(img_id)
-
-        # sort indices for reproducible results
-        img_ids = sorted(img_ids)
-
-        return img_ids
+            if min(img_info['width'], img_info['height']) >= min_size:
+                valid_inds.append(i)
+        return valid_inds
 
     def _read_ann_info(self, img_id, with_mask=True):
         img_info = self.coco.loadImgs(img_id)[0]
@@ -125,6 +111,9 @@ class DOTARCNNDataset(Dataset):
                 gt_mask_polys.append(mask_polys)
                 gt_poly_lens.extend(poly_lens)
 
+        if len(gt_bboxes) == 0:
+            return None
+
         if gt_bboxes:
             gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
             gt_labels = np.array(gt_labels, dtype=np.int32)
@@ -132,12 +121,12 @@ class DOTARCNNDataset(Dataset):
             gt_bboxes = np.zeros((0, 4), dtype=np.float32)
             gt_labels = np.array([], dtype=np.int32)
 
-        
-
         if gt_bboxes_ignore:
             gt_bboxes_ignore = np.array(gt_bboxes_ignore, dtype=np.float32)
         else:
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
+        
+        flip = True if np.random.rand() < 0.5 else False
         
         ori_shape = (img_info['height'], img_info['width'], 3)
         img_meta = dict(
@@ -145,14 +134,13 @@ class DOTARCNNDataset(Dataset):
             img_shape=(width,height,3),
             pad_shape=(width,height,3),
             scale_factor=1.0,
-            flip=False)
+            flip=flip,
+            img_file=img_info["file_name"])
 
         if self.transforms is not None:
             image, img_meta = self.transforms(image, img_meta)
 
-        flip = True if np.random.rand() < 0.5 else False
-
-        if flip:
+        if self.keep_flip and flip:
             image = np.flip(image, -1)
             gt_bboxes_ = gt_bboxes.copy()
             gt_bboxes_[:,0] = 1023 - gt_bboxes[:,2]
@@ -173,29 +161,87 @@ class DOTARCNNDataset(Dataset):
         # print(asarray(image))
         # print(gt_bboxes, gt_labels)
         return data
+
+    def _set_group_flag(self):
+        """Set flag according to image aspect ratio.
+
+        Images with aspect ratio greater than 1 will be set as group 1,
+        otherwise group 0.
+        """
+        self.flag = np.zeros(self.total_len, dtype=np.uint8)
+        for i in range(self.total_len):
+            img_info = self.img_infos[i]
+            if img_info['width'] / img_info['height'] > 1:
+                self.flag[i] = 1
     
+    def _rand_another(self, idx):
+        pool = np.where(self.flag == self.flag[idx])[0]
+        return np.random.choice(pool)
+
     def __getitem__(self, idx):
+        if self.test_mode:
+            return self.prepare_test_img(idx)
+        while True:
+            data = self.prepare_train_img(idx)
+            if data is None:
+                idx = self._rand_another(idx)
+                continue
+            return data
+
+    def prepare_train_img(self, idx):
         img_id = self.img_ids[idx]
         return self._read_ann_info(img_id)
+
+    def prepare_test_img(self, idx):
+        img_id = self.img_ids[idx]
+        img_info = self.coco.loadImgs(img_id)[0]
+        img_path = os.path.join(self.root, img_info["file_name"])
+        image = Image.open(img_path).convert("RGB")
+
+        ori_shape = (img_info['height'], img_info['width'], 3)
+
+        img_meta = dict(
+            ori_shape=ori_shape,
+            img_shape=ori_shape,
+            pad_shape=ori_shape,
+            scale_factor=1.0,
+            flip=False,
+            img_file=img_info["file_name"])
+
+        if self.transforms is not None:
+            image, img_meta = self.transforms(image, img_meta)
+
+        data = dict(
+            img=image,
+            img_meta=img_meta
+        )
+        return data
 
     def collate_batch(self, batch):
         img = []
         img_meta = []
-        gt_bboxes = []
-        gt_labels = []
-        gt_bboxes_ignore = []
-        gt_masks = []
+        if not self.test_mode:
+            gt_bboxes = []
+            gt_labels = []
+            gt_bboxes_ignore = []
+            gt_masks = []
         for data in batch:
             img.append(data['img'])
             img_meta.append(data['img_meta'])
-            gt_bboxes.append(jt.array(data['gt_bboxes']))
-            gt_labels.append(jt.array(data['gt_labels']))
-            gt_bboxes_ignore.append(jt.array(data['gt_bboxes_ignore']))
-            gt_masks.append(np.stack(data['gt_masks'], axis=0))
+            if not self.test_mode:
+                gt_bboxes.append(jt.array(data['gt_bboxes']))
+                gt_labels.append(jt.array(data['gt_labels']))
+                gt_bboxes_ignore.append(jt.array(data['gt_bboxes_ignore']))
+                gt_masks.append(np.stack(data['gt_masks'], axis=0))
         img = jt.array(np.stack(img, axis=0))
-        targets = dict(
-            img_meta=img_meta, gt_bboxes=gt_bboxes, gt_labels=gt_labels, gt_bboxes_ignore=gt_bboxes_ignore, gt_masks=gt_masks
-        )
+        if not self.test_mode:
+            targets = dict(
+                img_meta=img_meta, gt_bboxes=gt_bboxes, gt_labels=gt_labels, gt_bboxes_ignore=gt_bboxes_ignore, gt_masks=gt_masks
+            )
+        else:
+            targets = [dict(
+                img_meta=img_meta
+            )]
         return img, targets
     
     def save_results(self,results,save_file):

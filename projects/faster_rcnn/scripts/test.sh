@@ -1,1 +1,1 @@
-python3 run_net.py --config-file=configs/faster_rcnn_coco128.yaml --use_cuda --task=test
+python3 run_net.py --config-file=configs/faster_rcnn_obb_r50_fpn_1x_dota_test.yaml --use_cuda --task=test
