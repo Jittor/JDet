@@ -108,7 +108,7 @@ python run_net.py --config-file=configs/base.py --task=test
 :clock3: R3Det
 :clock3: Cascade R-CNN
 :clock3: R3Det
-:heavy_plus_sign: ROI Transformer
+:clock3: ROI Transformer
 :heavy_plus_sign: CSL
 :heavy_plus_sign: DCL
 :heavy_plus_sign: GWD
