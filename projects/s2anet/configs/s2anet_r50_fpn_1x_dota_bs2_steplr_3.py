@@ -162,7 +162,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 
 logger = dict(
@@ -174,4 +174,3 @@ eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
 work_dir = "/mnt/disk/lxl/JDet/work_dirs/s2anet_r50_fpn_1x_dota_bs2_steplr_3"
-# resume_path = "/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth"

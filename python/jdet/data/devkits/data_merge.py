@@ -88,7 +88,7 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
     os.system(f"zip -rj -q {zip_path} {os.path.join(final_path,'*')}")
 
 if __name__ == "__main__":
-    work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_norotate_ms"
+    work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r101_fpn_1x_dota_bs2_tobgr_steplr_rotate_balance_ms"
     epoch = 12
     result_pkl = f"{work_dir}/test/test_{epoch}.pkl"
     save_path = f"{work_dir}/test/submit_{epoch}/before_nms"

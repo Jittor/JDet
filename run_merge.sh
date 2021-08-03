@@ -1,1 +1,0 @@
-python3.7 python/jdet/data/devkits/dota_merge.py
