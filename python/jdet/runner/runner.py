@@ -76,7 +76,7 @@ class Runner:
         self.logger.print_log("Start running")
         while not self.finish:
             self.train()
-            if check_interval(self.epoch,self.eval_interval) and False: #TODO val evaluation is not implemented
+            if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 self.model.eval()
                 self.val()

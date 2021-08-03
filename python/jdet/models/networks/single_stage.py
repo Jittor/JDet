@@ -25,9 +25,6 @@ class SingleStageDetector(nn.Module):
 
     def execute(self, images, targets):
 
-        # import torch
-        # images = jt.array(torch.load(
-        #     'test_img', map_location=torch.device('cpu')).numpy())
         feat = self.backbone(images)
         if self.neck:
             feat = self.neck(feat)

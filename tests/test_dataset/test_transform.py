@@ -1,4 +1,3 @@
-import torch 
 from PIL import Image,ImageDraw
 # import jittor as jt 
 import numpy as np

@@ -534,7 +534,7 @@ class S2ANetHead(nn.Module):
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
             proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list,
-                                               refine_anchors[0][0], img_shape,
+                                               refine_anchors[0][img_id], img_shape,
                                                scale_factor, cfg, rescale)
 
             result_list.append(proposals)
