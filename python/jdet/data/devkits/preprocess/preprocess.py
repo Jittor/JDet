@@ -29,6 +29,8 @@ def run(cfg):
         vertical_flip=False if cfg_.vertical_flip is None else cfg_.vertical_flip
         rotation_angles=[0.] if cfg_.rotation_angles is None else cfg_.rotation_angles
         assert(rotation_angles == [0.]) #TODO support multi angles
+        assert(horizontal_flip == False) #TODO support horizontal_flip
+        assert(vertical_flip == False) #TODO support vertical_flip
 
         assert(label in ['trainval', 'train', 'val', 'test'])
         in_path = os.path.join(cfg.source_dataset_path, label)
@@ -65,7 +67,6 @@ def main():
         action='store_true'
     )
     args = parser.parse_args()
-    #TODO fair to_dota
     if args.config_file:
         init_cfg(args.config_file)
     cfg = get_cfg()
