@@ -98,11 +98,26 @@ python run_net.py --config-file=configs/base.py --task=test
 5. 1x : 12 epochs
 6. bc: balance category
 
-### Incoming Models
-| Model | Paper | Status|
-| :---: | :---: | :---: |
-| YOLO | - | Doing|
-| R3Det| - | Doing|
+### Plan
+<b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
+
+:heavy_check_mark: SSD
+:heavy_check_mark: Faster R-CNN
+:heavy_check_mark: RetinaNet
+:heavy_check_mark: Gliding
+:heavy_check_mark: S2ANet
+:clock3: ReDet
+:clock3: YOLOv5
+:clock3: R3Det
+:clock3: Cascade R-CNN
+:clock3: R3Det
+:clock3: ROI Transformer
+:heavy_plus_sign: CSL
+:heavy_plus_sign: DCL
+:heavy_plus_sign: GWD
+:heavy_plus_sign: KLD
+:heavy_plus_sign: ...
+
 
 ## Contact Us
 

@@ -9,13 +9,11 @@ def pick_res(path):
         for f in files:
             src=os.path.join(root, f)
             cls=f[:-4].replace("_"," ")
-            print(src)
             with open(src, "r") as ff:
                 tot_data = ff.read().split("\n")
                 for data in tot_data:
                     if len(data)<5:
                         continue
-                    print(data)
                     data = data[:-1].split(" ")
                     box=[]
                     for i in range(2, len(data)):
@@ -23,8 +21,6 @@ def pick_res(path):
                     if not data[0] in res:
                         res[data[0]]=[]
                     res[data[0]].append({"cls":cls, "p":float(data[1]), "box":box})
-            break
-    print(res)
     return res
 
 def dota_to_fair(src_path, tar_path):

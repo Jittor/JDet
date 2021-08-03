@@ -7,16 +7,10 @@ from PIL import Image
 
 from jdet.models.boxes.box_ops import poly_to_rotated_box_single
 from tqdm import tqdm
-
-wordname_15 = ['plane', 'baseball-diamond', 'bridge', 'ground-track-field',
-               'small-vehicle', 'large-vehicle', 'ship', 'tennis-court',
-               'basketball-court', 'storage-tank', 'soccer-ball-field', 'roundabout',
-               'harbor', 'swimming-pool', 'helicopter']
-
-label_ids = {name: i + 1 for i, name in enumerate(wordname_15)}
+from jdet.config.constant import DOTA1_CLASSES, FAIR_CLASSES_
 
 
-def parse_ann_info(label_base_path, img_name):
+def parse_ann_info(label_base_path, img_name, label_ids):
     lab_path = osp.join(label_base_path, img_name + '.txt')
     bboxes, labels, bboxes_ignore, labels_ignore = [], [], [], []
     with open(lab_path, 'r') as f:
@@ -37,13 +31,19 @@ def parse_ann_info(label_base_path, img_name):
     return bboxes, labels, bboxes_ignore, labels_ignore
 
 
-def convert_dota_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=True, ext='.png'):
+def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=True, ext='.png', type=''):
     """Generate .pkl format annotation that is consistent with mmdet.
     Args:
         src_path: dataset path containing images and labelTxt folders.
         out_path: output pkl file path
         trainval: trainval or test
     """
+    if (type == 'DOTA'):
+        label_ids = {name: i + 1 for i, name in enumerate(DOTA1_CLASSES)}
+    elif(type == 'FAIR'):
+        label_ids = {name: i + 1 for i, name in enumerate(FAIR_CLASSES_)}
+    else:
+        assert(False) #unsupported
     img_path = os.path.join(src_path, 'images')
     label_path = os.path.join(src_path, 'labelTxt')
     img_lists = os.listdir(img_path)
@@ -65,7 +65,7 @@ def convert_dota_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
             # filter images without gt to speed up training
             if filter_empty_gt & (osp.getsize(label) == 0):
                 continue
-            bboxes, labels, bboxes_ignore, labels_ignore = parse_ann_info(label_path, img_name)
+            bboxes, labels, bboxes_ignore, labels_ignore = parse_ann_info(label_path, img_name, label_ids)
             ann = {}
             ann['bboxes'] = np.array(bboxes, dtype=np.float32)
             ann['labels'] = np.array(labels, dtype=np.int64)
