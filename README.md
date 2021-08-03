@@ -103,11 +103,11 @@ python run_net.py --config-file=configs/base.py --task=test
 ### Plan
 <b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
 
-- :heavy_check_mark: SSD
-- :heavy_check_mark: Faster R-CNN
-- :heavy_check_mark: RetinaNet
-- :heavy_check_mark: Gliding
 - :heavy_check_mark: S2ANet
+- :heavy_check_mark: Gliding
+- :heavy_check_mark: RetinaNet
+- :heavy_check_mark: Faster R-CNN
+- :clock3: SSD
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det
@@ -119,7 +119,6 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_plus_sign: GWD
 - :heavy_plus_sign: KLD
 - :heavy_plus_sign: ...
-
 
 
 ## Contact Us
