@@ -2,6 +2,7 @@ import os
 import cv2
 from xml.dom.minidom import parse
 from tqdm import tqdm
+import sys
 
 def solve_xml(src, tar):
     domTree = parse(src)
@@ -60,3 +61,8 @@ def fair_to_dota(in_path, out_path):
         print("processing labels")
         for task in tqdm(tasks):
             solve_xml(task[0], task[1])
+
+if __name__ == '__main__':
+    src = sys.argv[1]
+    tar = sys.argv[2]
+    fair_to_dota(src, tar)
