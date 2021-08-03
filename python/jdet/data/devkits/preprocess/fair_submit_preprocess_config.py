@@ -1,0 +1,19 @@
+type='FAIR'
+source_fair_dataset_path='/dataset/fair/'
+convert_tasks=['test']
+source_dataset_path='/dataset/fair_DOTA'
+target_dataset_path='/dataset/processed'
+
+tasks=[
+    dict(
+        label='test',
+        config=dict(
+            subimage_size=600,
+            overlap_size=150,
+            multi_scale=[1.],
+            horizontal_flip=False,
+            vertical_flip=False,
+            rotation_angles=[0.] 
+        )
+    )
+]

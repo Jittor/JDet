@@ -52,7 +52,10 @@ class Runner:
         self.epoch = 0
 
         if self.max_epoch:
-            self.total_iter = self.max_epoch * len(self.train_dataset)
+            if (self.train_dataset):
+                self.total_iter = self.max_epoch * len(self.train_dataset)
+            else:
+                self.total_iter = 0
         else:
             self.total_iter = self.max_iter
 
@@ -186,7 +189,11 @@ class Runner:
                 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
-            data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,self.cfg.dataset.train.type)
+            if (self.cfg.dataset.dataset_type):
+                dataset_type=self.cfg.dataset.dataset_type
+            else:
+                dataset_type=self.cfg.dataset.train.type
+            data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type)
 
     @jt.single_process_scope()
     def save(self):
