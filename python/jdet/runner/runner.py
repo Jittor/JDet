@@ -153,7 +153,7 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
                 result = self.model(images,targets)
-                results.extend(sync(result))
+                results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
 
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
