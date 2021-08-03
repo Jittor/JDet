@@ -197,7 +197,7 @@ def mergesingle(dstpath, nms, fullname):
         nms_threshold_type = 0
     name = util.custombasename(fullname)
     dstname = os.path.join(dstpath, name + '.txt')
-    print(dstname)
+    # print(dstname)
     name_ = dstname.split("/")[-1][:-4]
     with open(fullname, 'r') as f_in:
         nameboxdict = {}

@@ -173,7 +173,7 @@ class RetinaHead(nn.Module):
     # output xywha(pi) [-pi,0)
     def cvt2_w_greater_than_h(self, boxes, reverse_hw=True):
         boxes = boxes.copy()
-        if (reverse_hw): #TODO: yangxue?
+        if (reverse_hw): #TODO: yxe?
             x, y, w, h, a = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3], boxes[:, 4]
             boxes = jt.stack([x, y, h, w, a], dim=1)
 
@@ -201,7 +201,7 @@ class RetinaHead(nn.Module):
             else:
                 proposals = boxes_x0y0x1y1_to_xywh(proposals_[i])
                 proposals = self.cvt2_w_greater_than_h(proposals)
-                proposals[:, 4] += 0.5 * np.pi#TODO: yangxue?
+                proposals[:, 4] += 0.5 * np.pi#TODO: yxe?
                 cls_bbox = loc2bbox_r(proposals,bbox_pred_[i])
 
             probs = score_[i].sigmoid()
@@ -331,7 +331,7 @@ class RetinaHead(nn.Module):
                     # gt_bbox = get_var('gt_boxes_r')#TODO delete
                     # gt_bbox[:, 4] *= np.pi / 180#TODO delete
                     gt_label = target["labels"]
-                    gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yangxue?
+                    gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yxe?
 
                     gt_roi_loc,gt_roi_label= self.assign_labels(anchor,gt_bbox,gt_label)
                     all_gt_roi_locs[i].append(gt_roi_loc)

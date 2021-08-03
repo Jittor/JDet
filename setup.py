@@ -13,6 +13,8 @@ setup(
     packages=["jdet"],
     package_dir={'': os.path.join(path, 'python')},
     install_requires=[
+        "shapely",
+        "pyyaml",
         "numpy",
         "tqdm",
         "pillow",

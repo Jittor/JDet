@@ -23,7 +23,7 @@ eggs/
 dist
 develop-eggs/
 build/
-
+submit_zips
 *.pth
 *.jpg
 .idea

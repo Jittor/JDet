@@ -21,9 +21,11 @@ class DeltaXYWHBBoxCoder:
 
     def __init__(self,
                  target_means=(0., 0., 0., 0.),
-                 target_stds=(1., 1., 1., 1.)):
+                 target_stds=(1., 1., 1., 1.),
+                 weights=None):
         self.means = target_means
         self.stds = target_stds
+        self.weights = None
 
     def encode(self, bboxes, gt_bboxes):
         """Get box regression transformation deltas that can be used to
@@ -40,7 +42,7 @@ class DeltaXYWHBBoxCoder:
         assert bboxes.size(0) == gt_bboxes.size(0)
         assert bboxes.size(-1) == gt_bboxes.size(-1) == 4
         encoded_bboxes = bbox2delta(bboxes, gt_bboxes, self.means,
-                                    self.stds)
+                                    self.stds,weights=self.weights)
         return encoded_bboxes
 
     def decode(self,
@@ -63,7 +65,7 @@ class DeltaXYWHBBoxCoder:
         """
         assert pred_bboxes.size(0) == bboxes.size(0)
         decoded_bboxes = delta2bbox(bboxes, pred_bboxes, self.means,
-                                    self.stds, max_shape, wh_ratio_clip)
+                                    self.stds, max_shape, wh_ratio_clip,weights=self.weights)
 
         return decoded_bboxes
 

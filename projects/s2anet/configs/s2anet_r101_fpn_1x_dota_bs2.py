@@ -174,5 +174,4 @@ eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
 work_dir = "/mnt/disk/lxl/JDet/work_dirs/s2anet_r101_fpn_1x_dota_without_torch_pretrained"
-# pretrained_weights = "/home/lxl/workspace/s2anet/init_weight.pth"
 

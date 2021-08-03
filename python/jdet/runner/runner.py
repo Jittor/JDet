@@ -12,7 +12,7 @@ from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,
 from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
-from jdet.data.devkits.dota_merge import dota_merge, dota_merge_result
+from jdet.data.devkits.data_merge import data_merge_result
 import os
 import shutil
 
@@ -57,7 +57,7 @@ class Runner:
             self.total_iter = self.max_iter
 
         if (cfg.pretrained_weights):
-            self.model.load(cfg.pretrained_weights)
+            self.load(cfg.pretrained_weights, model_only=True)
         
         if self.resume_path is None:
             self.resume_path = search_ckpt(self.work_dir)
@@ -90,10 +90,6 @@ class Runner:
         start_time = time.time()
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
             losses = self.model(images,targets)
-            if (self.cfg.test_mode):
-                print(losses)
-                if (batch_idx > 10):
-                    exit(0)
             all_loss,losses = parse_losses(losses)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
             self.optimizer.step(all_loss)
@@ -153,7 +149,7 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
                 result = self.model(images,targets)
-                results.extend(sync(result))
+                results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
 
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
@@ -185,12 +181,12 @@ class Runner:
                 #         out = flip_result(result_[k], mode, targets[k])
                 #         result[k][0] = jt.concat([result[k][0], out], 0)
                 #         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
-
+                        
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
-            dota_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name)
+            data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,self.cfg.dataset.train.type)
 
     @jt.single_process_scope()
     def save(self):
@@ -212,18 +208,24 @@ class Runner:
         save_file = build_file(self.work_dir,prefix=f"checkpoints/ckpt_{self.epoch}.pkl")
         jt.save(save_data,save_file)
     
-    def load(self, load_path):
+    def load(self, load_path, model_only=False):
         resume_data = jt.load(load_path)
         
-        meta = resume_data.get("meta",dict())
-        self.epoch = meta.get("epoch",self.epoch)
-        self.iter = meta.get("iter",self.iter)
-        self.max_iter = meta.get("max_iter",self.max_iter)
-        self.max_epoch = meta.get("max_epoch",self.max_epoch)
+        if (not model_only):
+            meta = resume_data.get("meta",dict())
+            self.epoch = meta.get("epoch",self.epoch)
+            self.iter = meta.get("iter",self.iter)
+            self.max_iter = meta.get("max_iter",self.max_iter)
+            self.max_epoch = meta.get("max_epoch",self.max_epoch)
 
-        self.scheduler.load_parameters(resume_data.get("scheduler",dict()))
-        self.optimizer.load_parameters(resume_data.get("optimizer",dict()))
-        self.model.load_parameters(resume_data.get("model",dict()) if "model" in resume_data else resume_data.get("state_dict",dict()))
+            self.scheduler.load_parameters(resume_data.get("scheduler",dict()))
+            self.optimizer.load_parameters(resume_data.get("optimizer",dict()))
+        if ("model" in resume_data):
+            self.model.load_parameters(resume_data["model"])
+        elif ("state_dict" in resume_data):
+            self.model.load_parameters(resume_data["state_dict"])
+        else:
+            self.model.load_parameters(resume_data)
 
         self.logger.print_log(f"Loading model parameters from {load_path}")
 
