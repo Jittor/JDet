@@ -15,7 +15,7 @@ model = dict(
         add_extra_convs=False,
         num_outs=5),
     rpn_head=dict(
-        type='FasterrcnnHead',
+        type='RPNHead',
         in_channels=256,
         feat_channels=256,
         anchor_scales=[8],
@@ -24,7 +24,7 @@ model = dict(
         target_means=[.0, .0, .0, .0],
         target_stds=[1.0, 1.0, 1.0, 1.0],
         loss_cls=dict(
-            type='CrossEntropyLossForRcnn', use_sigmoid=True, loss_weight=1.0),
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
@@ -44,7 +44,7 @@ model = dict(
         with_module=False,
         hbb_trans='hbbpolyobb',
         loss_cls=dict(
-            type='CrossEntropyLossForRcnn', use_sigmoid=False, loss_weight=1.0),
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
 # model training and testing settings
     train_cfg = dict(
@@ -54,8 +54,7 @@ model = dict(
                 pos_iou_thr=0.7,
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
-                ignore_iof_thr=-1,
-                iou_calculator=dict(type='BboxOverlaps2D_v1')),
+                ignore_iof_thr=-1),
             sampler=dict(
                 type='RandomSampler',
                 num=256,
@@ -78,8 +77,7 @@ model = dict(
                 pos_iou_thr=0.5,
                 neg_iou_thr=0.5,
                 min_pos_iou=0.5,
-                ignore_iof_thr=-1,
-                iou_calculator=dict(type='BboxOverlaps2D_v1')),
+                ignore_iof_thr=-1),
             sampler=dict(
                 type='RandomSampler',
                 num=512,
@@ -102,11 +100,15 @@ model = dict(
     # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
     )
-);
+)
 # dataset settings
 dataset_type = 'DOTARCNNDataset'
 data_root = '/mnt/disk/zwy/dota1_1024/'
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 dataset = dict(
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
@@ -119,16 +121,23 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
+            # dict(type='RotatedRandomFlip', prob=0.5)
         ],
-        shuffle=True,
         batch_size=2,
+        # with_mask=True,s
+        #with_crowd=True,
+        #with_label=True
         ),
     val=dict(
         type=dataset_type,
         anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
         root=data_root + 'trainval1024/images/',
         transforms=[
+            # dict(
+            #     type="RotatedResize",
+            #     min_size=1024,
+            #     max_size=1024),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -136,8 +145,12 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
+            # dict(type='RotatedRandomFlip', prob=0)
         ],
+        # with_mask=True,
+        #with_crowd=True,
+        #with_label=True
         ),
     test=dict(
         type=dataset_type,
@@ -151,9 +164,12 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
+            # dict(type='RotatedRandomFlip', prob=0)
         ],
-        test_mode=True
+        # with_mask=False,
+        #with_label=False,
+        #test_mode=True
     )
 )
 # optimizer
@@ -172,7 +188,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[7, 10])
+    milestones=[8, 11])
 
 # yapf:disable
 logger = dict(
@@ -182,4 +198,5 @@ logger = dict(
 max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
-log_interval = 20
+log_interval = 1
+resume_path = 'work_dirs/faster_rcnn_obb_r50_fpn_1x_dota/checkpoints/ckpt_1.pkl'

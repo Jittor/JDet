@@ -96,7 +96,7 @@ class Runner:
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
-
+    
             batch_size = len(targets)*jt.mpi.world_size()
 
             if check_interval(self.iter,self.log_interval):
@@ -186,7 +186,7 @@ class Runner:
                 #         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
                         
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-                
+
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
             if (self.cfg.dataset.dataset_type):

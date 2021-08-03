@@ -214,6 +214,102 @@ def dbbox2delta_v2(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1])
 
     return deltas
 
+def choose_best_match_batch(Rrois, gt_rois):
+    Rroi_angles = Rrois[:, 4].unsqueeze(1)
+
+    gt_xs, gt_ys, gt_ws, gt_hs, gt_angles = gt_rois[:, 0].copy(), gt_rois[:, 1].copy(), gt_rois[:, 2].copy(), gt_rois[:, 3].copy(), gt_rois[:, 4].copy()
+
+    gt_angle_extent = jt.contrib.concat((gt_angles[:, np.newaxis], (gt_angles + np.pi/2.)[:, np.newaxis],
+                                      (gt_angles + np.pi)[:, np.newaxis], (gt_angles + np.pi * 3/2.)[:, np.newaxis]), 1)
+    dist = (Rroi_angles - gt_angle_extent) % (2 * np.pi)
+    dist = jt.min(dist, np.pi * 2 - dist)
+    min_index = jt.argmin(dist, 1)
+
+    gt_rois_extent0 = copy.deepcopy(gt_rois)
+    gt_rois_extent1 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
+                                 gt_hs.unsqueeze(1), gt_ws.unsqueeze(1), gt_angles.unsqueeze(1) + np.pi/2.), 1)
+    gt_rois_extent2 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
+                                 gt_ws.unsqueeze(1), gt_hs.unsqueeze(1), gt_angles.unsqueeze(1) + np.pi), 1)
+    gt_rois_extent3 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
+                                 gt_hs.unsqueeze(1), gt_ws.unsqueeze(1), gt_angles.unsqueeze(1) + np.pi * 3/2.), 1)
+    gt_rois_extent = jt.contrib.concat((gt_rois_extent0.unsqueeze(1),
+                                     gt_rois_extent1.unsqueeze(1),
+                                     gt_rois_extent2.unsqueeze(1),
+                                     gt_rois_extent3.unsqueeze(1)), 1)
+
+    gt_rois_new = jt.zeros_like(gt_rois)
+    for curiter, index in enumerate(min_index):
+        gt_rois_new[curiter, :] = gt_rois_extent[curiter, index, :]
+
+    gt_rois_new[:, 4] = gt_rois_new[:, 4] % (2 * np.pi)
+
+    return gt_rois_new
+
+def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
+    gt_boxes_new = choose_best_match_batch(Rrois, gt)
+    try:
+        assert np.all(Rrois.numpy()[:, 4] <= (np.pi + 0.001))
+    except:
+        import pdb
+        pdb.set_trace()
+    bbox_targets = dbbox2delta_v2(Rrois, gt_boxes_new, means, stds)
+
+    return bbox_targets
+
+def dbbox2result(dbboxes, labels, num_classes):
+    if dbboxes.shape[0] == 0:
+        return [
+            np.zeros((0, 9), dtype=np.float32) for i in range(num_classes - 1)
+        ]
+    else:
+        dbboxes = dbboxes.numpy()
+        labels = labels.numpy()
+        return [dbboxes[labels == i, :] for i in range(num_classes - 1)]
+
+def delta2dbbox_v3(Rrois,
+                deltas,
+                means=[0, 0, 0, 0, 0],
+                stds=[1, 1, 1, 1, 1],
+                max_shape=None,
+                wh_ratio_clip=16 / 1000):
+    means = jt.array(means, dtype=deltas.dtype).repeat(1, deltas.size(1) // 5)
+    stds = jt.array(stds, dtype=deltas.dtype).repeat(1, deltas.size(1) // 5)
+    denorm_deltas = deltas * stds + means
+
+    dx = denorm_deltas[:, 0::5]
+    dy = denorm_deltas[:, 1::5]
+    dw = denorm_deltas[:, 2::5]
+    dh = denorm_deltas[:, 3::5]
+    dangle = denorm_deltas[:, 4::5]
+
+    max_ratio = np.abs(np.log(wh_ratio_clip))
+    dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+    dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+    Rroi_x = (Rrois[:, 0]).unsqueeze(1).expand_as(dx)
+    Rroi_y = (Rrois[:, 1]).unsqueeze(1).expand_as(dy)
+    Rroi_w = (Rrois[:, 2]).unsqueeze(1).expand_as(dw)
+    Rroi_h = (Rrois[:, 3]).unsqueeze(1).expand_as(dh)
+    Rroi_angle = (Rrois[:, 4]).unsqueeze(1).expand_as(dangle)
+    # import pdb
+    # pdb.set_trace()
+    gx = dx * Rroi_w * jt.cos(Rroi_angle) \
+         - dy * Rroi_h * jt.sin(Rroi_angle) + Rroi_x
+    gy = dx * Rroi_w * jt.sin(Rroi_angle) \
+         + dy * Rroi_h * jt.cos(Rroi_angle) + Rroi_y
+    gw = Rroi_w * dw.exp()
+    gh = Rroi_h * dh.exp()
+
+    # TODO: check the hard code
+    # gangle = (2 * np.pi) * dangle + Rroi_angle
+    gangle = dangle + Rroi_angle
+    # gangle = gangle % ( 2 * np.pi)
+
+    if max_shape is not None:
+        pass
+
+    bboxes = jt.stack([gx, gy, gw, gh, gangle], dim=-1).view_as(deltas)
+    return bboxes
+
 def delta2bbox(rois,
                deltas,
                means=[0, 0, 0, 0],
