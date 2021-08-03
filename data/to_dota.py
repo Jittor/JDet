@@ -26,30 +26,38 @@ def solve_xml(src, tar):
         ss=""
         for f in box["bbox"]:
             ss+=str(f)+" "
-        ss+=box["name"]+" 0"
+        name=  box["name"]
+        name = name.replace(" ", "_")
+        ss+=name+" 0"
         print(ss,file=file)
     file.close()
 
-os.makedirs("fair_DOTA", exist_ok=True)
-os.makedirs("fair_DOTA/images", exist_ok=True)
-os.makedirs("fair_DOTA/labelTxt", exist_ok=True)
+def fair_to_dota(in_path, out_path):
+    os.makedirs(out_path, exist_ok=True)
+    os.makedirs(os.path.join(out_path, "images"), exist_ok=True)
+    os.makedirs(os.path.join(out_path, "labelTxt"), exist_ok=True)
 
-for root, dirs, files in os.walk("fair/images"):
-    for f in files:
-        src=os.path.join(root, f)
-        print("src",src)
-        tar="P"+f[:-4].zfill(4)+".png"
-        tar=os.path.join("fair_DOTA","images", tar)
-        print("tar",tar)
+    for root, dirs, files in os.walk(os.path.join(in_path, "images")):
+        for f in files:
+            src=os.path.join(root, f)
+            print("src",src)
+            tar="P"+f[:-4].zfill(4)+".png"
+            tar=os.path.join(out_path,"images", tar)
+            print("tar",tar)
 
-        file = cv2.imread(src, 1)
-        cv2.imwrite(tar, file)
+            file = cv2.imread(src, 1)
+            cv2.imwrite(tar, file)
 
-for root, dirs, files in os.walk("fair/labelXmls"):
-    for f in files:
-        src=os.path.join(root, f)
-        print("src",src)
-        tar="P"+f[:-4].zfill(4)+".txt"
-        tar=os.path.join("fair_DOTA","labelTxt", tar)
-        print("tar",tar)
-        solve_xml(src, tar)
+    for root, dirs, files in os.walk(os.path.join(in_path, "labelXmls")):
+        for f in files:
+            src=os.path.join(root, f)
+            print("src",src)
+            tar="P"+f[:-4].zfill(4)+".txt"
+            tar=os.path.join(out_path,"labelTxt", tar)
+            print("tar",tar)
+            solve_xml(src, tar)
+
+if __name__ == '__main__':
+    src = sys.argv[1]
+    tar = sys.argv[2]
+    fair_to_dota(src, tar)
