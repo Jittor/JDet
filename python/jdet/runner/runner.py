@@ -79,7 +79,7 @@ class Runner:
         self.logger.print_log("Start running")
         while not self.finish:
             self.train()
-            if check_interval(self.epoch,self.eval_interval) and False: #TODO val evaluation is not implemented
+            if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 self.model.eval()
                 self.val()
@@ -152,7 +152,7 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
                 result = self.model(images,targets)
-                results.extend(sync(result))
+                results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
 
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 

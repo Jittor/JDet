@@ -1,5 +1,6 @@
 
 import numpy as np
+from jdet.ops.nms_poly import iou_poly
 
 def parse_gt(filename):
     """
@@ -73,7 +74,6 @@ def voc_eval(detpath,
              annopath,
              imagesetfile,
              classname,
-             iou_func,
              # cachedir,
              ovthresh=0.5,
              use_07_metric=False):
@@ -193,7 +193,7 @@ def voc_eval(detpath,
             def calcoverlaps(BBGT_keep, bb):
                 overlaps = []
                 for index, GT in enumerate(BBGT_keep):
-                    overlap = iou_func(BBGT_keep[index], bb)
+                    overlap = iou_poly(BBGT_keep[index], bb)
                     overlaps.append(overlap)
                 return overlaps
 
@@ -233,10 +233,112 @@ def voc_eval(detpath,
     return rec, prec, ap
 
 
+def voc_eval_dota(dets,gts,iou_func,ovthresh=0.5,use_07_metric=False):
+    dets = np.array(dets.tolist())
+    npos = sum([sum(~gts[k]["difficult"]) for k in gts])
+    nd = len(dets)
+    if nd==0 or npos==0:
+        return 0.,0.,0.
+
+    confidence = dets[:,-1]
+    dets = dets[:,:-1]
+
+    # sort by confidence
+    sorted_ind = np.argsort(-confidence)
+    scores = confidence[sorted_ind]
+
+    ## note the usage only in numpy not for list
+    dets = dets[sorted_ind, :]
+    # go down dets and mark TPs and FPs
+    tp = np.zeros(nd)
+    fp = np.zeros(nd)
+    for d,det in enumerate(dets):
+        bb = det[1:].astype(float)
+        ovmax = -np.inf
+        R = gts[int(det[0])]
+        BBGT = R["box"].astype(float)
+
+        ## compute det bb with each BBGT
+        if BBGT.size > 0:
+            # compute overlaps
+            # intersection
+
+            # 1. calculate the overlaps between hbbs, if the iou between hbbs are 0, the iou between obbs are 0, too.
+            BBGT_xmin = np.min(BBGT[:, 0::2], axis=1)
+            BBGT_ymin = np.min(BBGT[:, 1::2], axis=1)
+            BBGT_xmax = np.max(BBGT[:, 0::2], axis=1)
+            BBGT_ymax = np.max(BBGT[:, 1::2], axis=1)
+            bb_xmin = np.min(bb[0::2])
+            bb_ymin = np.min(bb[1::2])
+            bb_xmax = np.max(bb[0::2])
+            bb_ymax = np.max(bb[1::2])
+
+            ixmin = np.maximum(BBGT_xmin, bb_xmin)
+            iymin = np.maximum(BBGT_ymin, bb_ymin)
+            ixmax = np.minimum(BBGT_xmax, bb_xmax)
+            iymax = np.minimum(BBGT_ymax, bb_ymax)
+            iw = np.maximum(ixmax - ixmin + 1., 0.)
+            ih = np.maximum(iymax - iymin + 1., 0.)
+            inters = iw * ih
+
+            # union
+            uni = ((bb_xmax - bb_xmin + 1.) * (bb_ymax - bb_ymin + 1.) +
+                   (BBGT_xmax - BBGT_xmin + 1.) *
+                   (BBGT_ymax - BBGT_ymin + 1.) - inters)
+
+            overlaps = inters / uni
+
+            BBGT_keep_mask = overlaps > 0
+            BBGT_keep = BBGT[BBGT_keep_mask, :]
+            BBGT_keep_index = np.where(overlaps > 0)[0]
+
+            def calcoverlaps(BBGT_keep, bb):
+                overlaps = []
+                for index, GT in enumerate(BBGT_keep):
+                    overlap = iou_func(BBGT_keep[index], bb)
+                    overlaps.append(overlap)
+                return overlaps
+
+            if len(BBGT_keep) > 0:
+                overlaps = calcoverlaps(BBGT_keep, bb)
+
+                ovmax = np.max(overlaps)
+                jmax = np.argmax(overlaps)
+                # pdb.set_trace()
+                jmax = BBGT_keep_index[jmax]
+
+        if ovmax > ovthresh:
+            if not R['difficult'][jmax]:
+                if not R['det'][jmax]:
+                    tp[d] = 1.
+                    R['det'][jmax] = 1
+                else:
+                    fp[d] = 1.
+        else:
+            fp[d] = 1.
+
+    # compute precision recall
+
+    # print('check fp:', fp)
+    # print('check tp', tp)
+
+    # print('npos num:', npos)
+    # print("n dets",nd)
+    fp = np.cumsum(fp)
+    tp = np.cumsum(tp)
+
+    rec = tp / float(npos)
+    # avoid divide by zero in case the first detection matches a difficult
+    # ground truth
+    prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+    ap = voc_ap(rec, prec, use_07_metric)
+
+    return rec, prec, ap
+
 def main():
-    detpath = r'/home/hjm/mmdetection/work_dirs/cascade_s2anet_r50_fpn_1x_dota/results_after_nms/{:s}.txt'
-    annopath = r'data/dota/test/labelTxt/{:s}.txt'  # change the directory to the path of val/labelTxt, if you want to do evaluation on the valset
-    imagesetfile = r'data/dota/test/test.txt'
+    detpath = r'test_/{:s}.txt'
+    annopath = r'/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/labelTxt/{:s}.txt'  # change the directory to the path of val/labelTxt, if you want to do evaluation on the valset
+    imagesetfile = r'/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/test.txt'
 
     # For DOTA-v1.5
     # classnames = ['plane', 'baseball-diamond', 'bridge', 'ground-track-field', 'small-vehicle', 'large-vehicle', 'ship', 'tennis-court',

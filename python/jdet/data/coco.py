@@ -184,7 +184,7 @@ class COCODataset(Dataset):
             return [x1,y1,x2-x1,y2-y1]
         
         json_results = []
-        for result in results:
+        for result,target in results:
             img_id = result["img_id"]
             for box,score,label in zip(result["boxes"],result["scores"],result["labels"]):
                 data = dict()
