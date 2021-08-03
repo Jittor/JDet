@@ -70,3 +70,5 @@ class DOTADataset(CustomDataset):
     def evaluate(self,results,work_dir,epoch,logger=None):
         save_path = os.path.join(work_dir,f"detections/val_{epoch}")
         self.parse_result(results,save_path)
+        self.img_infos
+        

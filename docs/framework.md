@@ -23,9 +23,17 @@ There are:
 
 ## 3. data
 ### dataset
+In this module, we provide dataset for COCO format, yolo format,dota format and custom format(which is like mmdet).
 
+In transforms, we provide Flip,Rotate,Resize,etc,for horizontal and oriented boxes, more transformation operators are coming soon.
+
+**Notice**
+1. In Transform & Dataset, ```rboxes``` is for rotated box, ```hboxes & bboxes``` is for horizontal boxes, ```polys``` is for polygons.
+2. In dataset, ```filter_empty_gt=True``` means that we will remove the image without targets, otherwise, when we meet image without targets, we will randomly choose another image.
+3. In dataset, ```balance_category=True``` means that we will balance the number of images for that the number of each category targets is close, by repeating some images. 
 ### devkits
-
+In this module, we provide the code of preprocess,evaluation and merge devkits. 
+Details are shown in [dota.md](dota.md)
 
 ## 4. models
 
@@ -37,6 +45,6 @@ There are:
 ## 6. runner
 
 ## 7. utils
-
+In ```general.py```, we 
 
 
