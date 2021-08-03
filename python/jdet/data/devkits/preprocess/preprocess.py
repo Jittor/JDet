@@ -3,13 +3,19 @@ import argparse
 import os
 from jdet.config import init_cfg, get_cfg
 from jdet.data.devkits.ImgSplit_multi_process import process
-from jdet.data.devkits.convert_dota_to_mmdet import convert_dota_to_mmdet
+from jdet.data.devkits.convert_data_to_mmdet import convert_data_to_mmdet
+from jdet.data.devkits.fair_to_dota import fair_to_dota
 
 def clear(cfg):
     os.system(f"rm -rf {os.path.join(cfg.source_dataset_path, 'trainval')}")
     os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
 
 def run(cfg):
+    if (cfg.type=='FAIR'):
+        for task in cfg.convert_tasks:
+            print('==============')
+            print("convert to dota:", task)
+            fair_to_dota(os.path.join(cfg.source_fair_dataset_path, task), os.path.join(cfg.source_dataset_path, task))
     for task in cfg.tasks:
         label = task.label
         cfg_ = task.config
@@ -41,7 +47,8 @@ def run(cfg):
         target_path = process(in_path, out_path, subsize=subimage_size, gap=overlap_size, rates=multi_scale)
         if (label != "test"):
             print("converting to mmdet format...")
-            convert_dota_to_mmdet(target_path, os.path.join(target_path, 'labels.pkl'))
+            print(cfg.type)
+            convert_data_to_mmdet(target_path, os.path.join(target_path, 'labels.pkl'), type=cfg.type)
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor DOTA data preprocess")
@@ -58,7 +65,7 @@ def main():
         action='store_true'
     )
     args = parser.parse_args()
-
+    #TODO fair to_dota
     if args.config_file:
         init_cfg(args.config_file)
     cfg = get_cfg()
