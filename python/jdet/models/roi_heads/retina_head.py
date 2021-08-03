@@ -253,7 +253,7 @@ class RetinaHead(nn.Module):
                     keep = jt.nms(dets,self.nms_thresh) #TODO check
                 else:
                     keep = jdet.ops.nms_rotated.nms_rotated(bbox_j,score_j,self.nms_thresh)
-                bbox_j = bbox_j[keep] #x0,y0,x1,y1,a(pi)
+                bbox_j = bbox_j[keep] #cx,cy,w,h,a(pi)
                 score_j = score_j[keep]
                 label_j = jt.ones_like(score_j).int32()*j
                 boxes.append(bbox_j)
