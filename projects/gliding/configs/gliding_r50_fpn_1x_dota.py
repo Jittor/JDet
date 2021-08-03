@@ -113,23 +113,29 @@ dataset = dict(
         shuffle=True,
         filter_empty_gt=False
     ),
-    # val=dict(
-    #     type="DOTADataset",
-    #     anno_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-    #     image_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-    #     transforms=[
-    #         dict(
-    #             type = "Pad",
-    #             size_divisor=32),
-    #         dict(
-    #             type = "Normalize",
-    #             mean =  [123.675, 116.28, 103.53],
-    #             std = [58.395, 57.12, 57.375]),
-    #     ],
-    #     batch_size=2,
-    #     num_workers=4,
-    #     shuffle=False
-    # ),
+    val=dict(
+        type="DOTADataset",
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        transforms=[
+            dict(
+                type="RotatedResize",
+                min_size=1024,
+                max_size=1024
+            ),
+            dict(
+                type = "Pad",
+                size_divisor=32),
+            dict(
+                type = "Normalize",
+                mean =  [123.675, 116.28, 103.53],
+                std = [58.395, 57.12, 57.375],
+                to_bgr=False),
+        ],
+        batch_size=2,
+        num_workers=4,
+        shuffle=False
+    ),
     test=dict(
         type="ImageDataset",
         images_file='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
