@@ -1,6 +1,6 @@
 type='DOTA'
-source_dataset_path='/mnt/disk/lxl/dataset/DOTA/'
-target_dataset_path='/mnt/disk/lxl/dataset/DOTA_test/'
+source_dataset_path='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA/'
+target_dataset_path='/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/'
 
 # available labels: train, val, test, trainval
 tasks=[
@@ -9,7 +9,7 @@ tasks=[
         config=dict(
             subimage_size=600,
             overlap_size=150,
-            multi_scale=[1., 1.5],
+            multi_scale=[1.],
             horizontal_flip=False,
             vertical_flip=False,
             rotation_angles=[0.] 
