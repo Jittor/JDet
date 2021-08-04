@@ -132,8 +132,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024_05_10/test_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",

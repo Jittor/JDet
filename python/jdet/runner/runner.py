@@ -79,7 +79,7 @@ class Runner:
         self.logger.print_log("Start running")
         while not self.finish:
             self.train()
-            if check_interval(self.epoch,self.eval_interval):
+            if check_interval(self.epoch,self.eval_interval) and False:
                 # TODO: need remove this
                 self.model.eval()
                 self.val()

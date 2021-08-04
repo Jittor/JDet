@@ -152,10 +152,15 @@ class MaxIoUAssigner:
 
         if gt_labels is not None:
             assigned_labels = jt.zeros((num_bboxes,),dtype=assigned_gt_inds.dtype)
-            pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(1)
-            if pos_inds.numel() > 0:
-                assigned_labels[pos_inds] = gt_labels[
-                    assigned_gt_inds[pos_inds] - 1]
+            assigned_labels = jt.ternary(
+                assigned_gt_inds > 0, 
+                gt_labels[assigned_gt_inds-1],
+                assigned_labels)
+            # pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(1)
+            # breakpoint()
+            # if pos_inds.numel() > 0:
+            #     assigned_labels[pos_inds] = gt_labels[
+            #         assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
 
