@@ -74,4 +74,4 @@ def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
             img_info['ann'] = ann
         data_dict.append(img_info)
     print("left images:", len(data_dict))
-    pickle.dump(data_dict, out_path)
+    pickle.dump(data_dict, open(out_path, "wb"))
