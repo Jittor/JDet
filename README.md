@@ -31,9 +31,7 @@ If you have any installation problems for Jittor, please refer to [Jittor](https
  
 ```shell
 cd JDet
-python setup.py install # for user
-# or
-python setup.py develop # for developer
+python setup.py install
 ```
 If you don't have permission for install,please add ```--user```.
 
