@@ -132,7 +132,6 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_file='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         transforms=[
             dict(
