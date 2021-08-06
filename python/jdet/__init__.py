@@ -6,5 +6,6 @@ from . import ops
 from . import utils
 from . import optims
 
-__version__ = "0.0.1"
+# version must use ' instead of "
+__version__ = '0.1.0.0'
 

@@ -98,9 +98,8 @@ class Runner:
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
     
-            batch_size = len(targets)*jt.mpi.world_size()
-
             if check_interval(self.iter,self.log_interval):
+                batch_size = len(targets)*jt.world_size
                 ptime = time.time()-start_time
                 fps = batch_size*(batch_idx+1)/ptime
                 eta_time = (self.total_iter-self.iter)*ptime/(batch_idx+1)

@@ -102,7 +102,7 @@ model = dict(
     # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
     )
-);
+)
 # dataset settings
 dataset_type = 'DOTARCNNDataset'
 data_root = '/mnt/disk/zwy/dota1_1024/'
