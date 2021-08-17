@@ -19,7 +19,7 @@ model = dict(
         relu_before_extra_convs= True),
     rpn_net = dict(
         type= "RetinaHead",
-        n_class= 37,
+        n_class= 15,
         in_channels= 256,
         stacked_convs= 4,
         mode= "R",
@@ -41,8 +41,9 @@ model = dict(
 )
 dataset = dict(
     val=dict(
-        type="FAIRDataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/processed/trainval_600_150_1.0',
+        type="DOTADataset",
+        version='1_5',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA1_5/trainval_600_150_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -60,8 +61,9 @@ dataset = dict(
         shuffle=False
     ),
     train=dict(
-        type="FAIRDataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/processed/trainval_600_150_1.0',
+        type="DOTADataset",
+        version='1_5',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA1_5/trainval_600_150_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -85,8 +87,8 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      dataset_type="FAIR",
-      images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/FAIR/processed/test_600_150_1.0/images/",
+      dataset_type="DOTA1_5",
+      images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA1_5/test_600_150_1.0/images/",
       transforms= [
         dict(
           type= "RotatedResize",
@@ -124,7 +126,7 @@ eval_interval = 1
 log_interval = 50
 checkpoint_interval = 1
 pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"
-merge_nms_threshold_type = 0
+merge_nms_threshold_type = 1
 
 parameter_groups_generator = dict(
     type = "YangXuePrameterGroupsGenerator",
