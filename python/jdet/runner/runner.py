@@ -189,10 +189,7 @@ class Runner:
 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
-            if (self.cfg.dataset.dataset_type):
-                dataset_type=self.cfg.dataset.dataset_type
-            else:
-                dataset_type=self.cfg.dataset.train.type
+            dataset_type = self.test_dataset.dataset_type
             data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type)
 
     @jt.single_process_scope()

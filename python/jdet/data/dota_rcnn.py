@@ -16,6 +16,7 @@ from jdet.utils.registry import DATASETS
 from jdet.config.constant import DOTA1_CLASSES
 from .transforms import Compose
 
+#TODO: migrate to DOTADataset
 @DATASETS.register_module()
 class DOTARCNNDataset(Dataset):
     CLASSES = DOTA1_CLASSES
