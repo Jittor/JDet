@@ -4,4 +4,5 @@ from .s2anet import S2ANet
 from .gliding_vertex import GlidingVertex
 from .single_stage import SingleStageDetector
 from .faster_rcnn_obb import FasterRCNNOBB
+from .roi_transformer import RoITransformer
 __all__ = []
