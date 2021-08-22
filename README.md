@@ -166,5 +166,6 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
 7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
 8. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
 9. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
+10. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
 
 
