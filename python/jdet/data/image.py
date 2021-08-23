@@ -17,6 +17,7 @@ class ImageDataset(Dataset):
     """
     def __init__(self,images_file=None,
                       images_dir="",
+                      dataset_type="DOTA",
                       transforms=[
                           dict(
                               type="Resize",
@@ -39,6 +40,7 @@ class ImageDataset(Dataset):
         super(ImageDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle)
         self.images_file = self._load_images(images_file,images_dir=images_dir)
         self.total_len = len(self.images_file)
+        self.dataset_type = dataset_type
 
         if isinstance(transforms,list):
             transforms = Compose(transforms)

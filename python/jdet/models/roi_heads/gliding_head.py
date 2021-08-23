@@ -419,7 +419,7 @@ def visual_gts(targets,save_dir="./"):
     for t in targets:
         bbox = t["hboxes"].numpy()
         labels = t["labels"].numpy()
-        classes = DOTA1_CLASSES
+        classes = DOTA1_CLASSES #TODO:support DOTA1.5
         ori_img_size = t["ori_img_size"]
         img_size = t["img_size"]
         bbox[:,0::2] *= float(ori_img_size[0]/img_size[0])

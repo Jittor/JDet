@@ -1,6 +1,6 @@
 import shutil
 import jittor as jt 
-from jdet.config.constant import DOTA1_CLASSES, FAIR_CLASSES_
+from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, FAIR_CLASSES_
 from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.devkits.result_merge import mergebypoly
@@ -74,9 +74,11 @@ def prepare_fasterrcnn(result_pkl,save_path, classes):
         f_out.close()
 
 def data_merge(result_pkl, save_path, final_path,dataset_type):
-    if (dataset_type == 'DOTADataset' or dataset_type == 'DOTARCNNDataset'):
+    if (dataset_type == 'DOTA'):
         classes = DOTA1_CLASSES
-    elif (dataset_type == 'FAIRDataset'):
+    elif (dataset_type == 'DOTA1_5'):
+        classes = DOTA1_5_CLASSES
+    elif (dataset_type == 'FAIR'):
         classes = FAIR_CLASSES_
     else:
         assert(False)
@@ -90,6 +92,7 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
+    assert dataset_type in ["FAIR", "DOTA", "DOTA1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, and DOTA1_5 are supported"
     print("Merge results...")
     save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")
     final_path = os.path.join(work_dir, f"test/submit_{epoch}/after_nms")
@@ -100,16 +103,20 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
     if not os.path.exists("submit_zips"):
         os.makedirs("submit_zips")
     data_merge(result_pkl, save_path, final_path,dataset_type)
-    if (dataset_type == 'FAIRDataset'):
+    if (dataset_type == 'FAIR'):
         print("converting to fair...")
-        final_fair_path = os.path.join(work_dir, f"test/submit_{epoch}/final_fair")
+        final_fair_path = os.path.join(work_dir, f"test/submit_{epoch}/final_fair/test")
         dota_to_fair(final_path, final_fair_path)
         final_path = final_fair_path
     print("zip..")
     zip_path = os.path.join("submit_zips", name + ".zip")
     if (os.path.exists(zip_path)):
         os.remove(zip_path)
-    os.system(f"zip -rj -q {zip_path} {os.path.join(final_path,'*')}")
+    if (dataset_type == 'FAIR'):
+        os.system(f"cd {os.path.join(final_path, '..')} && zip -r -q {name+'.zip'} 'test'")
+        os.system(f"mv {os.path.join(final_path, '..', name+'.zip')} {zip_path}")
+    else:
+        os.system(f"zip -rj -q {zip_path} {os.path.join(final_path,'*')}")
 
 if __name__ == "__main__":
     work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r101_fpn_1x_dota_bs2_tobgr_steplr_rotate_balance_ms"

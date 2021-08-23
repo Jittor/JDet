@@ -1,8 +1,6 @@
-type='FAIR'
-source_fair_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/fair'
-source_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/fair_DOTA'
-target_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/processed'
-convert_tasks=['train','val','test']
+type='DOTA1_5'
+source_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/DOTA1_5/'
+target_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA1_5/'
 
 # available labels: train, val, test, trainval
 tasks=[
