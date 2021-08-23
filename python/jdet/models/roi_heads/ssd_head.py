@@ -2,11 +2,11 @@ from re import M
 import jittor as jt
 from jittor import nn, init
 from jdet.utils.general import multi_apply
-from jdet.utils.registry import build_from_cfg, HEADS, BOXES, MODELS
+from jdet.utils.registry import build_from_cfg, HEADS, BOXES
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
 from jdet.models.boxes.anchor_target import anchor_target
 from jdet.ops.nms import multiclass_nms
-
+from jdet.models.utils.weight_init import xavier_init
 
 @HEADS.register_module()
 class SSDHead(nn.Module):
@@ -53,37 +53,40 @@ class SSDHead(nn.Module):
         self.anchor_generator = build_from_cfg(anchor_generator, BOXES)
         n_anchor = self.anchor_generator.num_base_anchors
 
-        reg_convs = []
-        cls_convs = []
+        self.cls_convs = nn.ModuleList()
+        self.reg_convs = nn.ModuleList()
+
         for i in range(len(in_channels)):
-            reg_convs.append(
+            cls_layers = []
+            reg_layers = []
+            reg_layers.append(
                 nn.Conv2d(
                     in_channels[i],
                     n_anchor[i] * 4,
                     kernel_size=3,
                     padding=1))
-            cls_convs.append(
+            cls_layers.append(
                 nn.Conv2d(
                     in_channels[i],
                     n_anchor[i] * (num_classes + 1),
                     kernel_size=3,
                     padding=1))
-        self.reg_convs = nn.ModuleList(reg_convs)
-        self.cls_convs = nn.ModuleList(cls_convs)
+            self.cls_convs.append(nn.Sequential(*cls_layers))
+            self.reg_convs.append(nn.Sequential(*reg_layers))
 
         self.bbox_coder = build_from_cfg(bbox_coder_cfg, BOXES)
         self.train_cfg = train_cfg
-        self.train_cfg.update({'bbox_coder':bbox_coder_cfg})
         self.test_cfg = test_cfg
+        self.train_cfg.update({'bbox_coder':bbox_coder_cfg})
+        self.target_means = bbox_coder_cfg.get('target_means')
+        self.target_stds = bbox_coder_cfg.get('target_stds')
         self.reg_decoded_bbox = reg_decoded_bbox
+        self.init_weights()
 
     def init_weights(self):
-        for i in self.reg_convs:
-            init.gauss_(i.weight, 0, 0.001)
-            init.constant_(i.bias, 0)
-        for i in self.cls_convs:
-            init.gauss_(i.weight, 0, 0.001)
-            init.constant_(i.bias, 0)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                xavier_init(m, distribution='uniform',bias=0)
 
     def get_bboxes(
             self,
@@ -138,7 +141,8 @@ class SSDHead(nn.Module):
                 if use_sigmoid_cls:
                     max_scores = scores.max(-1)
                 else:
-                    max_scores = scores[..., :-1].max(-1)
+                    #TODO
+                    max_scores = scores[..., 1:].max(-1)
                 _, topk_inds = jt.topk(max_scores, int(nms_pre))
                 batch_inds = jt.arange(batch_size).view(
                     -1, 1).expand_as(topk_inds)
@@ -270,7 +274,6 @@ class SSDHead(nn.Module):
             bbox_weights,
             beta=self.train_cfg['smoothl1_beta'],
             avg_factor=num_total_samples)
-        # print(loss_cls[None], loss_bbox)
         return loss_cls[None], loss_bbox
 
     def loss(self, cls_scores, bbox_preds, targets):
@@ -288,8 +291,8 @@ class SSDHead(nn.Module):
             valid_flag_list,
             gt_bboxes,
             img_metas,
-            target_means=None,
-            target_stds=None,
+            target_means=self.target_means,
+            target_stds=self.target_stds,
             cfg=self.train_cfg,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
