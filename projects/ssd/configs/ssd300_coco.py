@@ -152,6 +152,3 @@ max_epoch = 60
 eval_interval = 3
 checkpoint_interval = 3
 log_interval = 50
-# resume_path = "work_dirs/ssd300/checkpoints/ckpt_30.pkl"
-# pretrained_weights = "/home/gmh/project/yizhang/8_15/JDet/ssd300_coco_20210803_015428-d231a06e.pth"
-pretrained_weights = "/home/gmh/project/yizhang/8_15/JDet_bg_0/ssd_init.pth"
