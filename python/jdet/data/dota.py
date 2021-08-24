@@ -53,7 +53,8 @@ class DOTADataset(CustomDataset):
             "roundabout":(1,711),
             "tennis-court":(1,655),
             "basketball-court":(4,0),
-            "helicopter":(8,0)
+            "helicopter":(8,0),
+            "container-crane":(50,0)
         }
 
         for k,d in cate_dict.items():
@@ -104,13 +105,16 @@ class DOTADataset(CustomDataset):
                 det = np.concatenate([idx1,det_polys,det_scores.reshape(-1,1),det_labels.reshape(-1,1)],axis=1)
                 dets.append(det)
             
+            scale_factor = target["scale_factor"]
             gt_polys = target["polys"]
+            gt_polys /= scale_factor
+
             if gt_polys.size>0:
                 gt_labels = target["labels"].reshape(-1,1)
                 idx2 = np.ones((gt_labels.shape[0],1))*img_idx
                 gt = np.concatenate([idx2,gt_polys,gt_labels],axis=1)
                 gts.append(gt)
-            diffcult_polys[img_idx] = target["polys_ignore"]
+            diffcult_polys[img_idx] = target["polys_ignore"]/scale_factor
         dets = np.concatenate(dets)
         gts = np.concatenate(gts)
         aps = {}
