@@ -3,8 +3,15 @@ import os, sys
 import cv2
 from xml.dom.minidom import parse
 
-def pick_res(path):
+def pick_res(path, images_dir):
     res={}
+    imgs = []
+    for root, dirs, files in os.walk(images_dir):
+        for f in files:
+            if not f.endswith(".png"):
+                continue
+            name = f.split("__")[0]
+            res[name]=[]
     for root, dirs, files in os.walk(path):
         for f in files:
             src=os.path.join(root, f)
@@ -19,13 +26,14 @@ def pick_res(path):
                     for i in range(2, len(data)):
                         box.append(float(data[i]))
                     if not data[0] in res:
+                        assert(False)
                         res[data[0]]=[]
                     res[data[0]].append({"cls":cls, "p":float(data[1]), "box":box})
     return res
 
-def dota_to_fair(src_path, tar_path):
-    data=pick_res(src_path)
-    head="""<xml version="1.0" encoding="utf-8">
+def dota_to_fair(src_path, tar_path, images_dir):
+    data=pick_res(src_path, images_dir)
+    head="""<?xml version="1.0" encoding="utf-8"?>
     <annotation>
         <source>
         <filename>placeholder_filename</filename>
@@ -40,13 +48,18 @@ def dota_to_fair(src_path, tar_path):
             <pluginclass>placeholder_suject</pluginclass>
             <time>2020-07-2020-11</time>
         </research>
+        <size>
+            <width>placeholder_width</width>
+            <height>placeholder_height</height>
+            <depth>placeholder_depth</depth>
+        </size>
         <!--存放目标检测信息-->
         <objects>
     """
     obj_str="""        <object>
                 <coordinate>pixel</coordinate>
                 <type>rectangle</type>
-                <description>None/description>
+                <description>None</description>
                 <possibleresult>
                     <name>palceholder_cls</name>                
                     <probability>palceholder_prob</probability>
@@ -68,6 +81,9 @@ def dota_to_fair(src_path, tar_path):
     os.makedirs(tar_path, exist_ok=True)
     for i in data:
         out_xml=head.replace("placeholder_filename",str(int(i[1:]))+".tif")
+        out_xml=out_xml.replace("placeholder_width",str(1000))
+        out_xml=out_xml.replace("placeholder_height",str(1000))
+        out_xml=out_xml.replace("placeholder_depth",str(3))
         for obj in data[i]:
             obj_xml=obj_str.replace("palceholder_cls", obj["cls"])
             obj_xml=obj_xml.replace("palceholder_prob", str(obj["p"]))

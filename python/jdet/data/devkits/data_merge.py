@@ -91,7 +91,7 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
     check_dir(final_path)
     mergebypoly(save_path,final_path)
 
-def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
+def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
     assert dataset_type in ["FAIR", "DOTA", "DOTA1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, and DOTA1_5 are supported"
     print("Merge results...")
     save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")
@@ -106,7 +106,7 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
     if (dataset_type == 'FAIR'):
         print("converting to fair...")
         final_fair_path = os.path.join(work_dir, f"test/submit_{epoch}/final_fair/test")
-        dota_to_fair(final_path, final_fair_path)
+        dota_to_fair(final_path, final_fair_path, images_dir)
         final_path = final_fair_path
     print("zip..")
     zip_path = os.path.join("submit_zips", name + ".zip")
