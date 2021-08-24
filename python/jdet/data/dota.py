@@ -132,9 +132,9 @@ class DOTADataset(CustomDataset):
                 g = np.concatenate([g,dg])
                 classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
             rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly)
-            aps[classname]=ap 
+            aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
         map = sum(list(aps.values()))/len(aps)
-        aps["map"]=map
+        aps["eval/0_meanAP"]=map
         return aps
             
             
