@@ -188,8 +188,12 @@ class Runner:
 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
-            dataset_type = self.test_dataset.dataset_type
-            data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
+            if (self.test_dataset.type == "ImageDataset"):
+                dataset_type = self.test_dataset.dataset_type
+                data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
+            else:
+                if (self.test_dataset.type == "DOTARCNNDataset"):
+                    print(f"TODO: dataset type DOTARCNNDataset not supported auto data merge.")
 
     @jt.single_process_scope()
     def save(self):
