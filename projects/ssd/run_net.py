@@ -3,8 +3,6 @@ import os
 import jittor as jt
 from jdet.runner import Runner 
 from jdet.config import init_cfg, get_cfg
-import models
-import jdet
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor Object Detection Training")
