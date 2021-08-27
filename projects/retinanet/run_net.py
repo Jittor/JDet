@@ -32,7 +32,7 @@ def main():
     if not args.no_cuda:
         jt.flags.use_cuda=1
 
-    assert args.task in ["train","val","test"],f"{args.task} not support, please choose [train,val,test]"
+    assert args.task in ["train","val","test","time"],f"{args.task} not support, please choose [train,val,test]"
     
     if args.config_file:
         init_cfg(args.config_file)
@@ -47,6 +47,8 @@ def main():
         runner.val()
     elif args.task == "test":
         runner.test()
+    elif args.task == 'time':
+        runner.test_time()
 
 if __name__ == "__main__":
     main()
