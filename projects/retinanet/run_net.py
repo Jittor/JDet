@@ -1,6 +1,7 @@
+import jittor as jt
+jt.set_global_seed(233 + jt.rank * 2591) # TODO:random seed
 import argparse
 import os
-import jittor as jt
 from jdet.runner import Runner 
 from jdet.config import init_cfg, get_cfg
 import models

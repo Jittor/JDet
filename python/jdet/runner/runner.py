@@ -80,7 +80,6 @@ class Runner:
         self.logger.print_log("Start running")
         while not self.finish:
             self.train()
-            # TODO open evaluation
             if False and check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 self.model.eval()
@@ -215,11 +214,12 @@ class Runner:
 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))
-            if (self.cfg.dataset.dataset_type):
-                dataset_type=self.cfg.dataset.dataset_type
+            if (self.cfg.dataset.test.type == "ImageDataset"):
+                dataset_type = self.test_dataset.dataset_type
+                data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
             else:
-                dataset_type=self.cfg.dataset.train.type
-            data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type)
+                if (self.cfg.dataset.test.type == "DOTARCNNDataset"):
+                    print(f"TODO: dataset type DOTARCNNDataset not supported auto data merge.")
 
     @jt.single_process_scope()
     def save(self):

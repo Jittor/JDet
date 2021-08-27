@@ -3,7 +3,7 @@ from jdet.data.devkits.voc_eval import voc_eval_dota
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np, rotated_box_to_poly_single
 from jdet.utils.general import check_dir
 from jdet.utils.registry import DATASETS
-from jdet.config.constant import DOTA1_CLASSES
+from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES
 from jdet.data.custom import CustomDataset
 from jdet.ops.nms_poly import iou_poly
 import os
@@ -21,9 +21,14 @@ def s2anet_post(result):
 
 @DATASETS.register_module()
 class DOTADataset(CustomDataset):
-    CLASSES = DOTA1_CLASSES
 
-    def __init__(self,*arg,balance_category=False,**kwargs):
+    def __init__(self,*arg,balance_category=False,version='1',**kwargs):
+        assert version in ['1', '1_5']
+        if (version == '1'):
+            self.CLASSES = DOTA1_CLASSES
+        elif (version == '1_5'):
+            self.CLASSES = DOTA1_5_CLASSES
+
         super().__init__(*arg,**kwargs)
         if balance_category:
             self.img_infos = self._balance_categories()
@@ -48,7 +53,8 @@ class DOTADataset(CustomDataset):
             "roundabout":(1,711),
             "tennis-court":(1,655),
             "basketball-court":(4,0),
-            "helicopter":(8,0)
+            "helicopter":(8,0),
+            "container-crane":(50,0)
         }
 
         for k,d in cate_dict.items():
@@ -99,13 +105,16 @@ class DOTADataset(CustomDataset):
                 det = np.concatenate([idx1,det_polys,det_scores.reshape(-1,1),det_labels.reshape(-1,1)],axis=1)
                 dets.append(det)
             
+            scale_factor = target["scale_factor"]
             gt_polys = target["polys"]
+            gt_polys /= scale_factor
+
             if gt_polys.size>0:
                 gt_labels = target["labels"].reshape(-1,1)
                 idx2 = np.ones((gt_labels.shape[0],1))*img_idx
                 gt = np.concatenate([idx2,gt_polys,gt_labels],axis=1)
                 gts.append(gt)
-            diffcult_polys[img_idx] = target["polys_ignore"]
+            diffcult_polys[img_idx] = target["polys_ignore"]/scale_factor
         dets = np.concatenate(dets)
         gts = np.concatenate(gts)
         aps = {}
@@ -123,9 +132,9 @@ class DOTADataset(CustomDataset):
                 g = np.concatenate([g,dg])
                 classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
             rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly)
-            aps[classname]=ap 
+            aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
         map = sum(list(aps.values()))/len(aps)
-        aps["map"]=map
+        aps["eval/0_meanAP"]=map
         return aps
             
             
