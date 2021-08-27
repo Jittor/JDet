@@ -1,6 +1,5 @@
 from genericpath import isfile
 import time
-from jdet.models.boxes.box_ops import flip_result
 import jittor as jt
 from tqdm import tqdm
 import numpy as np
@@ -15,6 +14,8 @@ from jdet.utils.general import build_file, current_time, sync,check_file,build_f
 from jdet.data.devkits.data_merge import data_merge_result
 import os
 import shutil
+from tqdm import tqdm
+import copy
 
 class Runner:
     def __init__(self):
@@ -87,6 +88,32 @@ class Runner:
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
         self.test()
+
+    def test_time(self):
+        warmup = 10
+        rerun = 100
+        self.model.train()
+        for batch_idx,(images,targets) in enumerate(self.train_dataset):
+            break
+        print("warmup...")
+        for i in tqdm(range(warmup)):
+            losses = self.model(images,targets)
+            all_loss,losses = parse_losses(losses)
+            self.optimizer.step(all_loss)
+            self.scheduler.step(self.iter,self.epoch,by_epoch=True)
+        jt.sync_all(True)
+        print("testing...")
+        start_time = time.time()
+        for i in tqdm(range(rerun)):
+            losses = self.model(images,targets)
+            all_loss,losses = parse_losses(losses)
+            self.optimizer.step(all_loss)
+            self.scheduler.step(self.iter,self.epoch,by_epoch=True)
+        jt.sync_all(True)
+        batch_size = len(targets)*jt.world_size
+        ptime = time.time()-start_time
+        fps = batch_size*rerun/ptime
+        print("FPS:", fps)
 
     def train(self):
         self.model.train()
@@ -169,23 +196,22 @@ class Runner:
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
                 result = self.model(images,targets)
-                # for mode in self.flip_test:
-                #     images_flip = images.copy()
-                #     if (mode == 'H'):
-                #         images_flip = images_flip[:, :, :, ::-1]
-                #     elif (mode == 'V'):
-                #         images_flip = images_flip[:, :, ::-1, :]
-                #     elif (mode == 'HV'):
-                #         images_flip = images_flip[:, :, ::-1, ::-1]
-                #     else:
-                #         assert(False)
-                #     result_ = self.model(images_flip,targets)
-                #     for k in range(len(targets)):
-                #         out = flip_result(result_[k], mode, targets[k])
-                #         result[k][0] = jt.concat([result[k][0], out], 0)
-                #         result[k][1] = jt.concat([result[k][1], result_[k][1]], 0)
-                        
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
+                for mode in self.flip_test:
+                    images_flip = images.copy()
+                    if (mode == 'H'):
+                        images_flip = images_flip[:, :, :, ::-1]
+                    elif (mode == 'V'):
+                        images_flip = images_flip[:, :, ::-1, :]
+                    elif (mode == 'HV'):
+                        images_flip = images_flip[:, :, ::-1, ::-1]
+                    else:
+                        assert(False)
+                    result = self.model(images_flip,targets)
+                    targets_ = copy.deepcopy(targets)
+                    for i in range(len(targets_)):
+                        targets_[i]["flip_mode"] = mode
+                    results.extend([(r,t) for r,t in zip(sync(result),sync(targets_))])
 
             save_file = build_file(self.work_dir,f"test/test_{self.epoch}.pkl")
             pickle.dump(results,open(save_file,"wb"))

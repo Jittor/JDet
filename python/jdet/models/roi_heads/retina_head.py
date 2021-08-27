@@ -133,18 +133,14 @@ class RetinaHead(nn.Module):
 
         return bbox_pred, cls_score
     
-    def assign_labels(self,roi, bbox, label):
+    def assign_labels(self,roi, bbox, bbox_h, label):
         #roi:x0y0x1y1a
         #bbox:xywha
         if (self.mode == 'H'):
             iou = bbox_iou(roi, bbox)
         else:
             if (self.anchor_mode == 'H'):
-                bbox__ = bbox.copy()
-                bbox__[:, 4] += np.pi / 2
-                bbox_ = rotated_box_to_bbox(bbox__) #TODO move to outside/dataloader
-                # bbox_ = get_var('gt_boxes_h')[:, :-1] #TODO delete
-                iou = bbox_iou(roi[:, :4], bbox_)
+                iou = bbox_iou(roi[:, :4], bbox_h)
             else:
                 iou = box_iou_rotated(roi, bbox) #TODO check
         gt_assignment,max_iou = iou.argmax(dim=1)
@@ -328,12 +324,10 @@ class RetinaHead(nn.Module):
             for i,target in enumerate(targets):
                 if self.is_training():
                     gt_bbox = target["rboxes"]#xywha
-                    # gt_bbox = get_var('gt_boxes_r')#TODO delete
-                    # gt_bbox[:, 4] *= np.pi / 180#TODO delete
+                    gt_bbox_h = target["rboxes_h"]#xywha
                     gt_label = target["labels"]
-                    gt_bbox = self.cvt2_w_greater_than_h(gt_bbox, False)#TODO: yxe?
 
-                    gt_roi_loc,gt_roi_label= self.assign_labels(anchor,gt_bbox,gt_label)
+                    gt_roi_loc,gt_roi_label= self.assign_labels(anchor,gt_bbox,gt_bbox_h,gt_label)
                     all_gt_roi_locs[i].append(gt_roi_loc)
                     all_gt_roi_labels[i].append(gt_roi_label)
 
