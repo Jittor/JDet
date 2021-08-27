@@ -1,6 +1,6 @@
 # JDet
 ## Introduction
-JDet is Object Detection Framework  based on [Jittor](https://github.com/Jittor/jittor). 
+JDet is a object detection benchmark based on [Jittor](https://github.com/Jittor/jittor). 
 
 <!-- **Features**
 - Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
