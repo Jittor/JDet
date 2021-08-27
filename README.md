@@ -21,7 +21,7 @@ JDet environment requirements:
 
 **Step 1: Install the requirements**
 ```shell
-git clone https://github.com/li-xl/JDet
+git clone https://github.com/Jittor/JDet
 cd JDet
 python -m pip install -r requirements.txt
 ```
