@@ -10,6 +10,33 @@ import argparse
 import os
 import pickle as pk
 
+import numpy as np
+
+def fake_argsort(x, dim=0,descending=False):
+    return jt.index(x)[0], x
+
+def fake_argsort2(x, dim=0,descending=False):
+    x_ = x.data
+    if (descending):
+        x__ = -x_
+    else:
+        x__ = x_
+    index_ = np.argsort(x__, axis=dim,kind="stable")
+    y_ = x_[index_]
+
+    index = jt.array(index_)
+    y = jt.array(y_)
+    return index, y
+
+def fake_sort2(x):
+    x_ = x.data
+    y_ = np.sort(x,kind="stable")
+    y = jt.array(y_)
+    return y
+
+jt.sort=fake_sort2
+jt.argsort = fake_argsort2
+
 def main():
     parser = argparse.ArgumentParser(description="Jittor Object Detection Training")
     parser.add_argument(
