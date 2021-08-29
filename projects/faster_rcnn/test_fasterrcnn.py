@@ -119,6 +119,7 @@ def main():
             print(f"correct loss is {float(c_l):.4f}, runtime loss is {float(l):.4f}, err rate is {err_rate*100:.2f}%")
             assert err_rate<thr,f"LOSS is not correct, please check it"
         print(f"Loss is correct with err_rate<{thr}")
+    print("success!")
     
 if __name__ == "__main__":
     main()
