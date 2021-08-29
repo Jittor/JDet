@@ -108,7 +108,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Gliding
 - :heavy_check_mark: RetinaNet
 - :heavy_check_mark: Faster R-CNN
-- :clock3: SSD
+- :heavy_check_mark: SSD
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det
