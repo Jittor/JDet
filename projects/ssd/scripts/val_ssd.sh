@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0 python tools/run_net.py --config-file=projects/ssd/configs/ssd300.py --task=val
+CUDA_VISIBLE_DEVICES=1 python tools/run_net.py --config-file=projects/ssd/configs/ssd300_coco.py --task=val

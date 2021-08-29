@@ -13,33 +13,8 @@ from jittor import nn
 from jdet.utils.registry import BACKBONES
 
 __all__ = [
-    'SSD_VGG', 'SSD_VGG11', 'SSD_VGG11_bn', 'SSD_VGG13', 'SSD_VGG13_bn', 'SSD_VGG16', 'SSD_VGG16_bn',
-    'SSD_VGG19_bn', 'SSD_VGG19',
+    'SSD_VGG16', 'SSD_VGG19',
 ]
-
-
-class L2Norm(nn.Module):
-
-    def __init__(self, n_dims, scale=20., eps=1e-10):
-        """L2 normalization layer.
-        Args:
-            n_dims (int): Number of dimensions to be normalized
-            scale (float, optional): Defaults to 20..
-            eps (float, optional): Used to avoid division by zero.
-                Defaults to 1e-10.
-        """
-        super(L2Norm, self).__init__()
-        self.n_dims = n_dims
-        self.weight = jt.random((self.n_dims,))
-        self.eps = eps
-        self.scale = scale
-
-    def execute(self, x):
-        x_float = x.float()
-        norm = x_float.pow(2).sum(1, keepdims=True).sqrt() + self.eps
-        return (self.weight[None, :, None, None].float().expand_as(x_float) *
-                x_float / norm).type_as(x)
-
 
 @BACKBONES.register_module()
 class SSD_VGG(nn.Module):
@@ -52,8 +27,7 @@ class SSD_VGG(nn.Module):
     def __init__(self,
                  features,
                  input_size,
-                 out_feature_indices=(22, 34),
-                 l2_norm_scale=20.):
+                 out_feature_indices=(22, 34)):
 
         super(SSD_VGG, self).__init__()
         assert input_size in (300, 512)
@@ -69,13 +43,6 @@ class SSD_VGG(nn.Module):
         self.features = nn.Sequential(self.features)
         self.out_feature_indices = out_feature_indices
 
-        self.inplanes = 1024
-        self.extra_layers = self._make_extra_layers(
-            self.extra_setting[input_size])
-        self.l2_norm = L2Norm(
-            self.features[out_feature_indices[0] - 1].out_channels,
-            l2_norm_scale)
-
     def execute(self, x):
         outs = []
         for i, layer in enumerate(self.features):
@@ -83,43 +50,10 @@ class SSD_VGG(nn.Module):
             if i in self.out_feature_indices:
                 outs.append(x)
 
-        for i, layer in enumerate(self.extra_layers):
-            x = nn.relu(layer(x))
-            if i % 2 == 1:
-                outs.append(x)
-
-        outs[0] = self.l2_norm(outs[0])
         if len(outs) == 1:
             return outs[0]
         else:
             return tuple(outs)
-
-    def _make_extra_layers(self, outplanes):
-        layers = []
-        kernel_sizes = (1, 3)
-        num_layers = 0
-        outplane = None
-        for i in range(len(outplanes)):
-            if self.inplanes == 'S':
-                self.inplanes = outplane
-                continue
-            k = kernel_sizes[num_layers % 2]
-            if outplanes[i] == 'S':
-                outplane = outplanes[i + 1]
-                conv = nn.Conv2d(
-                    self.inplanes, outplane, k, stride=2, padding=1)
-            else:
-                outplane = outplanes[i]
-                conv = nn.Conv2d(
-                    self.inplanes, outplane, k, stride=1, padding=0)
-            layers.append(conv)
-            self.inplanes = outplanes[i]
-            num_layers += 1
-        if self.input_size == 512:
-            layers.append(nn.Conv2d(self.inplanes, 256, 4, padding=1))
-
-        return nn.Sequential(*layers)
-
 
 def make_layers(cfg, batch_norm=False):
     layers = []
@@ -150,70 +84,20 @@ def _vgg(arch, cfg, batch_norm, **kwargs):
     model = SSD_VGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
     return model
 
-
 @BACKBONES.register_module()
-def SSD_VGG11(pretrained=False, **kwargs):
-    model = _vgg('vgg11', 'A', False, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg11.pkl")
-    return model
-
-
-@BACKBONES.register_module()
-def SSD_VGG11_bn(pretrained=False, **kwargs):
-    model = _vgg('vgg11_bn', 'A', True, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg11_bn.pkl")
-    return model
-
-
-@BACKBONES.register_module()
-def SSD_VGG13(pretrained=False, **kwargs):
-    model = _vgg('vgg13', 'B', False, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg13.pkl")
-    return model
-
-
-@BACKBONES.register_module()
-def SSD_VGG13_bn(pretrained=False, **kwargs):
-    model = _vgg('vgg13_bn', 'B', True, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg13_bn.pkl")
-    return model
-
-
-@BACKBONES.register_module()
-def SSD_VGG16(pretrained=False, **kwargs):
+def SSD_VGG16(pretrained=None, **kwargs):
     model = _vgg('vgg16', 'D', False, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg16.pkl")
+    if pretrained is not None:
+        model.load(pretrained)
     return model
 
 
 @BACKBONES.register_module()
-def SSD_VGG16_bn(pretrained=False, **kwargs):
-    model = _vgg('vgg16_bn', 'D', True, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg16_bn.pkl")
-    return model
-
-
-@BACKBONES.register_module()
-def SSD_VGG19(pretrained=False, **kwargs):
+def SSD_VGG19(pretrained=None, **kwargs):
     model = _vgg('vgg19', 'E', False, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg19.pkl")
+    if pretrained is not None:
+        model.load(pretrained)
     return model
-
-
-@BACKBONES.register_module()
-def SSD_VGG19_bn(pretrained=False, **kwargs):
-    model = _vgg('vgg19_bn', 'E', True, **kwargs)
-    if pretrained:
-        model.load("jittorhub://vgg19_bn.pkl")
-    return model
-
 
 if __name__ == '__main__':
     model = SSD_VGG16(input_size=300)

@@ -1,11 +1,19 @@
 # model settings
 input_size = 300
+img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1])
 model = dict(
     type='SingleStageDetector',
     backbone=dict(
         type='SSD_VGG16',
         input_size=input_size,
-        pretrained=True),
+        pretrained='../../weights/vgg16_caffe.pkl'),
+    neck=dict(
+        type='SSDNeck',
+        in_channels=(512, 1024),
+        out_channels=(512, 1024, 512, 256, 256, 256),
+        level_strides=(2, 2, 1, 1),
+        level_paddings=(1, 1, 0, 0),
+        l2_norm_scale=20),
     roi_heads=dict(
         type='SSDHead',
         num_classes=80,
@@ -13,7 +21,7 @@ model = dict(
         anchor_generator=dict(
             type='SSDAnchorGenerator',
             scale_major=False,
-            input_size=300,
+            input_size=input_size,
             basesize_ratio_range=(0.15, 0.9),
             strides=[8, 16, 32, 64, 100, 300],
             ratios=[[2], [2, 3], [2, 3], [2, 3], [2], [2]]),
@@ -43,40 +51,37 @@ model = dict(
             max_per_img=200),
     )
 )
+
 dataset = dict(
     train=dict(
         type="COCODataset",
-        # anno_file='../coco128/detections_train2017_test.json',
-        # root='../coco128/images/train2017/',
         anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json',
         root='/mnt/disk/lxl/dataset/coco/images/train2017/',
         transforms=[
             dict(
-                type="Resize",
+                type="Resize_keep_ratio",
                 min_size=300,
                 max_size=300,
                 keep_ratio=False
             ),
             dict(
                 type="Normalize",
-                mean=[123.675, 116.28, 103.53],
-                std=[1, 1, 1],
+                mean=img_norm_cfg['mean'],
+                std=img_norm_cfg['std'],
                 to_bgr=True,)
 
         ],
-        batch_size=32,
-        num_workers=0,
+        batch_size=1,
+        num_workers=1,
         shuffle=False
     ),
     val=dict(
         type="COCODataset",
-        # anno_file='../coco128/detections_train2017.json',
-        # root='../coco128/images/train2017/',
         anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json',
         root='/mnt/disk/lxl/dataset/coco/images/val2017/',
         transforms=[
             dict(
-                type="Resize",
+                type="Resize_keep_ratio",
                 min_size=300,
                 max_size=300,
                 keep_ratio=False
@@ -85,18 +90,18 @@ dataset = dict(
                 type="Normalize",
                 mean=[123.675, 116.28, 103.53],
                 std=[1, 1, 1],
-                to_bgr=False,),
+                to_bgr=True,),
         ],
-        num_workers=0,
-        batch_size=1,
+        num_workers=2,
+        batch_size=2,
     ),
     test=dict(
         type="COCODataset",
-        anno_file='../coco128/detections_train2017_test.json',
-        root='../coco128/images/train2017/',
+        anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json',
+        root='/mnt/disk/lxl/dataset/coco/images/val2017/',
         transforms=[
             dict(
-                type="Resize",
+                type="Resize_keep_ratio",
                 min_size=300,
                 max_size=300,
                 keep_ratio=False
@@ -105,35 +110,30 @@ dataset = dict(
                 type="Normalize",
                 mean=[123.675, 116.28, 103.53],
                 std=[1, 1, 1],
-                to_bgr=False,),
+                to_bgr=True,),
         ],
-        num_workers=0,
+        num_workers=1,
         batch_size=1,
     )
 )
 
 optimizer = dict(
     type='SGD',
-    # lr=0.0,  # 0.01*(1/8.),
     lr=2e-3,
     momentum=0.9,
-    weight_decay=0.0001,
-    grad_clip=dict(
-        max_norm=10,
-        norm_type=2))
+    weight_decay=5e-4)
 
 scheduler = dict(
     type='StepLR',
     warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
-    milestones=[60, 100, 110])
+    warmup_iters=1000,
+    warmup_ratio=0.001,
+    milestones=[45,55])
 
 logger = dict(
     type="RunLogger")
 
-max_epoch = 120
-eval_interval = 1
-checkpoint_interval = 1
+max_epoch = 60
+eval_interval = 3
+checkpoint_interval = 3
 log_interval = 50
-# resume_path = "ssd300_coco_model.pth"
