@@ -346,8 +346,8 @@ def delta2bbox(rois,
         deltas /= weights
 
     if means is not None and stds is not None:
-        means = jt.array(means).repeat(1, deltas.size(1) // 4)
-        stds = jt.array(stds).repeat(1, deltas.size(1) // 4)
+        means = jt.array(means).view(1, -1).repeat(1, deltas.size(-1) // 4)
+        stds = jt.array(stds).view(1, -1).repeat(1, deltas.size(-1) // 4)
         deltas = deltas * stds + means
     dx = deltas[..., 0::4]
     dy = deltas[..., 1::4]
