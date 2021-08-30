@@ -307,7 +307,7 @@ def iou_poly(poly1,poly2):
     poly1 = Polygon(poly1.reshape(4,2))
     poly2 = Polygon(poly2.reshape(4,2))
     inter_area = poly1.intersection(poly2).area
-    iou = inter_area/(poly1.area+poly2.area-inter_area)
+    iou = inter_area/max(poly1.area+poly2.area-inter_area,0.01)
     return iou
 
 def nms_poly_numpy(dets, thresh):
