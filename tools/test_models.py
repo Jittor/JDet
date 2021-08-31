@@ -1,8 +1,9 @@
 import os
 tasks = ["faster_rcnn", "retinanet", "s2anet", "ssd"]
+zip_path = "https://cloud.tsinghua.edu.cn/f/c790a39cfdd7453c9732/?dl=1"
 
 if (not os.path.exists("test_datas.zip")):
-    os.system("wget https://cloud.tsinghua.edu.cn/f/c790a39cfdd7453c9732/?dl=1")
+    os.system(f"wget {zip_path}")
     os.system("mv 'index.html?dl=1' test_datas.zip")
     os.system("unzip -o test_datas.zip")
     for task in tasks:
