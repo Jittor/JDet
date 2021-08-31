@@ -44,12 +44,12 @@ def main():
             "targetss": targetss,
             "correct_loss": correct_loss,
         }
-        if (not os.path.exists("test_datas")):
-            os.makedirs("test_datas")
-        pk.dump(data, open("test_datas/test_data.pk", "wb"))
+        if (not os.path.exists("test_datas_s2anet")):
+            os.makedirs("test_datas_s2anet")
+        pk.dump(data, open("test_datas_s2anet/test_data.pk", "wb"))
         print(correct_loss)
     else:
-        data = pk.load(open("test_datas/test_data.pk", "rb"))
+        data = pk.load(open("test_datas_s2anet/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         correct_loss = data["correct_loss"]

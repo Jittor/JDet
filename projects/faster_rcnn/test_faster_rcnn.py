@@ -69,7 +69,7 @@ def main():
     # [0.6244182586669922, 0.15812541544437408, 0.7723376750946045, 89.84375, 0.35137325525283813, 1.906254529953003]]
     # thr = 0.1
     if (args.set_data):
-        jt.save(model.state_dict(), "test_datas/model.pk")
+        jt.save(model.state_dict(), "test_datas_faster_rcnn/model.pk")
 
         imagess = []
         targetss = []
@@ -92,13 +92,13 @@ def main():
             "targetss": targetss,
             "correct_loss": correct_loss,
         }
-        if (not os.path.exists("test_datas")):
-            os.makedirs("test_datas")
-        pk.dump(data, open("test_datas/test_data.pk", "wb"))
+        if (not os.path.exists("test_datas_faster_rcnn")):
+            os.makedirs("test_datas_faster_rcnn")
+        pk.dump(data, open("test_datas_faster_rcnn/test_data.pk", "wb"))
         print(correct_loss)
     else:
-        model.load_parameters(jt.load("test_datas/model.pk"))
-        data = pk.load(open("test_datas/test_data.pk", "rb"))
+        model.load_parameters(jt.load("test_datas_faster_rcnn/model.pk"))
+        data = pk.load(open("test_datas_faster_rcnn/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         for batch_idx in range(len(targetss)):

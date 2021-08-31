@@ -63,13 +63,13 @@ def main():
             "std_roi_cls_losses": std_roi_cls_losses,
             "std_roi_loc_losses": std_roi_loc_losses
         }
-        if (not os.path.exists("test_datas")):
-            os.makedirs("test_datas")
-        pk.dump(data, open("test_datas/test_data.pk", "wb"))
+        if (not os.path.exists("test_datas_retinanet")):
+            os.makedirs("test_datas_retinanet")
+        pk.dump(data, open("test_datas_retinanet/test_data.pk", "wb"))
         print(std_roi_cls_losses)
         print(std_roi_loc_losses)
     else:
-        data = pk.load(open("test_datas/test_data.pk", "rb"))
+        data = pk.load(open("test_datas_retinanet/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         std_roi_cls_losses = data["std_roi_cls_losses"]
