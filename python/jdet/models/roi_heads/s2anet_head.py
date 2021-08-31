@@ -514,7 +514,7 @@ class S2ANetHead(nn.Module):
                    odm_cls_scores,
                    odm_bbox_preds,
                    img_metas,
-                   rescale=False):
+                   rescale=True):
         assert len(odm_cls_scores) == len(odm_bbox_preds)
         cfg = self.test_cfg.copy()
 

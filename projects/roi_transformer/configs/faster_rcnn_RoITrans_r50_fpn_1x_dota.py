@@ -179,6 +179,7 @@ dataset = dict(
         ),
     test=dict(
         type=dataset_type,
+        dataset_type="DOTA",
         anno_file=data_root + 'test1024/DOTA_test1024.json',
         root=data_root + 'test1024/images/',
         transforms=[
@@ -197,7 +198,7 @@ dataset = dict(
 # optimizer
 optimizer = dict(
     type='SGD', 
-    lr=0.0025, 
+    lr=0.025, 
     momentum=0.9, 
     weight_decay=0.0001,
     grad_clip=dict(
@@ -215,7 +216,7 @@ scheduler = dict(
 logger = dict(
     type="RunLogger")
 max_epoch = 12
-eval_interval = 1
+eval_interval = 13   #TODO: implement eval
 checkpoint_interval = 1
 log_interval = 20
-resume_path = 'work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'
+resume_path = '../../work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'

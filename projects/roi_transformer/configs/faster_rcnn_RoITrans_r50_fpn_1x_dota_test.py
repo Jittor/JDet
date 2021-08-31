@@ -1,3 +1,4 @@
+pretrained_weights = "weights/init_pretrained.pk_jt.pk"
 model = dict(
     type='RoITransformer',
     pretrained='modelzoo://resnet50',
@@ -219,4 +220,4 @@ max_epoch = 12
 eval_interval = 13   #TODO: implement eval
 checkpoint_interval = 1
 log_interval = 20
-#resume_path = 'work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'
+resume_path = '../../work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'

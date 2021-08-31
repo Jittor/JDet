@@ -586,7 +586,7 @@ def multiclass_nms_rotated(multi_bboxes,
     labels = labels[keep]
 
     if keep.size(0) > max_num:
-        _, inds = scores.sort(descending=True)
+        _, inds = scores.argsort(descending=True)
         inds = inds[:max_num]
         bboxes = bboxes[inds]
         scores = scores[inds]
