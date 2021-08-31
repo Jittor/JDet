@@ -30,3 +30,4 @@ submit_zips
 *.pkl
 *.pk
 test_configs
+projects/*/test_datas*

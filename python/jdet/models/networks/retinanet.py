@@ -5,7 +5,6 @@ import numpy as np
 import jdet
 import copy
 from jdet.models.boxes.box_ops import rotated_box_to_bbox
-from my_utils import *
 
 @MODELS.register_module()
 class RetinaNet(nn.Module):
