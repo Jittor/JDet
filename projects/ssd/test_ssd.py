@@ -1,12 +1,11 @@
-import jdet
 import jittor as jt
 from jdet.config import init_cfg, get_cfg
 from jdet.utils.general import parse_losses
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
-import models
 import argparse
 import os
 import pickle as pk
+import jdet
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor Object Detection Training")
@@ -18,38 +17,32 @@ def main():
 
     jt.flags.use_cuda=1
     jt.set_global_seed(666)
-    init_cfg("configs/retinanet_test.py")
+    init_cfg("configs/ssd300_coco_test.py")
     cfg = get_cfg()
 
     iter = 0
     model = build_from_cfg(cfg.model,MODELS)
-    model.load(cfg.pretrained_weights)
-    if (cfg.parameter_groups_generator):
-        params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=model.named_parameters(), model=model)
-    else:
-        params = model.parameters()
+    params = model.parameters()
     optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=params)
     scheduler = build_from_cfg(cfg.scheduler,SCHEDULERS,optimizer=optimizer)
+
     model.train()
 
     if (args.set_data):
+        train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
         imagess = []
         targetss = []
         std_roi_cls_losses = []
         std_roi_loc_losses = []
-
-        train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
         for batch_idx,(images,targets) in enumerate(train_dataset):
             print(batch_idx)
             imagess.append(jdet.utils.general.sync(images))
             targetss.append(jdet.utils.general.sync(targets))
-            # print(targets)
-            # print(jdet.utils.general.sync(targets))
-
             losses = model(images,targets)
-            l1 = losses["roi_cls_loss"].data[0]
+            
+            l1 = losses["loss_cls"][0].data.reshape(1).item()
+            l2 = losses["loss_bbox"][0].data.reshape(1).item()
             std_roi_cls_losses.append(l1)
-            l2 = losses["roi_loc_loss"].data[0]
             std_roi_loc_losses.append(l2)
             if (batch_idx > 10):
                 break
@@ -61,29 +54,29 @@ def main():
             "imagess": imagess,
             "targetss": targetss,
             "std_roi_cls_losses": std_roi_cls_losses,
-            "std_roi_loc_losses": std_roi_loc_losses
+            "std_roi_loc_losses": std_roi_loc_losses,
         }
-        if (not os.path.exists("test_datas_retinanet")):
-            os.makedirs("test_datas_retinanet")
-        pk.dump(data, open("test_datas_retinanet/test_data.pk", "wb"))
+        if (not os.path.exists("test_datas_ssd")):
+            os.makedirs("test_datas_ssd")
+        pk.dump(data, open("test_datas_ssd/test_data.pk", "wb"))
         print(std_roi_cls_losses)
         print(std_roi_loc_losses)
     else:
-        data = pk.load(open("test_datas_retinanet/test_data.pk", "rb"))
+        data = pk.load(open("test_datas_ssd/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         std_roi_cls_losses = data["std_roi_cls_losses"]
         std_roi_loc_losses = data["std_roi_loc_losses"]
-        # std_roi_cls_losses = [1.1452212, 1.1484368, 1.1538603, 1.1621443, 1.1542724, 1.1430459, 1.1834915, 1.1830766, 1.5154903, 1.1654731, 1.1685958, 1.1577367]
-        # std_roi_loc_losses = [0.17455772, 0.3866686, 0.2991456, 0.232427, 0.2683379, 0.33200195, 0.39404622, 0.39015254, 0.23770154, 0.3625164, 0.3487473, 0.3281753]
+        # std_roi_cls_losses = jt.Var([26.437416,26.762486,25.729113,26.188711,26.580881,27.949156,24.762697,25.833862,25.867805,25.638443,25.699451,26.303846])
+        # std_roi_loc_losses = jt.Var([2.8528306,3.5279472,2.517684,2.9012783,2.5886812,2.6759088,3.6240485,3.865853,2.7286806,7.5056534,2.933507,2.5085826])
         for batch_idx in range(len(imagess)):
             images = imagess[batch_idx]
             targets = targetss[batch_idx]
-
-            losses = model(images,targets)
-            l1 = losses["roi_cls_loss"].data[0]
+            
+            losses = model(images,targets)            
+            l1 = losses["loss_cls"][0].data.reshape(1)
             s_l1 = std_roi_cls_losses[batch_idx]
-            l2 = losses["roi_loc_loss"].data[0]
+            l2 = losses["loss_bbox"][0].data.reshape(1)
             s_l2 = std_roi_loc_losses[batch_idx]
             assert(abs(l1 - s_l1) / abs(s_l1) < 1e-3)
             assert(abs(l2 - s_l2) / abs(s_l2) < 1e-3)
@@ -93,5 +86,6 @@ def main():
             scheduler.step(iter,0,by_epoch=True)
             iter+=1
     print("success!")
+
 if __name__ == "__main__":
     main()
