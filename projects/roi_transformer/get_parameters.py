@@ -11,7 +11,7 @@ def main():
     init_cfg("configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py")
     cfg = get_cfg()
     runner = Runner()
-    runner.model.save("weights/init_pretrained.pk_jt.pk")
+    runner.model.save("test_datas_roitrans/init_pretrained.pk_jt.pk")
 
 if __name__ == "__main__":
     main()

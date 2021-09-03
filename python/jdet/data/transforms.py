@@ -6,6 +6,8 @@ import math
 from PIL import Image
 from jdet.utils.registry import build_from_cfg,TRANSFORMS
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box_np,norm_angle
+from jdet.models.boxes.iou_calculator import bbox_overlaps_np
+from numpy import random as nprandom
 
 @TRANSFORMS.register_module()
 class Compose:
@@ -148,6 +150,167 @@ class Resize:
             target["pad_shape"] = image.size
             target["keep_ratio"] = self.keep_ratio
         return image, target
+
+@TRANSFORMS.register_module()
+class MinIoURandomCrop:
+    def __init__(self,
+                 min_ious=(0.1, 0.3, 0.5, 0.7, 0.9),
+                 min_crop_size=0.3,
+                 bbox_clip_border=True):
+        # 1: return ori img
+        self.min_ious = min_ious
+        self.sample_mode = (1, *min_ious, 0)
+        self.min_crop_size = min_crop_size
+        self.bbox_clip_border = bbox_clip_border
+
+    def __call__(self, image, target=None):
+        boxes = target['bboxes']
+        w, h = image.size
+        while True:
+            mode = nprandom.choice(self.sample_mode)
+            self.mode = mode
+            if mode == 1:
+                return image, target
+
+            min_iou = mode
+            for i in range(50):
+                new_w = nprandom.uniform(self.min_crop_size * w, w)
+                new_h = nprandom.uniform(self.min_crop_size * h, h)
+
+                # h / w in [0.5, 2]
+                if new_h / new_w < 0.5 or new_h / new_w > 2:
+                    continue
+
+                left = nprandom.uniform(w - new_w)
+                top = nprandom.uniform(h - new_h)
+
+                patch = np.array(
+                    (int(left), int(top), int(left + new_w), int(top + new_h)))
+                # Line or point crop is not allowed
+                if patch[2] == patch[0] or patch[3] == patch[1]:
+                    continue
+                overlaps = bbox_overlaps_np(
+                    patch.reshape(-1, 4), boxes.reshape(-1, 4)).reshape(-1)
+                if len(overlaps) > 0 and overlaps.min() < min_iou:
+                    continue
+                # center of boxes should inside the crop img
+                # only adjust boxes and instance masks when the gt is not empty
+                if len(overlaps) > 0:
+                    # adjust boxes
+                    def is_center_of_bboxes_in_patch(boxes, patch):
+                        center = (boxes[:, :2] + boxes[:, 2:]) / 2
+                        mask = ((center[:, 0] > patch[0]) *
+                                (center[:, 1] > patch[1]) *
+                                (center[:, 0] < patch[2]) *
+                                (center[:, 1] < patch[3]))
+                        return mask
+
+                    mask = is_center_of_bboxes_in_patch(boxes, patch)
+                    if not mask.any():
+                        continue
+                    boxes = boxes[mask]
+                    if self.bbox_clip_border:
+                        boxes[:, 2:] = boxes[:, 2:].clip(max=patch[2:])
+                        boxes[:, :2] = boxes[:, :2].clip(min=patch[:2])
+                    boxes -= np.tile(patch[:2], 2)
+                    target['bboxes'] = boxes
+                    # labels
+                    target['labels'] = target['labels'][mask]
+
+                # adjust the img no matter whether the gt is empty before crop
+                image_crop = image.crop(patch)
+                target['img_size'] = image_crop.size
+
+                return image_crop, target
+
+
+@TRANSFORMS.register_module()
+class Expand:
+    def __init__(self,
+                 mean=(0, 0, 0),
+                 ratio_range=(1, 4),
+                 prob=0.5):
+        self.ratio_range = ratio_range
+        self.mean = tuple([int(i) for i in mean])
+        self.min_ratio, self.max_ratio = ratio_range
+        self.prob = prob
+
+    def __call__(self, image, target=None):
+        if nprandom.uniform(0, 1) > self.prob:
+            return image, target
+        w, h = image.size
+        ratio = nprandom.uniform(self.min_ratio, self.max_ratio)
+        left = int(nprandom.uniform(0, w * ratio - w))
+        top = int(nprandom.uniform(0, h * ratio - h))
+        
+        new_image = Image.new(image.mode,(int(w * ratio), int(h * ratio)), self.mean)
+        new_image.paste(image,(left, top, left+image.size[0], top+image.size[1]))
+
+        target["bboxes"] = target["bboxes"] + np.tile(
+            (left, top), 2).astype(target["bboxes"].dtype)
+        target['img_size'] = new_image.size
+        return new_image, target
+
+@TRANSFORMS.register_module()
+class PhotoMetricDistortion:
+    def __init__(self, brightness_delta=32./255, contrast_range=(0.5, 1.5), saturation_range=(0.5, 1.5), hue_delta=18):
+        self.t = jt.transform.ColorJitter(brightness=brightness_delta, contrast=contrast_range, saturation=saturation_range, hue=hue_delta)
+
+    def __call__(self, image, target=None):
+        image = self.t(image)
+        
+        return image, target
+
+@TRANSFORMS.register_module()
+class Resize_keep_ratio:
+    def __init__(self, min_size, max_size, keep_ratio=True):
+        if not isinstance(min_size, (list, tuple)):
+            min_size = (min_size,)
+        self.min_size = min_size
+        self.max_size = max_size
+        self.keep_ratio = keep_ratio
+
+    # modified from torchvision to add support for max size
+    def get_size(self, image_size):
+        w, h = image_size
+        size = random.choice(self.min_size)
+        max_size = self.max_size
+
+        oh = self.min_size[0]
+        ow = self.max_size
+        return (oh, ow), [ow/w, oh/h, ow/w, oh/h]
+        
+
+    def _resize_boxes(self,target,size):
+        for key in ["bboxes","polys"]:
+            if key not in target:
+                continue
+            bboxes = target[key]
+            width,height = target["img_size"]
+            new_w,new_h = size
+            bboxes[:,0::2] = bboxes[:,0::2]*float(new_w/width)
+            bboxes[:,1::2] = bboxes[:,1::2]*float(new_h/height)
+
+            # clip to border
+            bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, new_w - 1)
+            bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, new_h - 1)
+
+            target[key]=bboxes
+    
+    def _resize_mask(self,target,size):
+        pass
+
+    def __call__(self, image, target=None):
+        size,scale_factor = self.get_size(image.size)
+        image = image.resize(size[::-1],Image.BILINEAR)
+        if target is not None:
+            self._resize_boxes(target,image.size)
+            target["img_size"] = image.size
+            target["scale_factor"] = scale_factor
+            target["pad_shape"] = image.size
+            target["keep_ratio"] = self.keep_ratio
+        return image, target
+
 
 @TRANSFORMS.register_module()
 class RotatedResize(Resize):

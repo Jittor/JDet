@@ -4,6 +4,7 @@ from jdet.utils.registry import MODELS,build_from_cfg,BACKBONES,HEADS,NECKS
 import numpy as np
 import jdet
 import copy
+from jdet.models.boxes.box_ops import rotated_box_to_bbox
 
 @MODELS.register_module()
 class RetinaNet(nn.Module):
@@ -51,7 +52,12 @@ class RetinaNet(nn.Module):
                         w, h = h, w
                     out_bbox.append(np.array([x, y, w, h, a])[np.newaxis, :])
                 out_bbox = np.concatenate(out_bbox, 0)
-                targets[i]["rboxes"] = jt.array(out_bbox)
+                temp = jt.array(out_bbox)
+                temp = self.rpn_net.cvt2_w_greater_than_h(temp, False)#TODO: yxe?
+                targets[i]["rboxes"] = temp
+                temp_ = temp.copy()
+                temp_[:, 4] += np.pi / 2
+                targets[i]["rboxes_h"] = rotated_box_to_bbox(temp_)
         features = self.backbone(images)
         if self.neck:
             features = self.neck(features)

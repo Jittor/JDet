@@ -1,6 +1,6 @@
 # JDet
 ## Introduction
-JDet is Object Detection Framework  based on [Jittor](https://github.com/Jittor/jittor). 
+JDet is a object detection benchmark based on [Jittor](https://github.com/Jittor/jittor). 
 
 <!-- **Features**
 - Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
@@ -21,7 +21,7 @@ JDet environment requirements:
 
 **Step 1: Install the requirements**
 ```shell
-git clone https://github.com/li-xl/JDet
+git clone https://github.com/Jittor/JDet
 cd JDet
 python -m pip install -r requirements.txt
 ```
@@ -108,7 +108,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Gliding
 - :heavy_check_mark: RetinaNet
 - :heavy_check_mark: Faster R-CNN
-- :clock3: SSD
+- :heavy_check_mark: SSD
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det

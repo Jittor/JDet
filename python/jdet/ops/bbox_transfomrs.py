@@ -44,7 +44,11 @@ def hbb2obb_v2(boxes):
     return dbboxes
 
 def mask2poly_single(binary_mask):
-    contours, hierarchy = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    res = cv2.findContours(binary_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) #TODO: check binary_mask.copy()
+    if (len(res) == 2):
+        contours, hierarchy = res
+    else:
+        _, contours, hierarchy = res
     max_contour = max(contours, key=len)
     rect = cv2.minAreaRect(max_contour)
     poly = cv2.boxPoints(rect)

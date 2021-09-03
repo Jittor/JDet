@@ -10,6 +10,21 @@ from tqdm import tqdm
 import numpy as np
 from jdet.data.devkits.dota_to_fair import dota_to_fair
 
+def flip_box(box, target):
+    ans = [box[i] for i in range(8)]
+    if not "flip_mode" in target:
+        return ans
+    mode = target["flip_mode"]
+    w = target['ori_img_size'][0]
+    h = target['ori_img_size'][1]
+    if ('H' in mode):
+        for i in [0,2,4,6]:
+            ans[i] = w - ans[i]
+    if ('V' in mode):
+        for i in [1,3,5,7]:
+            ans[i] = h - ans[i]
+    return ans
+
 def prepare(result_pkl,save_path, classes):
     check_dir(save_path)
     results = jt.load(result_pkl)
@@ -22,9 +37,11 @@ def prepare(result_pkl,save_path, classes):
             score = det[5]
             classname = classes[label]
             bbox = rotated_box_to_poly_single(bbox)
+            bbox_ = flip_box(bbox, target)
             temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
-                        img_name, score, bbox[0], bbox[1], bbox[2], bbox[3], bbox[4],
-                        bbox[5], bbox[6], bbox[7])
+                        img_name, score, 
+                        bbox_[0], bbox_[1], bbox_[2], bbox_[3], 
+                        bbox_[4], bbox_[5], bbox_[6], bbox_[7])
             if classname not in data:
                 data[classname] = []
             data[classname].append(temp_txt)
@@ -41,9 +58,11 @@ def prepare_gliding(result_pkl,save_path, classes):
         img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
         for bbox,score,label in zip(*result):
             classname = classes[label-1]
+            bbox_ = flip_box(bbox, target)
             temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
-                        img_name, score, bbox[0], bbox[1], bbox[2], bbox[3], bbox[4],
-                        bbox[5], bbox[6], bbox[7])
+                        img_name, score, 
+                        bbox_[0], bbox_[1], bbox_[2], bbox_[3], 
+                        bbox_[4], bbox_[5], bbox_[6], bbox_[7])
             if classname not in data:
                 data[classname] = []
             data[classname].append(temp_txt)
@@ -62,9 +81,13 @@ def prepare_fasterrcnn(result_pkl,save_path, classes):
             for i in range(res.shape[0]):
                 bbox = res[i]
                 classname = classes[idx]
+                score = bbox[-1]
+                bbox_ = [bbox[0], bbox[1], bbox[2], bbox[3], bbox[4], bbox[5], bbox[6], bbox[7]]
+                bbox_ = flip_box(bbox_, target)
                 temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
-                            img_name, bbox[-1], bbox[0], bbox[1], bbox[2], bbox[3], bbox[4],
-                            bbox[5], bbox[6], bbox[7])
+                            img_name, score, 
+                            bbox_[0], bbox_[1], bbox_[2], bbox_[3], 
+                            bbox_[4], bbox_[5], bbox_[6], bbox_[7])
                 if classname not in data:
                     data[classname] = []
                 data[classname].append(temp_txt)
@@ -91,7 +114,7 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
     check_dir(final_path)
     mergebypoly(save_path,final_path)
 
-def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
+def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
     assert dataset_type in ["FAIR", "DOTA", "DOTA1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, and DOTA1_5 are supported"
     print("Merge results...")
     save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")
@@ -106,7 +129,7 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type):
     if (dataset_type == 'FAIR'):
         print("converting to fair...")
         final_fair_path = os.path.join(work_dir, f"test/submit_{epoch}/final_fair/test")
-        dota_to_fair(final_path, final_fair_path)
+        dota_to_fair(final_path, final_fair_path, images_dir)
         final_path = final_fair_path
     print("zip..")
     zip_path = os.path.join("submit_zips", name + ".zip")

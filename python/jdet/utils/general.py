@@ -7,6 +7,24 @@ import os
 import glob
 from functools import partial
 from six.moves import map, zip
+import numpy
+
+def to_jt_var(data):
+    """
+        convert data to jt_array
+    """
+    def _to_jt_var(data):
+        if isinstance(data,(list,tuple)):
+            data =  [_to_jt_var(d) for d in data]
+        elif isinstance(data,dict):
+            data = {k:_to_jt_var(d) for k,d in data.items()}
+        elif isinstance(data,numpy.ndarray):
+            data = jt.array(data)
+        elif not isinstance(data,(int,float,str,np.ndarray)):
+            raise ValueError(f"{type(data)} is not supported")
+        return data
+    
+    return _to_jt_var(data) 
 
 def sync(data,reduce_mode="mean",to_numpy=True):
     """
