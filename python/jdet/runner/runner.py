@@ -219,7 +219,9 @@ class Runner:
                 data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
             else:
                 if (self.cfg.dataset.test.type == "DOTARCNNDataset"):
-                    print(f"TODO: dataset type DOTARCNNDataset not supported auto data merge.")
+                    # print(f"TODO: dataset type DOTARCNNDataset not supported auto data merge.")
+                    dataset_type = self.test_dataset.dataset_type
+                    data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
 
     @jt.single_process_scope()
     def save(self):

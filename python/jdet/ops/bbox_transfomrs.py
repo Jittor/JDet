@@ -2,6 +2,7 @@ import jittor as jt
 import numpy as np      #TODO: remove numpy
 import cv2
 import math
+import copy             #TODO: remove copy(?)
 
 def dbbox2delta_v3(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
     proposals = proposals.float()
@@ -198,7 +199,7 @@ def dbbox2delta_v2(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1])
     targets_dh = jt.log(gt_heights / roi_heights)
     targets_dangle = (gt_angle - roi_angle)
     dist = targets_dangle % (2 * np.pi)
-    dist = jt.min(dist, np.pi * 2 - dist)
+    dist = jt.minimum(dist, np.pi * 2 - dist)
     try:
         assert np.all(dist.numpy() <= (np.pi/2. + 0.001) )
     except:
@@ -212,8 +213,8 @@ def dbbox2delta_v2(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1])
     deltas = jt.stack((targets_dx, targets_dy, targets_dw, targets_dh, dist), -1)
 
 
-    means = deltas.new_tensor(means).unsqueeze(0)
-    stds = deltas.new_tensor(stds).unsqueeze(0)
+    means = jt.array(means).unsqueeze(0)
+    stds = jt.array(stds).unsqueeze(0)
     deltas = (deltas - means) / stds
 
     return deltas
@@ -226,8 +227,8 @@ def choose_best_match_batch(Rrois, gt_rois):
     gt_angle_extent = jt.contrib.concat((gt_angles[:, np.newaxis], (gt_angles + np.pi/2.)[:, np.newaxis],
                                       (gt_angles + np.pi)[:, np.newaxis], (gt_angles + np.pi * 3/2.)[:, np.newaxis]), 1)
     dist = (Rroi_angles - gt_angle_extent) % (2 * np.pi)
-    dist = jt.min(dist, np.pi * 2 - dist)
-    min_index = jt.argmin(dist, 1)
+    dist = jt.minimum(dist, np.pi * 2 - dist)
+    min_index = jt.argmin(dist, 1)[0]
 
     gt_rois_extent0 = copy.deepcopy(gt_rois)
     gt_rois_extent1 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
@@ -243,7 +244,7 @@ def choose_best_match_batch(Rrois, gt_rois):
 
     gt_rois_new = jt.zeros_like(gt_rois)
     for curiter, index in enumerate(min_index):
-        gt_rois_new[curiter, :] = gt_rois_extent[curiter, index, :]
+        gt_rois_new[curiter, :] = gt_rois_extent[curiter, index.item(), :]
 
     gt_rois_new[:, 4] = gt_rois_new[:, 4] % (2 * np.pi)
 
@@ -314,6 +315,45 @@ def delta2dbbox_v3(Rrois,
     bboxes = jt.stack([gx, gy, gw, gh, gangle], dim=-1).view_as(deltas)
     return bboxes
 
+def delta2dbbox_v2(Rrois,
+                deltas,
+                means=[0, 0, 0, 0, 0],
+                stds=[1, 1, 1, 1, 1],
+                max_shape=None,
+                wh_ratio_clip=16 / 1000):
+    means = jt.array(means, dtype=deltas.dtype).repeat(1, deltas.size(1) // 5)
+    stds = jt.array(stds, dtype=deltas.dtype).repeat(1, deltas.size(1) // 5)
+    denorm_deltas = deltas * stds + means
+
+    dx = denorm_deltas[:, 0::5]
+    dy = denorm_deltas[:, 1::5]
+    dw = denorm_deltas[:, 2::5]
+    dh = denorm_deltas[:, 3::5]
+    dangle = denorm_deltas[:, 4::5]
+
+    max_ratio = np.abs(np.log(wh_ratio_clip))
+    dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+    dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+    Rroi_x = (Rrois[:, 0]).unsqueeze(1).expand_as(dx)
+    Rroi_y = (Rrois[:, 1]).unsqueeze(1).expand_as(dy)
+    Rroi_w = (Rrois[:, 2]).unsqueeze(1).expand_as(dw)
+    Rroi_h = (Rrois[:, 3]).unsqueeze(1).expand_as(dh)
+    Rroi_angle = (Rrois[:, 4]).unsqueeze(1).expand_as(dangle)
+    gx = dx * Rroi_w * jt.cos(Rroi_angle) \
+         - dy * Rroi_h * jt.sin(Rroi_angle) + Rroi_x
+    gy = dx * Rroi_w * jt.sin(Rroi_angle) \
+         + dy * Rroi_h * jt.cos(Rroi_angle) + Rroi_y
+    gw = Rroi_w * dw.exp()
+    gh = Rroi_h * dh.exp()
+
+    gangle = (np.pi / 2.) * dangle + Rroi_angle
+
+    if max_shape is not None:
+        pass
+
+    bboxes = jt.stack([gx, gy, gw, gh, gangle], dim=-1).view_as(deltas)
+    return bboxes
+
 def delta2bbox(rois,
                deltas,
                means=[0, 0, 0, 0],
@@ -370,3 +410,67 @@ def bbox2roi(bbox_list):
         rois_list.append(rois)
     rois = jt.contrib.concat(rois_list, 0)
     return rois
+
+def gt_mask_bp_obbs(gt_masks, with_module=True):
+
+    # trans gt_masks to gt_obbs
+    gt_polys = mask2poly(gt_masks)
+    gt_bp_polys = get_best_begin_point(gt_polys)
+    gt_obbs = polygonToRotRectangle_batch(gt_bp_polys, with_module)
+
+    return gt_obbs
+
+def gt_mask_bp_obbs_list(gt_masks_list):
+
+    gt_obbs_list = map(gt_mask_bp_obbs, gt_masks_list)
+
+    return list(gt_obbs_list)
+
+def roi2droi(rois):
+    """
+    :param rois: Tensor: shape (n, 5), [batch_ind, x1, y1, x2, y2]
+    :return: drois: Tensor: shape (n, 6), [batch_ind, x, y, w, h, theta]
+    """
+    hbbs = rois[:, 1:]
+    obbs = hbb2obb_v2(hbbs)
+
+    return jt.contrib.concat((rois[:, 0].unsqueeze(1), obbs), 1)
+
+def choose_best_Rroi_batch(Rroi):
+    """
+    There are many instances with large aspect ratio, so we choose the point, previous is long side,
+    after is short side, so it makes sure h < w
+    then angle % 180,
+    :param Rroi: (x_ctr, y_ctr, w, h, angle)
+            shape: (n, 5)
+    :return: Rroi_new: Rroi with new representation
+    """
+    x_ctr, y_ctr, w, h, angle = copy.deepcopy(Rroi[:, 0]), copy.deepcopy(Rroi[:, 1]), \
+                                copy.deepcopy(Rroi[:, 2]), copy.deepcopy(Rroi[:, 3]), copy.deepcopy(Rroi[:, 4])
+    indexes = w < h
+
+    Rroi[indexes, 2] = h[indexes]
+    Rroi[indexes, 3] = w[indexes]
+    Rroi[indexes, 4] = Rroi[indexes, 4] + np.pi / 2.
+    # TODO: check the module
+    Rroi[:, 4] = Rroi[:, 4] % np.pi
+
+    return Rroi
+
+def dbbox2roi(dbbox_list):
+    """
+    Convert a list of dbboxes to droi format.
+    :param dbbox_list: (list[Tensor]): a list of dbboxes corresponding to a batch of images
+    :return: Tensor: shape (n, 6) [batch_ind, x_ctr, y_ctr, w, h, angle]
+    """
+    drois_list = []
+    for img_id, dbboxes in enumerate(dbbox_list):
+        if dbboxes.size(0) > 0:
+            img_inds = jt.full((dbboxes.size(0), 1), img_id, dtype=dbboxes.dtype)
+            drois = jt.contrib.concat([img_inds, dbboxes[:, :5]], dim=-1)
+        else:
+            drois = jt.zeros((0, 6), dtype=dbboxes.dtype)
+
+        drois_list.append(drois)
+    drois = jt.contrib.concat(drois_list, 0)
+    return drois

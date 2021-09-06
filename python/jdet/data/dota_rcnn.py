@@ -21,9 +21,10 @@ from .transforms import Compose
 class DOTARCNNDataset(Dataset):
     CLASSES = DOTA1_CLASSES
 
-    def __init__(self,root,anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,use_anno_cats=False,test_mode=False,keep_flip=True):
+    def __init__(self,root, anno_file,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,use_anno_cats=False,test_mode=False,keep_flip=True, dataset_type="DOTA1"):
         super().__init__()
         print('init DOTARCNNDataset')
+        self.dataset_type = dataset_type
         self.root = root 
         self.coco = COCO(anno_file)
         self.keep_flip = keep_flip
