@@ -33,12 +33,44 @@ class RCNN(nn.Module):
         
         if self.neck:
             features = self.neck(features)
+
+        proposals_list, rpn_losses = self.rpn(features,targets)
+
+        # Test code begin
+
+        # import pickle
+        # print("load feature")
+        # with open('/mnt/disk/czh/masknet/temp/feature.pkl', 'rb') as f:
+        #     features_load = pickle.load(f)
+
+        # print("load proposals")
+        # proposals_list = []
+
+        # for i in range(len(targets)):
+
+        #     with open(f'/mnt/disk/czh/masknet/temp/proposal_{i}.pkl', 'rb') as f:
+        #         proposal = jt.array(pickle.load(f))
+        #     with open(f'/mnt/disk/czh/masknet/temp/label_{i}.pkl', 'rb') as f:
+        #         label = jt.array(pickle.load(f))
+        #     with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
+        #         obboxes = jt.array(pickle.load(f))
+        #     with open(f'/mnt/disk/czh/masknet/temp/bboxes_{i}.pkl', 'rb') as f:
+        #         bboxes = jt.array(pickle.load(f))
+
+        #     proposals_list.append(proposal)
+        #     targets[i]['labels'] = label
+        #     targets[i]['hboxes'] = bboxes
+        #     targets[i]['polys'] = obboxes
+
+        # features = (jt.array(features_load[0]), jt.array(features_load[1]), jt.array(features_load[2]), jt.array(features_load[3]), jt.array(features_load[4]))
         
-        proposals,rpn_losses = self.rpn(features,targets)
-        output = self.bbox_head(features, proposals, targets)
-        
+        # Test code end
+       
+        output = self.bbox_head(features, proposals_list, targets)
+
         if self.is_training():
             output.update(rpn_losses)
+
         return output
 
 

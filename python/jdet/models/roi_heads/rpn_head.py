@@ -18,6 +18,7 @@ class RPNHead(nn.Module):
                  min_bbox_size = -1,
                  nms_thresh = 0.3,
                  nms_pre = 1200,
+                 nms_post = 1200,
                  feat_channels=256,
                  anchor_generator=dict(
                      type='AnchorGenerator',
@@ -51,6 +52,7 @@ class RPNHead(nn.Module):
         self.min_bbox_size = min_bbox_size
         self.nms_thresh  = nms_thresh
         self.nms_pre = nms_pre
+        self.nms_post = nms_post
         self.in_channels = in_channels
         self.feat_channels = feat_channels
         self.num_classes = num_classes
@@ -109,7 +111,10 @@ class RPNHead(nn.Module):
                 5-th column is a score between 0 and 1.
         """
         # bboxes from different level should be independent during NMS,
-        mlvl_proposals = []
+        mlvl_scores = []
+        mlvl_valid_anchors = []
+        mlvl_bbox_pred = []
+
         for idx in range(len(cls_scores)):
             rpn_cls_score = cls_scores[idx]
             rpn_bbox_pred = bbox_preds[idx]
@@ -120,7 +125,7 @@ class RPNHead(nn.Module):
             # num_class in RPN head since mmdet v2.5, which is unified to
             # be consistent with other head since mmdet v2.0. In mmdet v2.0
             # to v2.4 we keep BG label as 0 and FG label as 1 in rpn head.
-            scores = nn.softmax(rpn_cls_score,dim=1)[:, 0]
+            scores = nn.softmax(rpn_cls_score,dim=1)[:, 1]
 
             rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             anchors = mlvl_anchors[idx]
@@ -132,26 +137,53 @@ class RPNHead(nn.Module):
                 topk_inds = rank_inds[:self.nms_pre]
                 scores = ranked_scores[:self.nms_pre]
                 rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
-                anchors = anchors[topk_inds, :]
+                anchors = anchors[topk_inds, :]  
 
-            proposals = self.bbox_coder.decode(anchors,rpn_bbox_pred,max_shape=img_shape)
+            # proposals = self.bbox_coder.decode(anchors, rpn_bbox_pred, max_shape=img_shape)
 
-            if self.min_bbox_size >= 0:
-                w = proposals[:, 2] - proposals[:, 0]
-                h = proposals[:, 3] - proposals[:, 1]
-                valid_mask = (w > self.min_bbox_size) & (h > self.min_bbox_size)
-                if not valid_mask.all():
-                    proposals = proposals[valid_mask]
-                    scores = scores[valid_mask]
+            # if self.min_bbox_size >= 0:
+            #     w = proposals[:, 2] - proposals[:, 0]
+            #     h = proposals[:, 3] - proposals[:, 1]
+            #     valid_mask = (w > self.min_bbox_size) & (h > self.min_bbox_size)
+            #     if not valid_mask.all():
+            #         proposals = proposals[valid_mask]
+            #         scores = scores[valid_mask]
 
-            dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
-            keep = jt.nms(dets,self.nms_thresh)
-            proposals = proposals[keep,:]
-            # scores = scores[keep]
-            # mlvl_proposals.append((proposals,scores))
-            mlvl_proposals.append(proposals)
+            # dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
+            # keep = jt.nms(dets, self.nms_thresh)
 
-        return mlvl_proposals
+            # proposals = proposals[keep,:]
+
+            mlvl_scores.append(scores)
+            mlvl_bbox_pred.append(rpn_bbox_pred)
+            mlvl_valid_anchors.append(anchors)
+        
+        anchors = jt.concat(mlvl_valid_anchors)
+        rpn_bbox_pred = jt.concat(mlvl_bbox_pred)
+        scores = jt.concat(mlvl_scores)
+
+        proposals = self.bbox_coder.decode(anchors, rpn_bbox_pred, max_shape=img_shape)
+
+        if self.min_bbox_size >= 0:
+            w = proposals[:, 2] - proposals[:, 0]
+            h = proposals[:, 3] - proposals[:, 1]
+            valid_mask = (w > self.min_bbox_size) & (h > self.min_bbox_size)
+            if not valid_mask.all():
+                proposals = proposals[valid_mask]
+                scores = scores[valid_mask]
+
+        # print("proposals before nms: ")
+        # print(proposals.shape)
+        # print(proposals)
+        dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
+        keep = jt.nms(dets, self.nms_thresh)
+        dets = dets[keep, :]
+        # print("nms dets: ")
+        # print(dets.shape)
+        # print(dets)
+
+        dets = dets[:self.nms_post]
+        return proposals
 
     def get_bboxes(self,
                    cls_scores,
@@ -194,6 +226,7 @@ class RPNHead(nn.Module):
             ]
             # W,H
             img_shape = target['img_size']
+
             proposals = self._get_bboxes_single(cls_score_list, bbox_pred_list,mlvl_anchors, img_shape)
             result_list.append(proposals)
         return result_list

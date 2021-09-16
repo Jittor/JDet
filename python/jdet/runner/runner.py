@@ -16,6 +16,9 @@ from jdet.data.devkits.data_merge import data_merge_result
 import os
 import shutil
 
+from jittor_utils import auto_diff
+import sys
+
 class Runner:
     def __init__(self):
         cfg = get_cfg()
@@ -89,10 +92,22 @@ class Runner:
         self.test()
 
     def train(self):
+
+
         self.model.train()
 
         start_time = time.time()
+
+        ### Test Begin
+        # hook = auto_diff.Hook("gliding2")
+        # hook.hook_module(self.model)
+        # hook.hook_optimizer(self.optimizer)
+        # # auto_diff.hook_rand()
+        # self.model.eval()
+        ### Test End
+
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
+
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
@@ -124,6 +139,7 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
+
         self.epoch +=1
 
 
