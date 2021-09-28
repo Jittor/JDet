@@ -275,9 +275,18 @@ class ROIAlign(nn.Module):
 
     def execute(self, input, rois):
         # breakpoint()
-        return roi_align(
+        # print("inputs")
+        # print(input)
+        # print("rois")
+        # print(rois)
+        # print("spatial_scale")
+        # print(self.spatial_scale)
+        res = roi_align(
             input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.version
         )
+        # print("align_res")
+        # print(res)
+        return res
 
     def __repr__(self):
         tmpstr = self.__class__.__name__ + "("

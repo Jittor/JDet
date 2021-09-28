@@ -225,3 +225,92 @@ class GVRatioCoder:
 
     def decode(self, bboxes, bboxes_pred):
         raise NotImplementedError
+
+@BOXES.register_module()
+class GVDeltaXYWHBBoxCoder:
+
+    def __init__(self,
+                 target_means=(0., 0., 0., 0.),
+                 target_stds=(1., 1., 1., 1.)):
+        self.means = target_means
+        self.stds = target_stds
+
+    def encode(self, bboxes, gt_bboxes):
+
+        assert bboxes.size(0) == gt_bboxes.size(0)
+        assert bboxes.size(-1) == gt_bboxes.size(-1) == 4
+        assert bboxes.size() == gt_bboxes.size()
+
+        proposals = bboxes.float()
+        gt = gt_bboxes.float()
+        px = (proposals[..., 0] + proposals[..., 2]) * 0.5
+        py = (proposals[..., 1] + proposals[..., 3]) * 0.5
+        pw = proposals[..., 2] - proposals[..., 0]
+        ph = proposals[..., 3] - proposals[..., 1]
+
+        gx = (gt[..., 0] + gt[..., 2]) * 0.5
+        gy = (gt[..., 1] + gt[..., 3]) * 0.5
+        gw = gt[..., 2] - gt[..., 0]
+        gh = gt[..., 3] - gt[..., 1]
+
+        dx = (gx - px) / pw
+        dy = (gy - py) / ph
+        dw = jt.log(gw / pw)
+        dh = jt.log(gh / ph)
+        deltas = jt.stack([dx, dy, dw, dh], dim=-1)
+
+        means = jt.array(self.means, dtype=deltas.dtype).unsqueeze(0)
+        stds = jt.array(self.stds, dtype=deltas.dtype).unsqueeze(0)
+        deltas = (deltas - means) / stds
+
+        return deltas
+
+    def decode(self,
+               bboxes,
+               pred_bboxes,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000):
+
+        assert pred_bboxes.size(0) == bboxes.size(0)
+
+        means = jt.array(self.means, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 4)
+        stds = jt.array(self.stds, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 4)
+        denorm_deltas = pred_bboxes * stds + means
+
+        dx = denorm_deltas[:, 0::4]
+        dy = denorm_deltas[:, 1::4]
+        dw = denorm_deltas[:, 2::4]
+        dh = denorm_deltas[:, 3::4]
+        
+        max_ratio = np.abs(np.log(wh_ratio_clip))
+        dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+        dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+
+        # Compute center of each roi
+        px = ((bboxes[:, 0] + bboxes[:, 2]) * 0.5).unsqueeze(1)
+        py = ((bboxes[:, 1] + bboxes[:, 3]) * 0.5).unsqueeze(1)
+        # Compute width/height of each roi
+        pw = (bboxes[:, 2] - bboxes[:, 0]).unsqueeze(1)
+        ph = (bboxes[:, 3] - bboxes[:, 1]).unsqueeze(1)
+
+        # Use exp(network energy) to enlarge/shrink each roi
+        gw = pw * dw.exp()
+        gh = ph * dh.exp()
+        # Use network energy to shift the center of each roi
+        gx = px + pw * dx
+        gy = py + ph * dy
+        # Convert center-xy/width/height to top-left, bottom-right
+        x1 = gx - gw * 0.5
+        y1 = gy - gh * 0.5
+        x2 = gx + gw * 0.5
+        y2 = gy + gh * 0.5
+        
+        if max_shape is not None:
+            x1 = x1.clamp(min_v=0, max_v=max_shape[1])
+            y1 = y1.clamp(min_v=0, max_v=max_shape[0])
+            x2 = x2.clamp(min_v=0, max_v=max_shape[1])
+            y2 = y2.clamp(min_v=0, max_v=max_shape[0])
+
+        bboxes = jt.stack([x1, y1, x2, y2], dim=-1).view_as(pred_bboxes)
+
+        return bboxes

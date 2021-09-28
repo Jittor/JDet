@@ -15,7 +15,7 @@ model = dict(
         type = "RPNHead",
         in_channels = 256,
         num_classes=2,
-        min_bbox_size = -1,
+        min_bbox_size = 0,
         nms_thresh = 0.7,
         nms_pre = 2000,
         nms_post = 2000,
@@ -26,14 +26,11 @@ model = dict(
             ratios=[0.5, 1.0, 2.0],
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
-            type='DeltaXYWHBBoxCoder',
+            type='GVDeltaXYWHBBoxCoder',
             target_means=(.0, .0, .0, .0),
             target_stds=(1.0, 1.0, 1.0, 1.0)),
-        loss_cls=dict(
-            type='CrossEntropyLoss',
-            loss_weight=1.0),
-        loss_bbox=dict(
-            type='L1Loss', loss_weight=1.0),
+        loss_cls=dict(type='CrossEntropyLoss', loss_weight=1.0),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.7,
@@ -73,12 +70,12 @@ model = dict(
             neg_pos_ub=-1,
             add_gt_as_proposals=True),
         bbox_coder=dict(
-            type='DeltaXYWHBBoxCoder',
+            type='GVDeltaXYWHBBoxCoder',
             target_means=(.0, .0, .0, .0),
             target_stds=(0.1, 0.1, 0.2, 0.2)),
         bbox_roi_extractor=dict(
             type='SingleRoIExtractor',
-            roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
+            roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=2),
             out_channels=256,
             featmap_strides=[4, 8, 16, 32]),
         cls_loss=dict(
@@ -139,6 +136,8 @@ dataset = dict(
         type="DOTADataset",
         annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        # annotations_file='/home/czh/OBBDetection/DOTA_single_jdet/trainval/labels.pkl',
+        # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -193,15 +192,16 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
+        # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
                 max_size=1024
             ),
-            dict(
+            dict(   
                 type = "Pad",
                 size_divisor=32),
             dict(
@@ -217,7 +217,7 @@ dataset = dict(
 
 optimizer = dict(
     type='SGD', 
-    lr=0.01/4.,#0.01*(1/8.), 
+    lr=0.005, #0.01*(1/8.), 
     momentum=0.9, 
     weight_decay=0.0001,)
     # grad_clip=dict(
@@ -228,9 +228,8 @@ scheduler = dict(
     type='StepLR',
     warmup='linear',
     warmup_iters=500,
-    warmup_ratio=1.0 / 3,
-    milestones=[7, 10])
-
+    warmup_ratio=0.001,
+    milestones=[8, 11])
 
 logger = dict(
     type="RunLogger")
@@ -240,4 +239,4 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/home/czh"
+work_dir = "/mnt/disk/czh/gliding"

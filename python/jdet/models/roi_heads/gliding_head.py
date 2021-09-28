@@ -4,16 +4,16 @@ from jittor import nn, std
 from jdet.ops.roi_align import ROIAlign
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
+from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.models.boxes.box_ops import delta2bbox
 from jdet.ops.nms_rotated import ml_nms_rotated
 from jdet.ops.nms import nms
 from jdet.ops.nms_poly import nms_poly
 import os
 from jdet.config.constant import DOTA1_CLASSES
+from numpy.lib.polynomial import poly
 from jdet.models.utils.gliding_transforms import *
 from jdet.models.losses import accuracy
-# from jdet.utils.visualization import draw_rboxes
-
 import math
 
 from numpy.lib.ufunclike import fix
@@ -54,7 +54,7 @@ class GlidingHead(nn.Module):
                  pooler_scales = [1/8., 1/16., 1/32., 1/64., 1/128.],
                  pooler_sampling_ratio = 0,
                  score_thresh=0.05,
-                 nms_thresh=0.5,
+                 nms_thresh=0.7,
                  detections_per_img=100,
                  box_weights = (10., 10., 5., 5.),
                  assigner=dict(
@@ -121,6 +121,7 @@ class GlidingHead(nn.Module):
         self.pos_weight = -1
         self.reg_class_agnostic = False
         self.ratio_thr = 0.8
+        self.max_per_img = 2000
 
         self.assigner = build_from_cfg(assigner, BOXES)
         self.sampler = build_from_cfg(sampler, BOXES)
@@ -147,22 +148,24 @@ class GlidingHead(nn.Module):
                  for scale in self.pooler_scales]
 
         in_dim = self.pooler_resolution*self.pooler_resolution*self.in_channels
-        self.fc1 = nn.Linear(in_dim,self.representation_dim)
-        self.fc2 = nn.Linear(self.representation_dim,self.representation_dim)
+        self.fc1 = nn.Linear(in_dim, self.representation_dim)
+        self.fc2 = nn.Linear(self.representation_dim, self.representation_dim)
 
-        self.cls_score = nn.Linear(self.representation_dim, self.num_classes)
+        self.cls_score = nn.Linear(self.representation_dim, self.num_classes + 1)
         self.bbox_pred = nn.Linear(self.representation_dim, self.num_classes * 4)
         self.fix_pred = nn.Linear(self.representation_dim, self.num_classes * 4)
         self.ratio_pred = nn.Linear(self.representation_dim, self.num_classes * 1)
         
-
     def init_weights(self):
-        nn.init.kaiming_uniform_(self.fc1.weight, a=1)
+        nn.init.xavier_uniform_(self.fc1.weight)
         nn.init.constant_(self.fc1.bias, 0)
-        nn.init.kaiming_uniform_(self.fc2.weight, a=1)
+        nn.init.xavier_uniform_(self.fc2.weight)
         nn.init.constant_(self.fc2.bias, 0)
 
-        for l in [self.cls_score, self.bbox_pred, self.fix_pred, self.ratio_pred]:
+        nn.init.gauss_(self.cls_score.weight,std=0.01)
+        nn.init.constant_(self.cls_score.bias, 0)
+
+        for l in [self.bbox_pred, self.fix_pred, self.ratio_pred]:
             nn.init.gauss_(l.weight,std=0.001)
             nn.init.constant_(l.bias, 0)
 
@@ -197,38 +200,87 @@ class GlidingHead(nn.Module):
         rois = jt.concat(rois_list, 0)
         return rois
 
-    def forward_single(self, x, sampling_results):
+    def arb2result(self, bboxes, labels, num_classes, bbox_type='hbb'):
 
-        rois = self.arb2roi([res.bboxes for res in sampling_results])
+        assert bbox_type in ['hbb', 'obb', 'poly']
+        bbox_dim = self.get_bbox_dim(bbox_type, with_score=True)
+
+        if bboxes.shape[0] == 0:
+            return [jt.zeros((0, bbox_dim), dtype="float32") for i in range(num_classes)]
+        else:
+            return [bboxes[labels == i, :] for i in range(num_classes)]
+    
+    def multiclass_arb_nms(self, multi_bboxes, multi_scores, score_thr, max_num=-1, score_factors=None, bbox_type='hbb'):
         
+        bbox_dim = self.get_bbox_dim(bbox_type)
+        num_classes = multi_scores.size(1) - 1
+
+        # exclude background category
+        if multi_bboxes.shape[1] > bbox_dim:
+            bboxes = multi_bboxes.view(multi_scores.size(0), -1, bbox_dim)
+        else:
+            bboxes = multi_bboxes[:, None].expand(-1, num_classes, bbox_dim)
+        scores = multi_scores[:, :-1]
+
+        # filter out boxes with low scores
+        valid_mask = scores > self.score_thresh
+        bboxes = bboxes[valid_mask]
+        if score_factors is not None:
+            scores = scores * score_factors[:, None]
+        scores = scores[valid_mask]
+        labels = valid_mask.nonzero()[:, 1]
+
+        if bboxes.numel() == 0:
+            bboxes =jt.zeros((0, bbox_dim+1), dtype=multi_bboxes.dtype)
+            labels = jt.zeros((0, ), dtype="int64")
+            return bboxes, labels
+
+        dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
+        keep = jt.nms(dets, self.nms_thresh)
+
+        if max_num > 0:
+            keep = keep[:max_num]
+            
+        dets = dets[keep, :]
+
+        return dets, labels
+
+    def forward_single(self, x, sampling_results, test=False):
+        
+        if test:
+            rois = self.arb2roi(sampling_results, bbox_type=self.start_bbox_type)
+        else:
+            rois = self.arb2roi([res.bboxes for res in sampling_results])
+            
         ### Test begin
         # sampling_results_bboxes = []
         # for i in range(len(sampling_results)):
         #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}.pkl', 'rb') as f:
         #         sampling_results_bboxes.append(jt.array(pickle.load(f)))
 
-        # print("sampling_results")
-        # for res in sampling_results_bboxes:
-        #     print(res)
+        # x = []
+        # for i in range(5):
+        #     with open(f'/mnt/disk/czh/masknet/temp/x_{i}.pkl', 'rb') as f:
+        #         x.append(jt.array(pickle.load(f)))
+            
+        # x = tuple(x)    
         # rois = self.arb2roi([res for res in sampling_results_bboxes])
         ### Test end
-
-        # print("rois")
-        # print(rois.shape)
-        # print(rois) 
-
-        # print("forward x")
-        # print(x[0].shape)
-        # print(x[0])
         
         x = self.bbox_roi_extractor(x[:self.bbox_roi_extractor.num_inputs], rois)
+        
+        ## Test begin
+        # if test == False:
+        #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_train.pkl', 'rb') as f:
+        #         x = jt.array(pickle.load(f))
+        # else:
+        #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_test.pkl', 'rb') as f:
+        #         x = jt.array(pickle.load(f))
+        ### Test end
+
         if self.with_shared_head:
             x = self.shared_head(x)
         
-        # print("after roi align x")
-        # print(x.shape)
-        # print(x)
-
         if self.with_avg_pool:
             x = self.avg_pool2d(x)
 
@@ -243,12 +295,6 @@ class GlidingHead(nn.Module):
         ratios = self.ratio_pred(x)
         ratios = ratios.sigmoid()
 
-        # print("Final Result!")
-        # print(scores)
-        # print(bbox_deltas)
-        # print(fixes)
-        # print(ratios)
-    
         return scores, bbox_deltas, fixes, ratios, rois
     
     def loss(self, cls_score, bbox_pred, fix_pred, ratio_pred, rois, labels, label_weights, bbox_targets, bbox_weights,
@@ -334,7 +380,7 @@ class GlidingHead(nn.Module):
 
         # original implementation uses new_zeros since BG are set to be 0
         # now use empty & fill because BG cat_id = num_classes,
-        # FG cat_id = [0, num_classes-1]
+        # FG cat_id = [0, num_classes - 1]
         labels = jt.full((num_samples,), self.num_classes, dtype="int64")
         label_weights = jt.zeros((num_samples,), dtype=pos_bboxes.dtype)
         bbox_targets = jt.zeros((num_samples, 4), dtype=pos_bboxes.dtype)
@@ -395,8 +441,10 @@ class GlidingHead(nn.Module):
         return (labels, label_weights, bbox_targets, bbox_weights, fix_targets, fix_weights, ratio_targets, ratio_weights)
 
     def get_bboxes(self, rois, cls_score, bbox_pred, fix_pred, ratio_pred, img_shape, scale_factor, rescale=False):
+        
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
+        
         scores = nn.softmax(cls_score, dim=1)
 
         bboxes = self.bbox_coder.decode(rois[:, 1:], bbox_pred, max_shape=img_shape)
@@ -412,83 +460,108 @@ class GlidingHead(nn.Module):
             scale_factor = jt.array(scale_factor, dtype=bboxes.dtype)
             polys /= scale_factor.repeat(2)
         polys = polys.view(polys.size(0), -1)
-        # print("polys!")
-        # print(polys.shape)
+        
+        det_bboxes, det_labels = self.multiclass_arb_nms(polys, scores, self.score_thresh, self.max_per_img, bbox_type='poly')
+        det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
-        return polys
+        return det_bboxes, det_labels
 
     def execute(self, x, proposal_list, targets):
 
-        # print("Func: Gliding_Head")
-
-        gt_obboxes = []
-        gt_bboxes = []
-        gt_labels = []
-        gt_bboxes_ignore = []
-        gt_obboxes_ignore = []
-
-        # TODO: Add ignore to config & get_obboxes
-        for target in targets:
-            gt_obboxes.append(target['polys']) # TODO: polys != obboxes
-            gt_bboxes.append(target['hboxes'])
-            gt_labels.append(target['labels'])
-            gt_bboxes_ignore.append(target['hboxes_ignore'])
-            gt_obboxes_ignore.append(target['polys_ignore'])
-
-        # assign gts and sample proposals
-        if self.with_bbox:
-            start_bbox_type = self.start_bbox_type
-            end_bbox_type = self.end_bbox_type
-            target_bboxes = gt_bboxes if start_bbox_type == 'hbb' else gt_obboxes
-            target_bboxes_ignore = gt_bboxes_ignore if start_bbox_type == 'hbb' else gt_obboxes_ignore
-
-            num_imgs = len(targets)
-            if target_bboxes_ignore is None:
-                target_bboxes_ignore = [None for _ in range(num_imgs)]
-            sampling_results = []
-
-            for i in range(num_imgs):
-
-                assign_result = self.assigner.assign(
-                    proposal_list[i], target_bboxes[i],
-                    target_bboxes_ignore[i], gt_labels[i])
-
-                sampling_result = self.sampler.sample(
-                    assign_result,
-                    proposal_list[i],
-                    target_bboxes[i],
-                    gt_labels[i],
-                    feats=[lvl_feat[i][None] for lvl_feat in x])
-
-                if start_bbox_type != end_bbox_type:
-                    if gt_obboxes[i].numel() == 0:
-                        # TODO: PR OBBDetection's bugs!
-                        # sampling_result.pos_gt_bboxes = gt_obboxes[i].new_zeors((0, gt_obboxes[0].size(-1)))
-                        sampling_result.pos_gt_bboxes = jt.zeros((0, gt_obboxes[0].size(-1)), dtype=gt_obboxes[i].dtype)
-                    else:
-                        sampling_result.pos_gt_bboxes = gt_obboxes[i][sampling_result.pos_assigned_gt_inds, :]
-
-                sampling_results.append(sampling_result)
-
-        scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, sampling_results)
-
-        # with open(f'/mnt/disk/czh/masknet/temp/cls_score.pkl', 'rb') as f:
-        #     scores = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
-        #     bbox_deltas = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/fix_pred.pkl', 'rb') as f:
-        #     fixes = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/ratio_pred.pkl', 'rb') as f:
-        #     ratios = jt.array(pickle.load(f))
-
-        bbox_targets = self.get_bboxes_targets(sampling_results)
-
         if self.is_training():
+
+            gt_obboxes = []
+            gt_bboxes = []
+            gt_labels = []
+            gt_bboxes_ignore = []
+            gt_obboxes_ignore = []
+
+            for target in targets:
+                gt_obboxes.append(target['polys'])
+                gt_bboxes.append(target['hboxes'])
+                gt_labels.append(target['labels'] - 1)
+                gt_bboxes_ignore.append(target['hboxes_ignore'])
+                gt_obboxes_ignore.append(target['polys_ignore'])
+
+            # assign gts and sample proposals
+            if self.with_bbox:
+                start_bbox_type = self.start_bbox_type
+                end_bbox_type = self.end_bbox_type
+                target_bboxes = gt_bboxes if start_bbox_type == 'hbb' else gt_obboxes
+                target_bboxes_ignore = gt_bboxes_ignore if start_bbox_type == 'hbb' else gt_obboxes_ignore
+
+                num_imgs = len(targets)
+                if target_bboxes_ignore is None:
+                    target_bboxes_ignore = [None for _ in range(num_imgs)]
+                sampling_results = []
+
+                for i in range(num_imgs):
+
+                    assign_result = self.assigner.assign(proposal_list[i], target_bboxes[i], target_bboxes_ignore[i], gt_labels[i])
+
+                    sampling_result = self.sampler.sample(
+                        assign_result,
+                        proposal_list[i],
+                        target_bboxes[i],
+                        gt_labels[i],
+                        feats=[lvl_feat[i][None] for lvl_feat in x])
+
+                    if start_bbox_type != end_bbox_type:
+                        if gt_obboxes[i].numel() == 0:
+                            # TODO: PR OBBDetection's bugs!
+                            # sampling_result.pos_gt_bboxes = gt_obboxes[i].new_zeors((0, gt_obboxes[0].size(-1)))
+                            sampling_result.pos_gt_bboxes = jt.zeros((0, gt_obboxes[0].size(-1)), dtype=gt_obboxes[i].dtype)
+                        else:
+                            sampling_result.pos_gt_bboxes = gt_obboxes[i][sampling_result.pos_assigned_gt_inds, :]
+
+                    sampling_results.append(sampling_result)
+                    
+
+            scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, sampling_results, test=False)
+
+            ## Test begin
+
+            # with open(f'/mnt/disk/czh/masknet/temp/cls_score.pkl', 'rb') as f:
+            #     scores = jt.array(pickle.load(f))
+            # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
+            #     bbox_deltas = jt.array(pickle.load(f))
+            # with open(f'/mnt/disk/czh/masknet/temp/fix_pred.pkl', 'rb') as f:
+            #     fixes = jt.array(pickle.load(f))
+            # with open(f'/mnt/disk/czh/masknet/temp/ratio_pred.pkl', 'rb') as f:
+            #     ratios = jt.array(pickle.load(f))
+
+            ## Test end
+
+            bbox_targets = self.get_bboxes_targets(sampling_results)
+
             return self.loss(scores, bbox_deltas, fixes, ratios, rois, *bbox_targets)
+            
         else:
-            img_shape = targets[0]['img_size']
-            scale_factor = targets[0]['scale_factor']
-            return self.get_bboxes(rois, scores, bbox_deltas, fixes, ratios, img_shape, scale_factor)
+            
+            result = []
+            for i in range(len(targets)):
+
+                scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, [proposal_list[i]], test=True)
+                img_shape = targets[i]['img_size']
+                scale_factor = targets[i]['scale_factor']
+                
+                det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, fixes, ratios, img_shape, scale_factor)
+
+                poly = det_bboxes[:, :8]
+                scores = det_bboxes[:, 8]
+                labels = det_labels
+
+                # img_vis = cv2.imread(targets[i]["img_file"])
+                # filename = targets[i]["img_file"].split('/')[-1]
+                # for j in range(poly.shape[0]):
+                #     box = poly[j]
+                #     draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
+
+                # cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_{filename}', img_vis)
+
+                result.append((poly, scores, labels))
+            
+            return result
 
 def draw_rbox(img,box,text,color):
     box = [int(x) for x in box]
