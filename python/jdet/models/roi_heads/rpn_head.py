@@ -170,19 +170,15 @@ class RPNHead(nn.Module):
                 proposals = proposals[valid_mask]
                 scores = scores[valid_mask]
 
-        # print("proposals before nms")
+        # print("proposals before nms: ")
+        # print(proposals.shape)
         # print(proposals)
 
         dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
         keep = jt.nms(dets, self.nms_thresh)
         dets = dets[keep, :]
-
-        # print("proposals after nms")
-        # print(dets.shape)
-        # print(dets)
-
         dets = dets[:self.nms_post]
-    
+            
         return dets
 
     def get_bboxes(self,
@@ -249,7 +245,7 @@ class RPNHead(nn.Module):
 
         # assign gt and sample anchors
         assign_result = self.assigner.assign(anchors, gt_bboxes, gt_bboxes_ignore)
-        sampling_result = self.sampler.sample(assign_result, anchors,gt_bboxes)
+        sampling_result = self.sampler.sample(assign_result, anchors, gt_bboxes)
 
         num_valid_anchors = anchors.shape[0]
         bbox_targets = jt.zeros_like(anchors)
@@ -333,11 +329,13 @@ class RPNHead(nn.Module):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        
         # classification loss
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         cls_score = cls_score.permute(0, 2, 3,1).reshape(-1, 2)
         loss_cls = self.loss_cls(cls_score, labels, weight=label_weights, avg_factor=num_total_samples)
+
         # regression loss
         bbox_targets = bbox_targets.reshape(-1, 4)
         bbox_weights = bbox_weights.reshape(-1, 4)
@@ -369,14 +367,6 @@ class RPNHead(nn.Module):
 
         num_total_samples =  num_total_pos + num_total_neg 
 
-        # anchor number of multi levels
-        # num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
-        # # concat all level anchors and flags to a single tensor
-        # concat_anchor_list = []
-        # for i in range(len(anchor_list)):
-        #     concat_anchor_list.append(jt.concat(anchor_list[i]))
-        # all_anchor_list = images_to_levels(concat_anchor_list,num_level_anchors)
-
         losses_cls, losses_bbox = multi_apply(
             self.loss_single,
             cls_scores,
@@ -393,10 +383,6 @@ class RPNHead(nn.Module):
     def execute(self,features,targets):
 
         outs = multi_apply(self.forward_single, features)
-        
-        ### Test Begin
-        # losses = self.loss(*outs, targets)
-        ### Test End
         
         if self.is_training():
             losses = self.loss(*outs,targets)

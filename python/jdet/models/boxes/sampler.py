@@ -15,7 +15,16 @@ class SamplingResult:
 
         self.num_gts = gt_bboxes.shape[0]
         self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1
-        self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]
+
+        if gt_bboxes.numel() == 0:
+            # hack for index error case
+            assert self.pos_assigned_gt_inds.numel() == 0
+            self.pos_gt_bboxes = jt.empty(gt_bboxes.size(), dtype=gt_bboxes.dtype).view(-1, 4)
+        else:
+            if len(gt_bboxes.shape) < 2:
+                gt_bboxes = gt_bboxes.view(-1, 4)
+            self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]
+
         if assign_result.labels is not None:
             self.pos_gt_labels = assign_result.labels[pos_inds]
         else:
@@ -136,15 +145,27 @@ class RandomSampler(BaseSampler):
     def random_choice(gallery, num):
         """Random select some elements from the gallery.
         """
-        assert len(gallery) >= num
-        if isinstance(gallery, list):
-            gallery = np.array(gallery)
-        cands = np.arange(len(gallery))
-        np.random.shuffle(cands)
-        rand_inds = cands[:num]
-        if not isinstance(gallery, np.ndarray):
-            rand_inds = jt.array(rand_inds).int()
-        return gallery[rand_inds]
+        # assert len(gallery) >= num
+        # if isinstance(gallery, list):
+        #     gallery = np.array(gallery)
+        # cands = np.arange(len(gallery))
+        # np.random.shuffle(cands)
+        # rand_inds = cands[:num]
+        # if not isinstance(gallery, np.ndarray):
+        #     rand_inds = jt.array(rand_inds).int()
+        
+        # print("rand_inds")
+        # print(jt.argsort(rand_inds)[1])
+        # return gallery[rand_inds]
+
+        is_tensor = isinstance(gallery, jt.Var)
+        if not is_tensor:
+            gallery = jt.array(gallery, dtype="int64")
+        perm = jt.randperm(gallery.numel())[:num]
+        rand_inds = gallery[perm]
+        if not is_tensor:
+            rand_inds = rand_inds.cpu().numpy()
+        return rand_inds
 
     def _sample_pos(self, assign_result, num_expected, **kwargs):
         """Randomly sample some positive samples."""

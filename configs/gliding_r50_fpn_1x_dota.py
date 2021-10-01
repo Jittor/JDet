@@ -36,7 +36,9 @@ model = dict(
             pos_iou_thr=0.7,
             neg_iou_thr=0.3,
             min_pos_iou=0.3,
-            ignore_iof_thr=-1),
+            ignore_iof_thr=-1,
+            match_low_quality=True,
+            ),
         sampler=dict(
             type='RandomSampler',
             num=256,
@@ -53,7 +55,7 @@ model = dict(
         pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
         pooler_sampling_ratio = 0,
         score_thresh=0.05,
-        nms_thresh=0.7,
+        nms_thresh=0.3,
         detections_per_img=2000,
         box_weights = (10., 10., 5., 5.),
         assigner=dict(
@@ -62,6 +64,7 @@ model = dict(
             neg_iou_thr=0.5,
             min_pos_iou=0.5,
             ignore_iof_thr=-1,
+            match_low_quality=False,
             iou_calculator=dict(type='BboxOverlaps2D')),
         sampler=dict(
             type='RandomSampler',
@@ -75,7 +78,7 @@ model = dict(
             target_stds=(0.1, 0.1, 0.2, 0.2)),
         bbox_roi_extractor=dict(
             type='SingleRoIExtractor',
-            roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=2),
+            roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
             out_channels=256,
             featmap_strides=[4, 8, 16, 32]),
         cls_loss=dict(
@@ -147,10 +150,10 @@ dataset = dict(
             dict(
                 type='RotatedRandomFlip', 
                 prob=0.5),
-            dict(
-                type="RandomRotateAug",
-                random_rotate_on=True,
-            ),
+            # dict(
+            #     type="RandomRotateAug",
+            #     random_rotate_on=True,
+            # ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -165,7 +168,7 @@ dataset = dict(
         num_workers=4,
         shuffle=True,
         filter_empty_gt=False,
-        balance_category=True
+        balance_category=False
     ),
     val=dict(
         type="DOTADataset",
@@ -192,6 +195,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
+        # images_file='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
         # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
@@ -215,14 +219,7 @@ dataset = dict(
     )
 )
 
-optimizer = dict(
-    type='SGD', 
-    lr=0.005, #0.01*(1/8.), 
-    momentum=0.9, 
-    weight_decay=0.0001,)
-    # grad_clip=dict(
-    #     max_norm=35, 
-    #     norm_type=2))
+optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
     type='StepLR',

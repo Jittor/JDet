@@ -236,15 +236,16 @@ class GlidingHead(nn.Module):
             return bboxes, labels
 
         dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
-        keep = jt.nms(dets, self.nms_thresh)
 
-        if max_num > 0:
-            keep = keep[:max_num]
+        # keep = jt.nms(dets, self.nms_thresh)
+
+        # if max_num > 0:
+        #     keep = keep[:max_num]
             
-        dets = dets[keep, :]
+        # dets = dets[keep, :]
 
         return dets, labels
-
+        
     def forward_single(self, x, sampling_results, test=False):
         
         if test:
@@ -268,7 +269,7 @@ class GlidingHead(nn.Module):
         ### Test end
         
         x = self.bbox_roi_extractor(x[:self.bbox_roi_extractor.num_inputs], rois)
-        
+
         ## Test begin
         # if test == False:
         #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_train.pkl', 'rb') as f:
@@ -460,7 +461,7 @@ class GlidingHead(nn.Module):
             scale_factor = jt.array(scale_factor, dtype=bboxes.dtype)
             polys /= scale_factor.repeat(2)
         polys = polys.view(polys.size(0), -1)
-        
+
         det_bboxes, det_labels = self.multiclass_arb_nms(polys, scores, self.score_thresh, self.max_per_img, bbox_type='poly')
         det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
@@ -551,13 +552,20 @@ class GlidingHead(nn.Module):
                 scores = det_bboxes[:, 8]
                 labels = det_labels
 
+                # visualization
+                # poly_oris = polys_ori.reshape(-1, 8)
+
                 # img_vis = cv2.imread(targets[i]["img_file"])
+                # img_vis_ori = cv2.imread(targets[i]["img_file"])
                 # filename = targets[i]["img_file"].split('/')[-1]
                 # for j in range(poly.shape[0]):
                 #     box = poly[j]
                 #     draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
-
+                # for j in range(polys_ori.shape[0]):
+                #     box = polys_ori[j]
+                #     draw_poly(img_vis_ori, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
                 # cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_{filename}', img_vis)
+                # cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_ori_{filename}', img_vis_ori)
 
                 result.append((poly, scores, labels))
             

@@ -97,7 +97,7 @@ class Runner:
 
         start_time = time.time()
 
-        # ### Test Begin
+        ### Test Begin
         # hook = auto_diff.Hook("gliding2")
         # hook.hook_module(self.model)
         # hook.hook_optimizer(self.optimizer)
