@@ -17,7 +17,6 @@ from jdet.models.losses import accuracy
 import math
 
 from numpy.lib.ufunclike import fix
-import cv2
 
 def print_shape(ll):
     for l in ll:
@@ -199,18 +198,8 @@ class GlidingHead(nn.Module):
             rois_list.append(rois)
         rois = jt.concat(rois_list, 0)
         return rois
-
-    def arb2result(self, bboxes, labels, num_classes, bbox_type='hbb'):
-
-        assert bbox_type in ['hbb', 'obb', 'poly']
-        bbox_dim = self.get_bbox_dim(bbox_type, with_score=True)
-
-        if bboxes.shape[0] == 0:
-            return [jt.zeros((0, bbox_dim), dtype="float32") for i in range(num_classes)]
-        else:
-            return [bboxes[labels == i, :] for i in range(num_classes)]
     
-    def multiclass_arb_nms(self, multi_bboxes, multi_scores, score_thr, max_num=-1, score_factors=None, bbox_type='hbb'):
+    def get_results(self, multi_bboxes, multi_scores, score_factors=None, bbox_type='hbb'):
         
         bbox_dim = self.get_bbox_dim(bbox_type)
         num_classes = multi_scores.size(1) - 1
@@ -236,14 +225,6 @@ class GlidingHead(nn.Module):
             return bboxes, labels
 
         dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
-
-        # keep = jt.nms(dets, self.nms_thresh)
-
-        # if max_num > 0:
-        #     keep = keep[:max_num]
-            
-        # dets = dets[keep, :]
-
         return dets, labels
         
     def forward_single(self, x, sampling_results, test=False):
@@ -252,32 +233,8 @@ class GlidingHead(nn.Module):
             rois = self.arb2roi(sampling_results, bbox_type=self.start_bbox_type)
         else:
             rois = self.arb2roi([res.bboxes for res in sampling_results])
-            
-        ### Test begin
-        # sampling_results_bboxes = []
-        # for i in range(len(sampling_results)):
-        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}.pkl', 'rb') as f:
-        #         sampling_results_bboxes.append(jt.array(pickle.load(f)))
-
-        # x = []
-        # for i in range(5):
-        #     with open(f'/mnt/disk/czh/masknet/temp/x_{i}.pkl', 'rb') as f:
-        #         x.append(jt.array(pickle.load(f)))
-            
-        # x = tuple(x)    
-        # rois = self.arb2roi([res for res in sampling_results_bboxes])
-        ### Test end
         
         x = self.bbox_roi_extractor(x[:self.bbox_roi_extractor.num_inputs], rois)
-
-        ## Test begin
-        # if test == False:
-        #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_train.pkl', 'rb') as f:
-        #         x = jt.array(pickle.load(f))
-        # else:
-        #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_test.pkl', 'rb') as f:
-        #         x = jt.array(pickle.load(f))
-        ### Test end
 
         if self.with_shared_head:
             x = self.shared_head(x)
@@ -310,7 +267,6 @@ class GlidingHead(nn.Module):
                 label_weights,
                 avg_factor=avg_factor,
                 reduction_override=reduction_override)
-            # losses['acc'] = accuracy(cls_score, labels)
 
         bg_class_ind = self.num_classes
         # 0~self.num_classes-1 are FG, self.num_classes is BG
@@ -462,7 +418,7 @@ class GlidingHead(nn.Module):
             polys /= scale_factor.repeat(2)
         polys = polys.view(polys.size(0), -1)
 
-        det_bboxes, det_labels = self.multiclass_arb_nms(polys, scores, self.score_thresh, self.max_per_img, bbox_type='poly')
+        det_bboxes, det_labels = self.get_results(polys, scores, bbox_type='poly')
         det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
         return det_bboxes, det_labels
@@ -509,8 +465,6 @@ class GlidingHead(nn.Module):
 
                     if start_bbox_type != end_bbox_type:
                         if gt_obboxes[i].numel() == 0:
-                            # TODO: PR OBBDetection's bugs!
-                            # sampling_result.pos_gt_bboxes = gt_obboxes[i].new_zeors((0, gt_obboxes[0].size(-1)))
                             sampling_result.pos_gt_bboxes = jt.zeros((0, gt_obboxes[0].size(-1)), dtype=gt_obboxes[i].dtype)
                         else:
                             sampling_result.pos_gt_bboxes = gt_obboxes[i][sampling_result.pos_assigned_gt_inds, :]
@@ -519,19 +473,6 @@ class GlidingHead(nn.Module):
                     
 
             scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, sampling_results, test=False)
-
-            ## Test begin
-
-            # with open(f'/mnt/disk/czh/masknet/temp/cls_score.pkl', 'rb') as f:
-            #     scores = jt.array(pickle.load(f))
-            # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
-            #     bbox_deltas = jt.array(pickle.load(f))
-            # with open(f'/mnt/disk/czh/masknet/temp/fix_pred.pkl', 'rb') as f:
-            #     fixes = jt.array(pickle.load(f))
-            # with open(f'/mnt/disk/czh/masknet/temp/ratio_pred.pkl', 'rb') as f:
-            #     ratios = jt.array(pickle.load(f))
-
-            ## Test end
 
             bbox_targets = self.get_bboxes_targets(sampling_results)
 
@@ -552,181 +493,6 @@ class GlidingHead(nn.Module):
                 scores = det_bboxes[:, 8]
                 labels = det_labels
 
-                # visualization
-                # poly_oris = polys_ori.reshape(-1, 8)
-
-                # img_vis = cv2.imread(targets[i]["img_file"])
-                # img_vis_ori = cv2.imread(targets[i]["img_file"])
-                # filename = targets[i]["img_file"].split('/')[-1]
-                # for j in range(poly.shape[0]):
-                #     box = poly[j]
-                #     draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
-                # for j in range(polys_ori.shape[0]):
-                #     box = polys_ori[j]
-                #     draw_poly(img_vis_ori, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
-                # cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_{filename}', img_vis)
-                # cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_ori_{filename}', img_vis_ori)
-
                 result.append((poly, scores, labels))
             
             return result
-
-def draw_rbox(img,box,text,color):
-    box = [int(x) for x in box]
-    img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=color, thickness=1)
-    img = cv2.putText(img=img, text=text, org=(box[0],box[1]-5), fontFace=0, fontScale=0.5, color=color, thickness=1)
-    return img 
-
-def draw_box(img,box,text,color):
-    box = [int(x) for x in box]
-    img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=color, thickness=1)
-    img = cv2.putText(img=img, text=text, org=(box[0],box[1]-5), fontFace=0, fontScale=0.5, color=color, thickness=1)
-    return img 
-
-def visual_gts(targets,save_dir="./"):
-    for t in targets:
-        bbox = t["hboxes"].numpy()
-        labels = t["labels"].numpy()
-        classes = DOTA1_CLASSES
-        ori_img_size = t["ori_img_size"]
-        img_size = t["img_size"]
-        bbox[:,0::2] *= float(ori_img_size[0]/img_size[0])
-        bbox[:,1::2] *= float(ori_img_size[1]/img_size[1])
-        img_f = t["img_file"]
-        img = cv2.imread(img_f)
-        for box,l in zip(bbox,labels):
-            text = classes[l-1]
-            img = draw_box(img,box,text,(255,0,0))
-        cv2.imwrite(os.path.join(save_dir,"targtes.jpg"),img)
-
-def draw_poly(img,point,color=(255,0,0),thickness=2):
-    cv2.line(img, tuple(point[0]), tuple(point[1]), color, thickness)
-    cv2.line(img, tuple(point[1]), tuple(point[2]), color, thickness)
-    cv2.line(img, tuple(point[2]), tuple(point[3]), color, thickness)
-    cv2.line(img, tuple(point[3]), tuple(point[0]), color, thickness)
-
-
-def draw_proposal(img_file,proposals):
-    img = cv2.imread(img_file)
-    for box in proposals:
-        box = [int(x) for x in box]
-        img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=(255,0,0), thickness=1)
-    cv2.imwrite("proposal.jpg",img)
-
-def draw_rboxes(img_file,boxes,scores,labels,classnames):
-    img = cv2.imread(img_file)
-    for box,score,label in zip(boxes,scores,labels):
-        # box = rotated_box_to_poly_single(box)
-        box = box.reshape(-1,2).astype(int)
-        classname = classnames[label-1]
-        text = f"{classname}:{score:.2}"
-        draw_poly(img,box,color=(255,0,0),thickness=2)
-
-        img = cv2.putText(img=img, text=text, org=(box[0][0],box[0][1]-5), fontFace=0, fontScale=0.5, color=(255,0,0), thickness=1)
-
-    cv2.imwrite("test.jpg",img)
-
-def handle_ratio_prediction(hboxes,rboxes,ratios,scores,labels):
-
-    if rboxes.numel()==0:
-        return rboxes, scores, labels
-
-    h_idx = jt.where(ratios > 0.8)[0]
-    h = hboxes[h_idx]
-    hboxes_vtx = jt.concat([h[:, 0:1], h[:, 1:2], h[:, 2:3], h[:, 1:2], h[:, 2:3], h[:, 3:4], h[:, 0:1], h[:, 3:4]],dim=1)
-    rboxes[h_idx] = hboxes_vtx
-    # keep = nms_poly(rboxes,scores, 0.1 )
-
-    # rboxes = rboxes[keep]
-    # scores = scores[keep]
-    # labels = labels[keep]
-
-    return rboxes, scores, labels
-
-
-def polygons2ratios(rbox):
-    def polygon_area( corners ):
-        n = len( corners ) # of corners
-        area = 0.0
-        for i in range( n ):
-            j = ( i + 1 ) % n
-            area += corners[i][0] * corners[j][1]
-            area -= corners[j][0] * corners[i][1]
-        area = abs( area ) / 2.0
-        return area
-    
-    max_x_ = rbox[:,  ::2].max( 1 )
-    min_x_ = rbox[:,  ::2].min( 1 )
-    max_y_ = rbox[:, 1::2].max( 1 )
-    min_y_ = rbox[:, 1::2].min( 1 )
-
-    rbox = rbox.view( (-1, 4, 2) )
-
-    polygon_areas = list( map( polygon_area, rbox ) )
-    polygon_areas = jt.concat( polygon_areas )
-
-    hbox_areas = ( max_y_ - min_y_ + 1 ) * ( max_x_ - min_x_ + 1 )
-    ratio_gt = polygon_areas / hbox_areas
-
-    ratio_gt = ratio_gt.view( (-1, 1) )
-    return ratio_gt
-
-def polygons2fix(rbox):
-    max_x_idx,max_x_  = rbox[:,  ::2].argmax( 1 )
-    min_x_idx,min_x_  = rbox[:,  ::2].argmin( 1 )
-    max_y_idx,max_y_  = rbox[:, 1::2].argmax( 1 )
-    min_y_idx,min_y_  = rbox[:, 1::2].argmin( 1 )
-
-    x_center = ( max_x_ + min_x_ ) / 2.
-    y_center = ( max_y_ + min_y_ ) / 2.
-
-    box = jt.stack( [min_x_, min_y_, max_x_, max_y_ ], dim=0 ).permute( 1, 0 )
-
-    rbox = rbox.view( (-1, 4, 2) )
-
-    rbox_ordered = jt.zeros_like( rbox )
-    rbox_ordered[:, 0] = rbox[range(len(rbox)), min_y_idx]
-    rbox_ordered[:, 1] = rbox[range(len(rbox)), max_x_idx]
-    rbox_ordered[:, 2] = rbox[range(len(rbox)), max_y_idx]
-    rbox_ordered[:, 3] = rbox[range(len(rbox)), min_x_idx]
-
-    top   = rbox_ordered[:, 0, 0]
-    right = rbox_ordered[:, 1, 1]
-    down  = rbox_ordered[:, 2, 0]
-    left  = rbox_ordered[:, 3, 1]
-
-    """
-    top = jt.min( jt.max( top, box[:, 0] ), box[:, 2] )
-    right = jt.min( jt.max( right, box[:, 1] ), box[:, 3] )
-    down = jt.min( jt.max( down, box[:, 0] ), box[:, 2] )
-    left = jt.min( jt.max( left, box[:, 1] ), box[:, 3] )
-    """
-
-    top_gt = (top - box[:, 0]) / (box[:, 2] - box[:, 0])
-    right_gt = (right - box[:, 1]) / (box[:, 3] - box[:, 1])
-    down_gt = (box[:, 2] - down) / (box[:, 2] - box[:, 0])
-    left_gt = (box[:, 3] - left) / (box[:, 3] - box[:, 1])
-
-    hori_box_mask = ((rbox_ordered[:,0,1] - rbox_ordered[:,1,1]) == 0) + ((rbox_ordered[:,1,0] - rbox_ordered[:,2,0]) == 0)
-
-    fix_gt = jt.stack( [top_gt, right_gt, down_gt, left_gt] ).permute( 1, 0 )
-    fix_gt = fix_gt.view( (-1, 4) )
-    fix_gt[hori_box_mask, :] = 1
-    return fix_gt
-
-def fix2polygons(box, alphas):
-    pred_top = (box[:, 2::4] - box[:, 0::4]) * alphas[:, 0::4] + box[:, 0::4]
-    pred_right = (box[:, 3::4] - box[:, 1::4]) * alphas[:, 1::4] + box[:, 1::4]
-    pred_down = (box[:, 0::4] - box[:, 2::4]) * alphas[:, 2::4] + box[:, 2::4]
-    pred_left = (box[:, 1::4] - box[:, 3::4]) * alphas[:, 3::4] + box[:, 3::4]
-
-    pred_rbox = jt.zeros( (box.shape[0], box.shape[1] * 2) )
-    pred_rbox[:, 0::8] = pred_top
-    pred_rbox[:, 1::8] = box[:, 1::4]
-    pred_rbox[:, 2::8] = box[:, 2::4]
-    pred_rbox[:, 3::8] = pred_right
-    pred_rbox[:, 4::8] = pred_down
-    pred_rbox[:, 5::8] = box[:, 3::4]
-    pred_rbox[:, 6::8] = box[:, 0::4]
-    pred_rbox[:, 7::8] = pred_left
-    return pred_rbox

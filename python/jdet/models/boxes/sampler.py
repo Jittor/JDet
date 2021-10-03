@@ -145,18 +145,6 @@ class RandomSampler(BaseSampler):
     def random_choice(gallery, num):
         """Random select some elements from the gallery.
         """
-        # assert len(gallery) >= num
-        # if isinstance(gallery, list):
-        #     gallery = np.array(gallery)
-        # cands = np.arange(len(gallery))
-        # np.random.shuffle(cands)
-        # rand_inds = cands[:num]
-        # if not isinstance(gallery, np.ndarray):
-        #     rand_inds = jt.array(rand_inds).int()
-        
-        # print("rand_inds")
-        # print(jt.argsort(rand_inds)[1])
-        # return gallery[rand_inds]
 
         is_tensor = isinstance(gallery, jt.Var)
         if not is_tensor:

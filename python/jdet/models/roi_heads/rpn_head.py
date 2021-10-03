@@ -170,10 +170,6 @@ class RPNHead(nn.Module):
                 proposals = proposals[valid_mask]
                 scores = scores[valid_mask]
 
-        # print("proposals before nms: ")
-        # print(proposals.shape)
-        # print(proposals)
-
         dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
         keep = jt.nms(dets, self.nms_thresh)
         dets = dets[keep, :]

@@ -173,18 +173,5 @@ class MaxIoUAssigner:
                 assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
-
-        # print("assign")
-        # print(self.pos_iou_thr)
-        # print(self.neg_iou_thr)
-        # print(self.min_pos_iou)
-        # print(self.match_low_quality)
-
-        # print("assign_result")
-        # print(num_gts)
-        # print(assigned_gt_inds.shape)
-        # print(assigned_gt_inds)
-        # print(max_overlaps.shape)
-        # print(max_overlaps)
-        # print(assigned_labels)
+            
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
