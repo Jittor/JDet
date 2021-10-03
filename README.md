@@ -84,10 +84,9 @@ python run_net.py --config-file=configs/base.py --task=test
 | S2ANet-R50-FPN | DOTA1.0| flip+ra90+bc|-|  SGD   |   1x    | 76.40   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance%2Fckpt_12.pkl&dl=1) |
 | S2ANet-R50-FPN | DOTA1.0| flip+ra90+bc+ms |ms|  SGD   |   1x    | 79.72   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance_ms%2Fckpt_12.pkl&dl=1) |
 | S2ANet-R101-FPN |DOTA1.0|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r101_fpn_1x_dota_bs2.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r101_fpn_1x_dota_without_torch_pretrained%2Fckpt_12.pkl&dl=1) |
-| Gliding-R50-FPN |DOTA1.0|flip+ms|ms|  SGD   |   1x    | 67.42   | [arxiv]()| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_without_rotate_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fgliding_r50_fpn_1x_dota_bs2_tobgr_steplr_norotate_ms%2Fckpt_12.pkl&dl=1) |
-| Gliding-R101-FPN |DOTA1.0|flip+ms+ra90+bc|ms|  SGD   |   1x    | 69.53   | [arxiv]()| [config](projects/gliding/configs/gliding_r101_fpn_2x_dota_with_rotate_balance_cate_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fgliding_r101_fpn_1x_dota_bs2_tobgr_steplr_rotate_balance_ms%2Fckpt_12.pkl&dl=1) |
+| Gliding-R50-FPN |DOTA1.0|Flip|-|  SGD   |   1x    | 72.14  | [arxiv]()| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_without_rotate_ss.py) | [model]() |
+| Gliding-R50-FPN |DOTA1.0|Flip+ra90+bc|-|  SGD   |   1x    | 74.94   | [arxiv]()| [config](projects/gliding/configs/gliding_r50_fpn_2x_dota_with_rotate_balance_cate_ss.py) | [model]() |
 | RetinaNet-R50-FPN |DOTA1.0|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) [pretrained](https://cloud.tsinghua.edu.cn/f/6b5db5fdd5304a5abf19/) |
-
 
 **Notice**:
 
@@ -163,5 +162,3 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
 7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
 8. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
 9. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
-
-
