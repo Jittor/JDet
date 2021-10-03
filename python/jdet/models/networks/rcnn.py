@@ -34,77 +34,8 @@ class RCNN(nn.Module):
         
         if self.neck:
             features = self.neck(features)
-
-        ### Test begin
-
-            # import pickle
-
-            # for i in range(len(targets)):
-
-            #     with open(f'/mnt/disk/czh/masknet/temp/label_{i}.pkl', 'rb') as f:
-            #         label = jt.array(pickle.load(f))
-            #     with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
-            #         obboxes = jt.array(pickle.load(f))
-            #     with open(f'/mnt/disk/czh/masknet/temp/bboxes_{i}.pkl', 'rb') as f:
-            #         bboxes = jt.array(pickle.load(f))
-
-            #     targets[i]['labels'] = label
-            #     targets[i]['hboxes'] = bboxes
-            #     targets[i]['polys'] = obboxes
-            #     targets[i]['hboxes_ignore'] = None
-            #     targets[i]['polys_ignore'] = None
-
-            # import pickle
-            # for i in range(len(targets)):
-            #     with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
-            #         obboxes = jt.array(pickle.load(f))
-            #     targets[i]['polys'] = obboxes
-        # else:
-        #     import pickle
-        #     for i in range(len(targets)):
-        #         with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
-        #             obboxes = jt.array(pickle.load(f))
-        #         targets[i]['polys'] = obboxes
-
-        ### Test end
-
+            
         proposals_list, rpn_losses = self.rpn(features,targets)
-
-        # Test code begin
-
-        # if not self.is_training():
-        #     import pickle
-        #     print("load proposals")
-        #     proposals_list = []
-
-        #     for i in range(len(targets)):
-
-        #         with open(f'/mnt/disk/czh/masknet/temp/proposal_{i}.pkl', 'rb') as f:
-        #             proposal = jt.array(pickle.load(f))
-        #         # with open(f'/mnt/disk/czh/masknet/temp/label_{i}.pkl', 'rb') as f:
-        #         #     label = jt.array(pickle.load(f))
-        #         # with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
-        #         #     obboxes = jt.array(pickle.load(f))
-        #         # with open(f'/mnt/disk/czh/masknet/temp/bboxes_{i}.pkl', 'rb') as f:
-        #         #     bboxes = jt.array(pickle.load(f))
-
-        #         proposals_list.append(proposal)
-        #         # targets[i]['labels'] = label
-        #         # targets[i]['hboxes'] = bboxes
-        #         # targets[i]['polys'] = obboxes
-        #     # import pickle
-        #     # for i in range(len(targets)):
-        #     #     with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
-        #     #         obboxes = jt.array(pickle.load(f))
-        #     #     targets[i]['polys'] = obboxes
-        # # else:
-        # #     import pickle
-        # #     for i in range(len(targets)):
-        # #         with open(f'/mnt/disk/czh/masknet/temp/obboxes_{i}.pkl', 'rb') as f:
-        # #             obboxes = jt.array(pickle.load(f))
-        # #         targets[i]['polys'] = obboxes
-
-        # Test code end
 
         output = self.bbox_head(features, proposals_list, targets)
 
