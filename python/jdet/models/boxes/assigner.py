@@ -163,3 +163,58 @@ class MaxIoUAssigner:
             assigned_labels = None
             
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+
+@BOXES.register_module()
+class MaxIoUAssignerRbbox(MaxIoUAssigner):
+    def __init__(self,
+                 pos_iou_thr,
+                 neg_iou_thr,
+                 min_pos_iou=.0,
+                 gt_max_assign_all=True,
+                 ignore_iof_thr=-1,
+                 ignore_wrt_candidates=True,
+                 iou_calculator=dict(type='BboxOverlaps2D')):
+        super(MaxIoUAssignerRbbox, self).__init__(pos_iou_thr=pos_iou_thr,
+                 neg_iou_thr=neg_iou_thr,
+                 min_pos_iou=min_pos_iou,
+                 gt_max_assign_all=gt_max_assign_all,
+                 ignore_iof_thr=ignore_iof_thr,
+                 ignore_wrt_candidates=ignore_wrt_candidates,
+                 iou_calculator=iou_calculator)
+
+    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
+        """Assign gt to bboxes.
+
+        This method assign a gt bbox to every bbox (proposal/anchor), each bbox
+        will be assigned with -1, 0, or a positive number. -1 means don't care,
+        0 means negative sample, positive number is the index (1-based) of
+        assigned gt.
+        The assignment is done in following steps, the order matters.
+
+        1. assign every bbox to -1
+        2. assign proposals whose iou with all gts < neg_iou_thr to 0
+        3. for each bbox, if the iou with its nearest gt >= pos_iou_thr,
+           assign it to that bbox
+        4. for each gt bbox, assign its nearest proposals (may be more than
+           one) to itself
+
+        Args:
+            bboxes (Tensor): Bounding boxes to be assigned, shape(n, 4).
+            gt_bboxes (Tensor): Groundtruth boxes, shape (k, 4).
+            gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
+                labelled as `ignored`, e.g., crowd boxes in COCO.
+            gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+
+        Returns:
+            :obj:`AssignResult`: The assign result.
+        """
+        if bboxes.shape[0] == 0 or gt_bboxes.shape[0] == 0:
+            raise ValueError('No gt or bboxes')
+        bboxes = bboxes[:, :5]
+        overlaps = self.iou_calculator(gt_bboxes, bboxes)
+
+        if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
+                gt_bboxes_ignore.numel() > 0):
+            assert NotImplementedError
+        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels)
+        return assign_result

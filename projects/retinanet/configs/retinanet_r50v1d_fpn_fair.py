@@ -85,6 +85,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
+      dataset_type="FAIR",
       images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/FAIR/processed/test_600_150_1.0/images/",
       transforms= [
         dict(
@@ -119,7 +120,7 @@ logger = dict(
     type= "RunLogger")
 
 max_epoch = 30
-eval_interval = 1
+eval_interval = 10
 log_interval = 50
 checkpoint_interval = 1
 pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"

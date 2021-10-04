@@ -4,7 +4,6 @@ scheduler = dict(
     warmup_iters= 0)
 
 dataset = dict(
-    dataset_type="FAIRDataset",
     val=None,
     train=None,
     test = dict(

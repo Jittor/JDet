@@ -1,6 +1,6 @@
 # JDet
 ## Introduction
-JDet is Object Detection Framework  based on [Jittor](https://github.com/Jittor/jittor). 
+JDet is a object detection benchmark based on [Jittor](https://github.com/Jittor/jittor). 
 
 <!-- **Features**
 - Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
@@ -21,7 +21,7 @@ JDet environment requirements:
 
 **Step 1: Install the requirements**
 ```shell
-git clone https://github.com/li-xl/JDet
+git clone https://github.com/Jittor/JDet
 cd JDet
 python -m pip install -r requirements.txt
 ```
@@ -31,6 +31,9 @@ If you have any installation problems for Jittor, please refer to [Jittor](https
  
 ```shell
 cd JDet
+# suggest this 
+python setup.py develop
+# or
 python setup.py install
 ```
 If you don't have permission for install,please add ```--user```.
@@ -78,15 +81,15 @@ python run_net.py --config-file=configs/base.py --task=test
 
 ## Models
 
-|    Models     | Dataset |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper | Config     | Download   |
-| :-----------: | :-----: |:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
-| S2ANet-R50-FPN | DOTA1.0| flip|-|  SGD   |   1x    | 74.11   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_bs2_steplr_3.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_bs2_steplr_3%2Fckpt_12.pkl&dl=1) |
-| S2ANet-R50-FPN | DOTA1.0| flip+ra90+bc|-|  SGD   |   1x    | 76.40   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance%2Fckpt_12.pkl&dl=1) |
-| S2ANet-R50-FPN | DOTA1.0| flip+ra90+bc+ms |ms|  SGD   |   1x    | 79.72   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance_ms%2Fckpt_12.pkl&dl=1) |
-| S2ANet-R101-FPN |DOTA1.0|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r101_fpn_1x_dota_bs2.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r101_fpn_1x_dota_without_torch_pretrained%2Fckpt_12.pkl&dl=1) |
+|    Models     | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper | Config     | Download   |
+| :-----------: | :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
+| S2ANet-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 74.11   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_bs2_steplr_3.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_bs2_steplr_3%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R50-FPN | DOTA1.0| 1024/200| flip+ra90+bc|-|  SGD   |   1x    | 76.40   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R50-FPN | DOTA1.0|1024/200| flip+ra90+bc+ms |ms|  SGD   |   1x    | 79.72   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance_ms%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R101-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r101_fpn_1x_dota_bs2.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r101_fpn_1x_dota_without_torch_pretrained%2Fckpt_12.pkl&dl=1) |
 | Gliding-R50-FPN |DOTA1.0|Flip|-|  SGD   |   1x    | 72.14  | [arxiv]()| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_without_rotate.py) | [model]() |
 | Gliding-R50-FPN |DOTA1.0|Flip+ra90+bc|-|  SGD   |   1x    | 74.94   | [arxiv]()| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_rotate_balance_cate.py) | [model]() |
-| RetinaNet-R50-FPN |DOTA1.0|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) [pretrained](https://cloud.tsinghua.edu.cn/f/6b5db5fdd5304a5abf19/) |
+| RetinaNet-R50-FPN |DOTA1.0|600/150|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) [pretrained](https://cloud.tsinghua.edu.cn/f/6b5db5fdd5304a5abf19/) |
 
 **Notice**:
 
@@ -104,12 +107,12 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Gliding
 - :heavy_check_mark: RetinaNet
 - :heavy_check_mark: Faster R-CNN
-- :clock3: SSD
+- :heavy_check_mark: SSD
+- :heavy_check_mark: ROI Transformer
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
-- :clock3: ROI Transformer
 - :heavy_plus_sign: CSL
 - :heavy_plus_sign: DCL
 - :heavy_plus_sign: GWD
@@ -162,3 +165,6 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
 7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
 8. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
 9. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
+10. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
+
+

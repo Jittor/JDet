@@ -15,6 +15,7 @@ from multiprocessing import Pool
 import multiprocessing
 from functools import partial
 import time
+from jdet.config import get_cfg
 
 def choose_best_pointorder_fit_another(poly1, poly2):
     """
@@ -172,6 +173,7 @@ class splitbase():
         return outpoly
 
     def savepatches(self, resizeimg, objects, subimgname, left, up, right, down):
+        cfg = get_cfg()
         outdir = os.path.join(self.outlabelpath, subimgname + '.txt')
         mask_poly = []
         imgpoly = shgeo.Polygon([(left, up), (right, up), (right, down),
@@ -186,6 +188,12 @@ class splitbase():
                     continue
                 inter_poly, half_iou = self.calchalf_iou(gtpoly, imgpoly)
 
+                if (cfg.yx_style):
+                    if (half_iou > 0.5):
+                        polyInsub = self.polyorig2sub(left, up, obj['poly'])
+                        outline = ' '.join(list(map(str, polyInsub)))
+                        outline = outline + ' ' + obj['name'] + ' 0'
+                        f_out.write(outline + '\n')
                 # print('writing...')
                 if (half_iou == 1):
                     polyInsub = self.polyorig2sub(left, up, obj['poly'])

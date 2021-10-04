@@ -1,8 +1,8 @@
 type='FAIR'
 source_fair_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/fair'
-convert_tasks=['train','val','test']
 source_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/fair_DOTA'
 target_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/processed'
+convert_tasks=['train','val','test']
 
 # available labels: train, val, test, trainval
 tasks=[

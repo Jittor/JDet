@@ -346,8 +346,8 @@ def delta2bbox(rois,
         deltas /= weights
 
     if means is not None and stds is not None:
-        means = jt.array(means).repeat(1, deltas.size(1) // 4)
-        stds = jt.array(stds).repeat(1, deltas.size(1) // 4)
+        means = jt.array(means).view(1, -1).repeat(1, deltas.size(-1) // 4)
+        stds = jt.array(stds).view(1, -1).repeat(1, deltas.size(-1) // 4)
         deltas = deltas * stds + means
     dx = deltas[..., 0::4]
     dy = deltas[..., 1::4]
@@ -611,17 +611,3 @@ def boxes_x0y0x1y1_to_xywh(boxes):
     y1 = boxes[:, 3]
     others = boxes[:, 4:]
     return jt.concat([jt.stack([(x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0], dim=1), others], dim=1)
-
-
-def flip_result(results, mode, target):
-    assert(False) #TODO not finished
-    #input: [n, 6]; (x0(w),y0(h),x1,y1,a(pi),score)
-    if (mode == 'HV'):
-        return flip_result(flip_result(results, 'H', target), 'V', target)
-    w = target['ori_img_size'][0].data[0]
-    h = target['ori_img_size'][1].data[0]
-    print(w, h)
-    print(target)
-    # out = results.copy()
-    # if (mode == 'H'):
-    #     out[:, [0,2]] = 

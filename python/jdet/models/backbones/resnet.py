@@ -188,12 +188,14 @@ def _resnet(block, layers, **kwargs):
     model = ResNet(block, layers, **kwargs)
     return model
 
+@BACKBONES.register_module()
 def Resnet18(pretrained=False, **kwargs):
     model = _resnet(BasicBlock, [2, 2, 2, 2], **kwargs)
     if pretrained: model.load("jittorhub://resnet18.pkl")
     return model
 resnet18 = Resnet18
 
+@BACKBONES.register_module()
 def Resnet34(pretrained=False, **kwargs):
     model = _resnet(BasicBlock, [3, 4, 6, 3], **kwargs)
     if pretrained: model.load("jittorhub://resnet34.pkl")
@@ -206,9 +208,11 @@ def Resnet50(pretrained=False, **kwargs):
     if pretrained: model.load("jittorhub://resnet50.pkl")
     return model
 
+@BACKBONES.register_module()
 def Resnet38(**kwargs):
     return _resnet(Bottleneck, [2, 3, 5, 2], **kwargs)
 
+@BACKBONES.register_module()
 def Resnet26(**kwargs):
     return _resnet(Bottleneck, [1, 2, 4, 1], **kwargs)
 
@@ -225,11 +229,13 @@ def Resnet101(pretrained=False, **kwargs):
     if pretrained: model.load("jittorhub://resnet101.pkl")
     return model
 
+@BACKBONES.register_module()
 def Resnet152(pretrained=False, **kwargs):
     model = _resnet(Bottleneck, [3, 8, 36, 3], **kwargs)
     if pretrained: model.load("jittorhub://resnet152.pkl")
     return model
 
+@BACKBONES.register_module()
 def Resnext50_32x4d(pretrained=False, **kwargs):
     kwargs['groups'] = 32
     kwargs['width_per_group'] = 4
@@ -237,6 +243,7 @@ def Resnext50_32x4d(pretrained=False, **kwargs):
     if pretrained: model.load("jittorhub://resnext50_32x4d.pkl")
     return model
 
+@BACKBONES.register_module()
 def Resnext101_32x8d(pretrained=False, **kwargs):
     kwargs['groups'] = 32
     kwargs['width_per_group'] = 8
@@ -244,12 +251,14 @@ def Resnext101_32x8d(pretrained=False, **kwargs):
     if pretrained: model.load("jittorhub://resnext101_32x8d.pkl")
     return model
 
+@BACKBONES.register_module()
 def Wide_resnet50_2(pretrained=False, **kwargs):
     kwargs['width_per_group'] = (64 * 2)
     model = _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained: model.load("jittorhub://wide_resnet50_2.pkl")
     return model
 
+@BACKBONES.register_module()
 def Wide_resnet101_2(pretrained=False, **kwargs):
     kwargs['width_per_group'] = (64 * 2)
     model = _resnet(Bottleneck, [3, 4, 23, 3], **kwargs)

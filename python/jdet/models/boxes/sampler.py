@@ -175,8 +175,16 @@ class RandomSampler(BaseSampler):
         else:
             return self.random_choice(neg_inds, num_expected)
 
-
+@BOXES.register_module()
 class RandomSamplerRotated(RandomSampler):
+    def __init__(self,
+                 num,
+                 pos_fraction,
+                 neg_pos_ub=-1,
+                 add_gt_as_proposals=True,
+                 **kwargs):
+        super(RandomSamplerRotated, self).__init__(num, pos_fraction, neg_pos_ub,
+                                            add_gt_as_proposals)
 
     def sample(self,
                assign_result,

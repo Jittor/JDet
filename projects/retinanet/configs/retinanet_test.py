@@ -1,6 +1,6 @@
 # test
 _base_ = 'retinanet.py'
-pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"
+pretrained_weights="test_datas_retinanet/yx_init_pretrained.pk_jt.pk"
 max_epoch = 30
 test_mode = True
 

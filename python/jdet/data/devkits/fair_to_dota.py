@@ -49,10 +49,10 @@ def fair_to_dota(in_path, out_path):
         file = cv2.imread(task[0], 1)
         cv2.imwrite(task[1], file)
 
-    if (os.path.exists(os.path.join(in_path, "labelXmls"))):
+    if (os.path.exists(os.path.join(in_path, "labelXml"))):
         os.makedirs(os.path.join(out_path, "labelTxt"), exist_ok=True)
         tasks = []
-        for root, dirs, files in os.walk(os.path.join(in_path, "labelXmls")):
+        for root, dirs, files in os.walk(os.path.join(in_path, "labelXml")):
             for f in files:
                 src=os.path.join(root, f)
                 tar="P"+f[:-4].zfill(4)+".txt"
