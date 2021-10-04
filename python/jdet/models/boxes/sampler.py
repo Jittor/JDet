@@ -145,7 +145,7 @@ class RandomSampler(BaseSampler):
     def random_choice(gallery, num):
         """Random select some elements from the gallery.
         """
-
+        assert len(gallery) >= num
         is_tensor = isinstance(gallery, jt.Var)
         if not is_tensor:
             gallery = jt.array(gallery, dtype="int64")

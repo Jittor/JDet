@@ -1,11 +1,12 @@
+from re import S
 import jittor as jt 
 from jittor import nn 
 from jdet.utils.registry import BOXES, LOSSES, build_from_cfg,HEADS
 from jdet.utils.general import multi_apply
-from jdet.models.boxes.anchor_target import images_to_levels
+from jdet.models.boxes.anchor_target import images_to_levels, anchor_inside_flags
 
 @HEADS.register_module()
-class RPNHead(nn.Module):
+class GlidingRPNHead(nn.Module):
     """RPN head.
     Args:
         in_channels (int): Number of channels in the input feature map.
@@ -18,6 +19,7 @@ class RPNHead(nn.Module):
                  min_bbox_size = -1,
                  nms_thresh = 0.3,
                  nms_pre = 1200,
+                 nms_post = 1200,
                  feat_channels=256,
                  anchor_generator=dict(
                      type='AnchorGenerator',
@@ -46,14 +48,16 @@ class RPNHead(nn.Module):
                     neg_pos_ub=-1,
                     add_gt_as_proposals=False)
                 ):
-        super(RPNHead, self).__init__()
+        super(GlidingRPNHead, self).__init__()
         
         self.min_bbox_size = min_bbox_size
         self.nms_thresh  = nms_thresh
         self.nms_pre = nms_pre
+        self.nms_post = nms_post
         self.in_channels = in_channels
         self.feat_channels = feat_channels
         self.num_classes = num_classes
+        self.unmap_outputs = True
 
         self.bbox_coder = build_from_cfg(bbox_coder,BOXES)
         self.loss_cls = build_from_cfg(loss_cls,LOSSES)
@@ -73,6 +77,18 @@ class RPNHead(nn.Module):
                                  self.num_anchors * self.num_classes, 1)
         self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 4, 1)
 
+    def unmap(self, data, count, inds, fill=0):
+        """ Unmap a subset of item (data) back to the original set of items (of
+        size count) """
+        if data.ndim == 1:
+            ret = jt.full((count, ), fill, dtype=data.dtype)
+            ret[inds.astype(jt.bool)] = data
+        else:
+            new_size = (count, ) + data.size()[1:]
+            ret = jt.full(new_size, fill, dtype=data.dtype)
+            ret[inds.astype(jt.bool), :] = data
+        return ret
+
     def forward_single(self, x):
         """Forward feature map of a single scale level."""
         x = self.rpn_conv(x)
@@ -81,7 +97,6 @@ class RPNHead(nn.Module):
         rpn_bbox_pred = self.rpn_reg(x)
         return rpn_cls_score, rpn_bbox_pred
 
-    
     def _get_bboxes_single(self,
                            cls_scores,
                            bbox_preds,
@@ -109,7 +124,10 @@ class RPNHead(nn.Module):
                 5-th column is a score between 0 and 1.
         """
         # bboxes from different level should be independent during NMS,
-        mlvl_proposals = []
+        mlvl_scores = []
+        mlvl_valid_anchors = []
+        mlvl_bbox_pred = []
+
         for idx in range(len(cls_scores)):
             rpn_cls_score = cls_scores[idx]
             rpn_bbox_pred = bbox_preds[idx]
@@ -120,7 +138,7 @@ class RPNHead(nn.Module):
             # num_class in RPN head since mmdet v2.5, which is unified to
             # be consistent with other head since mmdet v2.0. In mmdet v2.0
             # to v2.4 we keep BG label as 0 and FG label as 1 in rpn head.
-            scores = nn.softmax(rpn_cls_score,dim=1)[:, 0]
+            scores = nn.softmax(rpn_cls_score,dim=1)[:, 1]
 
             rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             anchors = mlvl_anchors[idx]
@@ -132,26 +150,32 @@ class RPNHead(nn.Module):
                 topk_inds = rank_inds[:self.nms_pre]
                 scores = ranked_scores[:self.nms_pre]
                 rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
-                anchors = anchors[topk_inds, :]
+                anchors = anchors[topk_inds, :]  
 
-            proposals = self.bbox_coder.decode(anchors,rpn_bbox_pred,max_shape=img_shape)
+            mlvl_scores.append(scores)
+            mlvl_bbox_pred.append(rpn_bbox_pred)
+            mlvl_valid_anchors.append(anchors)
+        
+        anchors = jt.concat(mlvl_valid_anchors)
+        rpn_bbox_pred = jt.concat(mlvl_bbox_pred)
+        scores = jt.concat(mlvl_scores)
 
-            if self.min_bbox_size >= 0:
-                w = proposals[:, 2] - proposals[:, 0]
-                h = proposals[:, 3] - proposals[:, 1]
-                valid_mask = (w > self.min_bbox_size) & (h > self.min_bbox_size)
-                if not valid_mask.all():
-                    proposals = proposals[valid_mask]
-                    scores = scores[valid_mask]
+        proposals = self.bbox_coder.decode(anchors, rpn_bbox_pred, max_shape=img_shape)
 
-            dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
-            keep = jt.nms(dets,self.nms_thresh)
-            proposals = proposals[keep,:]
-            # scores = scores[keep]
-            # mlvl_proposals.append((proposals,scores))
-            mlvl_proposals.append(proposals)
+        if self.min_bbox_size >= 0:
+            w = proposals[:, 2] - proposals[:, 0]
+            h = proposals[:, 3] - proposals[:, 1]
+            valid_mask = (w > self.min_bbox_size) & (h > self.min_bbox_size)
+            if not valid_mask.all():
+                proposals = proposals[valid_mask]
+                scores = scores[valid_mask]
 
-        return mlvl_proposals
+        dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
+        keep = jt.nms(dets, self.nms_thresh)
+        dets = dets[keep, :]
+        dets = dets[:self.nms_post]
+        
+        return dets
 
     def get_bboxes(self,
                    cls_scores,
@@ -194,56 +218,64 @@ class RPNHead(nn.Module):
             ]
             # W,H
             img_shape = target['img_size']
+
             proposals = self._get_bboxes_single(cls_score_list, bbox_pred_list,mlvl_anchors, img_shape)
             result_list.append(proposals)
         return result_list
 
 
-    def _get_targets_single(self,mlvl_anchors,target):
+    def _get_targets_single(self, anchors_list, valid_flag_list, target):
         """Compute regression and classification targets for anchors in a
         single image.
         """
-        # w,h
+
         gt_bboxes = target["hboxes"]
         gt_bboxes_ignore = target["hboxes_ignore"]
-        anchors = jt.concat(mlvl_anchors)
-        # print(gt_bboxes)
+        flat_anchors = jt.concat(anchors_list)
+        valid_flags = jt.concat(valid_flag_list)
 
-        # # filter TODO
-        # w,h = target["img_size"]
-        # inside_flags = (anchors[:,0]>=0) & (anchors[:,1]>=0 )& (anchors[:,2]<w) & (anchors[:,3]<h)
-        # anchors = anchors[inside_flags,:]
-
-        # print(anchors[:10],anchors.shape)
+        inside_flags = anchor_inside_flags(flat_anchors, valid_flags, target["img_size"][:2], allowed_border=0)
+        if not inside_flags.any_():
+            return (None, ) * 6
+        anchors = flat_anchors[inside_flags, :]
 
         # assign gt and sample anchors
         assign_result = self.assigner.assign(anchors, gt_bboxes, gt_bboxes_ignore)
-
-        sampling_result = self.sampler.sample(assign_result, anchors,gt_bboxes)
+        sampling_result = self.sampler.sample(assign_result, anchors, gt_bboxes)
 
         num_valid_anchors = anchors.shape[0]
         bbox_targets = jt.zeros_like(anchors)
         bbox_weights = jt.zeros_like(anchors)
         # 1 is background label
-        labels = jt.ones((num_valid_anchors, )).int()
+        labels = jt.zeros((num_valid_anchors, ), dtype="int64")
         label_weights = jt.zeros((num_valid_anchors,)).float()
 
         pos_inds = sampling_result.pos_inds
         neg_inds = sampling_result.neg_inds
+
         if len(pos_inds) > 0:
             # which is box delta
             pos_bbox_targets = self.bbox_coder.encode(sampling_result.pos_bboxes, sampling_result.pos_gt_bboxes)
             bbox_targets[pos_inds, :] = pos_bbox_targets
             bbox_weights[pos_inds, :] = 1.0
-            labels[pos_inds] = 0
+            labels[pos_inds] = 1
             label_weights[pos_inds] = 1.0
+        
         if len(neg_inds) > 0:
             label_weights[neg_inds] = 1.0
+        
+        if self.unmap_outputs:
+            num_total_anchors = flat_anchors.size(0)
+            labels = self.unmap(labels, num_total_anchors, inside_flags, fill=0)
+            label_weights = self.unmap(label_weights, num_total_anchors, inside_flags)
+            bbox_targets = self.unmap(bbox_targets, num_total_anchors, inside_flags)
+            bbox_weights = self.unmap(bbox_weights, num_total_anchors, inside_flags)
 
         return (labels, label_weights, bbox_targets, bbox_weights, pos_inds,neg_inds, sampling_result)
 
     def get_targets(self,
                     anchor_list,
+                    valid_flag_list,
                     targets):
         """Compute regression and classification targets for anchors in
         multiple images.
@@ -252,15 +284,14 @@ class RPNHead(nn.Module):
         # anchor number of multi levels
         num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
 
-
         # compute targets for each image
         (all_labels, all_label_weights, all_bbox_targets, 
-           all_bbox_weights, pos_inds_list, neg_inds_list, sampling_results_list) = multi_apply(self._get_targets_single,anchor_list,targets)
-
+           all_bbox_weights, pos_inds_list, neg_inds_list, sampling_results_list) = multi_apply(self._get_targets_single, anchor_list, valid_flag_list, targets)
         
         # sampled anchors of all images
         num_total_pos = sum([max(inds.numel(), 1) for inds in pos_inds_list])
         num_total_neg = sum([max(inds.numel(), 1) for inds in neg_inds_list])
+
         # split targets to a list w.r.t. multiple levels
         labels_list = images_to_levels(all_labels, num_level_anchors)
         label_weights_list = images_to_levels(all_label_weights,
@@ -294,11 +325,13 @@ class RPNHead(nn.Module):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        
         # classification loss
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         cls_score = cls_score.permute(0, 2, 3,1).reshape(-1, 2)
         loss_cls = self.loss_cls(cls_score, labels, weight=label_weights, avg_factor=num_total_samples)
+
         # regression loss
         bbox_targets = bbox_targets.reshape(-1, 4)
         bbox_weights = bbox_weights.reshape(-1, 4)
@@ -313,23 +346,22 @@ class RPNHead(nn.Module):
         """Compute losses of the head.
         Args:
         """
+
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         assert len(featmap_sizes) == self.anchor_generator.num_levels
 
         multi_level_anchors = self.anchor_generator.grid_anchors(featmap_sizes)
-        anchor_list = [multi_level_anchors for _ in range(len(targets))]
 
-        labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,num_total_pos, num_total_neg = self.get_targets(anchor_list,targets)
+        anchor_list = [multi_level_anchors for _ in range(len(targets))]
+        valid_flag_list = []
+
+        for img_id, target in enumerate(targets):
+            multi_level_flags = self.anchor_generator.valid_flags(featmap_sizes, target['pad_shape'])
+            valid_flag_list.append(multi_level_flags)
+
+        labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,num_total_pos, num_total_neg = self.get_targets(anchor_list, valid_flag_list, targets)
 
         num_total_samples =  num_total_pos + num_total_neg 
-
-        # anchor number of multi levels
-        # num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
-        # # concat all level anchors and flags to a single tensor
-        # concat_anchor_list = []
-        # for i in range(len(anchor_list)):
-        #     concat_anchor_list.append(jt.concat(anchor_list[i]))
-        # all_anchor_list = images_to_levels(concat_anchor_list,num_level_anchors)
 
         losses_cls, losses_bbox = multi_apply(
             self.loss_single,
@@ -341,13 +373,17 @@ class RPNHead(nn.Module):
             bbox_targets_list,
             bbox_weights_list,
             num_total_samples=num_total_samples)
+
         return dict(loss_rpn_cls=losses_cls, loss_rpn_bbox=losses_bbox)
 
     def execute(self,features,targets):
-        outs = multi_apply(self.forward_single,features)
+
+        outs = multi_apply(self.forward_single, features)
+        
         if self.is_training():
             losses = self.loss(*outs,targets)
         else:
             losses = dict()
+
         proposals = self.get_bboxes(*outs,targets)
-        return proposals,losses
+        return proposals, losses

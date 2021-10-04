@@ -122,19 +122,7 @@ class MaxIoUAssigner:
         num_gts, num_bboxes = overlaps.size(0), overlaps.size(1)
 
         # 1. assign -1 by default
-        assigned_gt_inds = jt.full((num_bboxes,), -1, dtype="int64")
-
-        if num_gts == 0 or num_bboxes == 0:
-            # No ground truth or boxes, return empty assignment
-            max_overlaps = jt.zeros((num_bboxes, ), dtype=overlaps.dtype)
-            if num_gts == 0:
-                # No truth, assign everything to background
-                assigned_gt_inds[:] = 0
-            if gt_labels is None:
-                assigned_labels = None
-            else:
-                assigned_labels = jt.full((num_bboxes, ), -1, dtype="int64")
-            return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+        assigned_gt_inds = jt.full((num_bboxes,), -1).int()
 
         # for each anchor, which gt best overlaps with it
         # for each anchor, the max iou of all gts

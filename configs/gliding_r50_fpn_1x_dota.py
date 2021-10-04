@@ -12,7 +12,7 @@ model = dict(
         out_channels=256,
         num_outs=5),
     rpn = dict(
-        type = "RPNHead",
+        type = "GlidingRPNHead",
         in_channels = 256,
         num_classes=2,
         min_bbox_size = 0,
@@ -102,39 +102,6 @@ model = dict(
         )
     )
 dataset = dict(
-    # train=dict(
-    #     type="DOTADataset",
-    #     annotations_file='/home/czh/JDet/DOTA_single_jdet/trainval/labels.pkl',
-    #     images_dir='/home/czh/JDet/DOTA_single_jdet/trainval/images',
-    #     transforms=[
-    #         dict(
-    #             type="RotatedResize",
-    #             min_size=1024,
-    #             max_size=1024
-    #         ),
-    #         dict(
-    #             type='RotatedRandomFlip', 
-    #             prob=0.0),
-    #         dict(
-    #             type="RandomRotateAug",
-    #             random_rotate_on=False,
-    #         ),
-    #         dict(
-    #             type = "Pad",
-    #             size_divisor=32),
-    #         dict(
-    #             type = "Normalize",
-    #             mean =  [123.675, 116.28, 103.53],
-    #             std = [58.395, 57.12, 57.375],
-    #             to_bgr=True,)
-            
-    #     ],
-    #     batch_size=2, # changed
-    #     num_workers=4,
-    #     shuffle=False, # changed
-    #     filter_empty_gt=False,
-    #     balance_category=True
-    # ),
     train=dict(
         type="DOTADataset",
         annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
@@ -221,7 +188,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=0.001,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 logger = dict(
     type="RunLogger")

@@ -12,12 +12,13 @@ model = dict(
         out_channels=256,
         num_outs=5),
     rpn = dict(
-        type = "RPNHead",
+        type = "GlidingRPNHead",
         in_channels = 256,
         num_classes=2,
-        min_bbox_size = -1,
-        nms_thresh = 0.3,
-        nms_pre = 1200,
+        min_bbox_size = 0,
+        nms_thresh = 0.7,
+        nms_pre = 2000,
+        nms_post = 2000,
         feat_channels=256,
         anchor_generator=dict(
             type='AnchorGenerator',
@@ -25,20 +26,19 @@ model = dict(
             ratios=[0.5, 1.0, 2.0],
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
-            type='DeltaXYWHBBoxCoder',
+            type='GVDeltaXYWHBBoxCoder',
             target_means=(.0, .0, .0, .0),
             target_stds=(1.0, 1.0, 1.0, 1.0)),
-        loss_cls=dict(
-            type='CrossEntropyLoss',
-            loss_weight=1.0),
-        loss_bbox=dict(
-            type='L1Loss', loss_weight=1.0),
+        loss_cls=dict(type='CrossEntropyLoss', loss_weight=1.0),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.7,
             neg_iou_thr=0.3,
             min_pos_iou=0.3,
-            ignore_iof_thr=-1),
+            ignore_iof_thr=-1,
+            match_low_quality=True,
+            ),
         sampler=dict(
             type='RandomSampler',
             num=256,
@@ -48,40 +48,57 @@ model = dict(
     ),
     bbox_head=dict(
         type='GlidingHead',
-        num_classes=16,
+        num_classes=15,
         in_channels=256,
         representation_dim = 1024,
         pooler_resolution =  7, 
         pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
         pooler_sampling_ratio = 0,
         score_thresh=0.05,
-        nms_thresh=0.5,
+        nms_thresh=0.3,
         detections_per_img=2000,
         box_weights = (10., 10., 5., 5.),
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
-            neg_iou_thr=0.4,
-            min_pos_iou=0,
+            neg_iou_thr=0.5,
+            min_pos_iou=0.5,
             ignore_iof_thr=-1,
-        iou_calculator=dict(type='BboxOverlaps2D')),
+            match_low_quality=False,
+            iou_calculator=dict(type='BboxOverlaps2D')),
         sampler=dict(
             type='RandomSampler',
-            num=256,
+            num=512,
             pos_fraction=0.25,
             neg_pos_ub=-1,
-            add_gt_as_proposals=False),
+            add_gt_as_proposals=True),
         bbox_coder=dict(
-            type='DeltaXYWHBBoxCoder',
+            type='GVDeltaXYWHBBoxCoder',
             target_means=(.0, .0, .0, .0),
-            target_stds=(1.0, 1.0, 1.0, 1.0)),
+            target_stds=(0.1, 0.1, 0.2, 0.2)),
+        bbox_roi_extractor=dict(
+            type='SingleRoIExtractor',
+            roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
+            out_channels=256,
+            featmap_strides=[4, 8, 16, 32]),
         cls_loss=dict(
             type='CrossEntropyLoss',
             ),
-        reg_loss=dict(
+        bbox_loss=dict(
             type='SmoothL1Loss', 
-            beta=1.0 / 9.0, 
-            loss_weight=1.0),
+            beta=1.0, 
+            loss_weight=1.0
+            ),
+        fix_loss=dict(
+            type='SmoothL1Loss', 
+            beta=1.0 / 3.0, 
+            loss_weight=1.0,
+            ),
+        ratio_loss=dict(
+            type='SmoothL1Loss', 
+            beta=1.0 / 3.0, 
+            loss_weight=16.0
+            ),
         )
     )
 dataset = dict(
@@ -115,7 +132,8 @@ dataset = dict(
         batch_size=2,
         num_workers=4,
         shuffle=True,
-        filter_empty_gt=False
+        filter_empty_gt=False,
+        balance_category=False
     ),
     val=dict(
         type="DOTADataset",
@@ -142,15 +160,14 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',\
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
                 max_size=1024
             ),
-            dict(
+            dict(   
                 type = "Pad",
                 size_divisor=32),
             dict(
@@ -164,22 +181,14 @@ dataset = dict(
     )
 )
 
-optimizer = dict(
-    type='SGD', 
-    lr=0.01/4.,#0.01*(1/8.), 
-    momentum=0.9, 
-    weight_decay=0.0001,)
-    # grad_clip=dict(
-    #     max_norm=35, 
-    #     norm_type=2))
+optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
     type='StepLR',
     warmup='linear',
     warmup_iters=500,
-    warmup_ratio=1.0 / 3,
+    warmup_ratio=0.001,
     milestones=[7, 10])
-
 
 logger = dict(
     type="RunLogger")
@@ -189,5 +198,3 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r50_fpn_1x_dota_bs2_tobgr_steplr_norotate"
-# resume_path = f"{work_dir}/checkpoints/ckpt_12.pkl"

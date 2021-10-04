@@ -13,11 +13,6 @@ from jdet.config import COCO_CLASSES
 from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.data_merge import data_merge_result
-import os
-import shutil
-
-from jittor_utils import auto_diff
-import sys
 
 class Runner:
     def __init__(self):

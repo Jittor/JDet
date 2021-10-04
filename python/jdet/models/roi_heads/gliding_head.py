@@ -1,46 +1,10 @@
-import pickle
 import jittor as jt 
-from jittor import nn, std 
+from jittor import nn
 from jdet.ops.roi_align import ROIAlign
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
-from jdet.models.boxes.box_ops import rotated_box_to_poly_single
-from jdet.models.boxes.box_ops import delta2bbox
-from jdet.ops.nms_rotated import ml_nms_rotated
-from jdet.ops.nms import nms
-from jdet.ops.nms_poly import nms_poly
-import os
-from jdet.config.constant import DOTA1_CLASSES
-from numpy.lib.polynomial import poly
+
 from jdet.models.utils.gliding_transforms import *
-from jdet.models.losses import accuracy
-import math
-
-from numpy.lib.ufunclike import fix
-
-def print_shape(ll):
-    for l in ll:
-        print(l.shape)
-    print("-------------------------")
-    
-def concat_pre(targets):
-    shape = list(targets[0].shape)
-    shape = shape[1:]
-    shape[0] = -1
-    return jt.concat([t.reshape(*shape) for t in targets])
-
-def images_to_levels(targets,num_level_anchors):
-    all_targets = []
-    for target,num_level_anchor in zip(targets,num_level_anchors):
-        all_targets.append(target.split(num_level_anchor,dim=0))
-    
-    all_targets = list(zip(*all_targets))
-    targets = []
-    for target in all_targets:
-        targets.extend(target)
-    all_targets = jt.concat(targets)
-    return all_targets
-
 
 @HEADS.register_module()
 class GlidingHead(nn.Module):
@@ -228,7 +192,7 @@ class GlidingHead(nn.Module):
         return dets, labels
         
     def forward_single(self, x, sampling_results, test=False):
-        
+
         if test:
             rois = self.arb2roi(sampling_results, bbox_type=self.start_bbox_type)
         else:
