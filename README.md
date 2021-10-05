@@ -114,6 +114,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :clock3: YOLOv5
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
+- :clock3: fcos
 - :heavy_plus_sign: CSL
 - :heavy_plus_sign: DCL
 - :heavy_plus_sign: GWD
