@@ -1,6 +1,5 @@
 import jittor as jt 
 from jittor import nn
-from jdet.ops.roi_align import ROIAlign
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
 
@@ -13,43 +12,44 @@ class GlidingHead(nn.Module):
                  num_classes=15,
                  in_channels=256,
                  representation_dim = 1024,
-                 pooler_resolution=7, 
-                 pooler_scales = [1/8., 1/16., 1/32., 1/64., 1/128.],
+                 pooler_resolution =  7, 
+                 pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
                  pooler_sampling_ratio = 0,
                  score_thresh=0.05,
-                 nms_thresh=0.7,
-                 detections_per_img=100,
+                 nms_thresh=0.3,
+                 detections_per_img=2000,
                  box_weights = (10., 10., 5., 5.),
                  assigner=dict(
-                    type='MaxIoUAssigner',
-                    pos_iou_thr=0.5,
-                    neg_iou_thr=0.4,
-                    min_pos_iou=0,
-                    ignore_iof_thr=-1,
-                    iou_calculator=dict(type='BboxOverlaps2D')),
+                     type='MaxIoUAssigner',
+                     pos_iou_thr=0.5,
+                     neg_iou_thr=0.5,
+                     min_pos_iou=0.5,
+                     ignore_iof_thr=-1,
+                     match_low_quality=False,
+                     iou_calculator=dict(type='BboxOverlaps2D')),
                  sampler=dict(
-                    type='RandomSampler',
-                    num=256,
-                    pos_fraction=0.5,
-                    neg_pos_ub=-1,
-                    add_gt_as_proposals=False),
+                     type='RandomSampler',
+                     num=512,
+                     pos_fraction=0.25,
+                     neg_pos_ub=-1,
+                     add_gt_as_proposals=True),
                  bbox_coder=dict(
-                     type='DeltaXYWHBBoxCoder',
+                     type='GVDeltaXYWHBBoxCoder',
                      target_means=(.0, .0, .0, .0),
-                     target_stds=(1.0, 1.0, 1.0, 1.0)),
+                     target_stds=(0.1, 0.1, 0.2, 0.2)),
                  fix_coder=dict(type='GVFixCoder'),
                  ratio_coder=dict(type='GVRatioCoder'),
                  bbox_roi_extractor=dict(
                      type='SingleRoIExtractor',
-                     roi_layer=dict(type='RoIAlign', out_size=7, sample_num=2),
+                     roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
                      out_channels=256,
                      featmap_strides=[4, 8, 16, 32]),
                  cls_loss=dict(
                      type='CrossEntropyLoss',
-                     ),
+                    ),
                  bbox_loss=dict(
                      type='SmoothL1Loss', 
-                     beta=1.0 / 3.0, 
+                     beta=1.0, 
                      loss_weight=1.0
                      ),
                  fix_loss=dict(
@@ -102,15 +102,8 @@ class GlidingHead(nn.Module):
 
     
     def _init_layers(self):
-        self.roi_aligns  = [
-                 ROIAlign(
-                     output_size = self.pooler_resolution,
-                     spatial_scale=scale,
-                     sampling_ratio=self.pooler_sampling_ratio
-                 ) 
-                 for scale in self.pooler_scales]
 
-        in_dim = self.pooler_resolution*self.pooler_resolution*self.in_channels
+        in_dim = self.pooler_resolution * self.pooler_resolution * self.in_channels
         self.fc1 = nn.Linear(in_dim, self.representation_dim)
         self.fc2 = nn.Linear(self.representation_dim, self.representation_dim)
 
@@ -118,7 +111,7 @@ class GlidingHead(nn.Module):
         self.bbox_pred = nn.Linear(self.representation_dim, self.num_classes * 4)
         self.fix_pred = nn.Linear(self.representation_dim, self.num_classes * 4)
         self.ratio_pred = nn.Linear(self.representation_dim, self.num_classes * 1)
-        
+
     def init_weights(self):
         nn.init.xavier_uniform_(self.fc1.weight)
         nn.init.constant_(self.fc1.bias, 0)

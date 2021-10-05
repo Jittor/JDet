@@ -49,7 +49,9 @@ class MaxIoUAssigner:
                  ignore_iof_thr=-1,
                  ignore_wrt_candidates=True,
                  match_low_quality=True,
+                 assigned_labels_filled=0,
                  iou_calculator=dict(type='BboxOverlaps2D')):
+
         self.pos_iou_thr = pos_iou_thr
         self.neg_iou_thr = neg_iou_thr
         self.min_pos_iou = min_pos_iou
@@ -57,6 +59,7 @@ class MaxIoUAssigner:
         self.ignore_iof_thr = ignore_iof_thr
         self.ignore_wrt_candidates = ignore_wrt_candidates
         self.match_low_quality = match_low_quality
+        self.assigned_labels_filled = assigned_labels_filled
         self.iou_calculator = build_from_cfg(iou_calculator,BOXES)
 
     def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
@@ -155,7 +158,7 @@ class MaxIoUAssigner:
                         assigned_gt_inds[gt_argmax_overlaps[i]] = i + 1
 
         if gt_labels is not None:
-            assigned_labels = jt.full((num_bboxes, ), -1, dtype=assigned_gt_inds.dtype)
+            assigned_labels = jt.full((num_bboxes, ), self.assigned_labels_filled, dtype=assigned_gt_inds.dtype)
             pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(-1)
             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]

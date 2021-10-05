@@ -116,9 +116,9 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(
-                type='RotatedRandomFlip', 
-                prob=0.5),
+            # dict(
+            #     type='RotatedRandomFlip', 
+            #     prob=0.5),
             # dict(
             #     type="RandomRotateAug",
             #     random_rotate_on=True,
@@ -135,54 +135,10 @@ dataset = dict(
         ],
         batch_size=2,
         num_workers=4,
-        shuffle=True,
+        shuffle=False,
         filter_empty_gt=False,
         balance_category=False
     ),
-    val=dict(
-        type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        transforms=[
-            dict(
-                type="RotatedResize",
-                min_size=1024,
-                max_size=1024
-            ),
-            dict(
-                type = "Pad",
-                size_divisor=32),
-            dict(
-                type = "Normalize",
-                mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375],
-                to_bgr=False),
-        ],
-        batch_size=2,
-        num_workers=4,
-        shuffle=False
-    ),
-    test=dict(
-        type="ImageDataset",
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',\
-        transforms=[
-            dict(
-                type="RotatedResize",
-                min_size=1024,
-                max_size=1024
-            ),
-            dict(   
-                type = "Pad",
-                size_divisor=32),
-            dict(
-                type = "Normalize",
-                mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375],
-                to_bgr=True,),
-        ],
-        num_workers=4,
-        batch_size=1,
-    )
 )
 
 optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
@@ -202,4 +158,3 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/czh/gliding"

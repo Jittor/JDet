@@ -38,6 +38,7 @@ model = dict(
             min_pos_iou=0.3,
             ignore_iof_thr=-1,
             match_low_quality=True,
+            assigned_labels_filled=-1,
             ),
         sampler=dict(
             type='RandomSampler',
@@ -65,6 +66,7 @@ model = dict(
             min_pos_iou=0.5,
             ignore_iof_thr=-1,
             match_low_quality=False,
+            assigned_labels_filled=-1,
             iou_calculator=dict(type='BboxOverlaps2D')),
         sampler=dict(
             type='RandomSampler',
@@ -76,6 +78,8 @@ model = dict(
             type='GVDeltaXYWHBBoxCoder',
             target_means=(.0, .0, .0, .0),
             target_stds=(0.1, 0.1, 0.2, 0.2)),
+        fix_coder=dict(type='GVFixCoder'),
+        ratio_coder=dict(type='GVRatioCoder'),
         bbox_roi_extractor=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
