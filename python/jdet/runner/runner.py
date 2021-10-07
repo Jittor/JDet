@@ -115,10 +115,13 @@ class Runner:
         print("FPS:", fps)
 
     def train(self):
+
         self.model.train()
 
         start_time = time.time()
+
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
+
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
@@ -150,6 +153,7 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
+
         self.epoch +=1
 
 

@@ -1,3 +1,4 @@
+from math import e
 import jittor as jt 
 from jittor import nn 
 
@@ -19,7 +20,7 @@ class RCNN(nn.Module):
         self.neck = build_from_cfg(neck,NECKS)
         self.rpn = build_from_cfg(rpn,HEADS)
         self.bbox_head = build_from_cfg(bbox_head,HEADS)
-
+        
     def execute(self,images,targets):
         '''
         Args:
@@ -33,12 +34,19 @@ class RCNN(nn.Module):
         
         if self.neck:
             features = self.neck(features)
-        
-        proposals,rpn_losses = self.rpn(features,targets)
-        output = self.bbox_head(features, proposals, targets)
-        
+            
+        proposals_list, rpn_losses = self.rpn(features,targets)
+
+        output = self.bbox_head(features, proposals_list, targets)
+
         if self.is_training():
             output.update(rpn_losses)
+
         return output
 
-
+    def train(self):
+        super(RCNN, self).train()
+        self.backbone.train()
+        self.neck.train()
+        self.rpn.train()
+        self.bbox_head.train()

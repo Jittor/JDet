@@ -274,10 +274,10 @@ class ROIAlign(nn.Module):
         self.version = version
 
     def execute(self, input, rois):
-        # breakpoint()
-        return roi_align(
+        res = roi_align(
             input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.version
         )
+        return res
 
     def __repr__(self):
         tmpstr = self.__class__.__name__ + "("
