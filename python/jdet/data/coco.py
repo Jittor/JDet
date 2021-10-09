@@ -1,7 +1,11 @@
 from jdet.utils.general import build_file
 from jittor.dataset import Dataset 
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
+import warnings 
+try:
+    from pycocotools.coco import COCO
+    from pycocotools.cocoeval import COCOeval
+except:
+    warnings.warn("pycocotools is not installed!")
 import os 
 from PIL import Image
 import numpy as np 

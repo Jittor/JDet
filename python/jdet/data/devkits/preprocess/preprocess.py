@@ -1,14 +1,22 @@
 import cv2
 import argparse
 import os
+import shutil
 from jdet.config import init_cfg, get_cfg
 from jdet.data.devkits.ImgSplit_multi_process import process
 from jdet.data.devkits.convert_data_to_mmdet import convert_data_to_mmdet
 from jdet.data.devkits.fair_to_dota import fair_to_dota
+from jdet.utils.general import is_win
+
+
 
 def clear(cfg):
-    os.system(f"rm -rf {os.path.join(cfg.source_dataset_path, 'trainval')}")
-    os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
+    if is_win():
+        shutil.rmtree(os.path.join(cfg.source_dataset_path, 'trainval'),ignore_errors=True)
+        shutil.rmtree(os.path.join(cfg.target_dataset_path),ignore_errors=True)
+    else:
+        os.system(f"rm -rf {os.path.join(cfg.source_dataset_path, 'trainval')}")
+        os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
 
 def run(cfg):
     if (cfg.type=='FAIR'):
@@ -16,6 +24,7 @@ def run(cfg):
             print('==============')
             print("convert to dota:", task)
             fair_to_dota(os.path.join(cfg.source_fair_dataset_path, task), os.path.join(cfg.source_dataset_path, task))
+
     for task in cfg.tasks:
         label = task.label
         cfg_ = task.config
@@ -39,13 +48,19 @@ def run(cfg):
         if (label == 'trainval' and (not os.path.exists(in_path))):
             out_img_path = os.path.join(cfg.source_dataset_path, 'trainval', 'images')
             out_label_path = os.path.join(cfg.source_dataset_path, 'trainval', 'labelTxt')
-            os.makedirs(out_img_path)
-            os.makedirs(out_label_path)
+            os.makedirs(out_img_path,exist_ok=True)
+            os.makedirs(out_label_path,exist_ok=True)
             # TODO support Windows etc.
-            os.system(f"cp {os.path.join(cfg.source_dataset_path, 'train', 'images', '*')} {out_img_path}")
-            os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'images', '*')} {out_img_path}")
-            os.system(f"cp {os.path.join(cfg.source_dataset_path, 'train', 'labelTxt', '*')} {out_label_path}")
-            os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'labelTxt', '*')} {out_label_path}")
+            if is_win():
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'train', 'images'),out_img_path,dirs_exist_ok=True) 
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'val', 'images'),out_img_path,dirs_exist_ok=True)
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'train', 'labelTxt'),out_label_path,dirs_exist_ok=True)
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'val', 'labelTxt'),out_label_path,dirs_exist_ok=True)
+            else:
+                os.system(f"cp {os.path.join(cfg.source_dataset_path, 'train', 'images', '*')} {out_img_path}")
+                os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'images', '*')} {out_img_path}")
+                os.system(f"cp {os.path.join(cfg.source_dataset_path, 'train', 'labelTxt', '*')} {out_label_path}")
+                os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'labelTxt', '*')} {out_label_path}")
         target_path = process(in_path, out_path, subsize=subimage_size, gap=overlap_size, rates=multi_scale)
         if (label != "test"):
             print("converting to mmdet format...")
