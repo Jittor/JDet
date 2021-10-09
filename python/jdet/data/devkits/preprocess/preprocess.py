@@ -12,10 +12,11 @@ from jdet.utils.general import is_win
 
 def clear(cfg):
     if is_win():
-        shutil.rmtree(os.path.join(cfg.source_dataset_path, 'trainval'))
-        shutil.rmtree(os.path.join(cfg.source_dataset_path, 'trainval'))
-    os.system(f"rm -rf {os.path.join(cfg.source_dataset_path, 'trainval')}")
-    os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
+        shutil.rmtree(os.path.join(cfg.source_dataset_path, 'trainval'),ignore_errors=True)
+        shutil.rmtree(os.path.join(cfg.target_dataset_path),ignore_errors=True)
+    else:
+        os.system(f"rm -rf {os.path.join(cfg.source_dataset_path, 'trainval')}")
+        os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
 
 def run(cfg):
     if (cfg.type=='FAIR'):
@@ -23,6 +24,7 @@ def run(cfg):
             print('==============')
             print("convert to dota:", task)
             fair_to_dota(os.path.join(cfg.source_fair_dataset_path, task), os.path.join(cfg.source_dataset_path, task))
+
     for task in cfg.tasks:
         label = task.label
         cfg_ = task.config
@@ -46,14 +48,14 @@ def run(cfg):
         if (label == 'trainval' and (not os.path.exists(in_path))):
             out_img_path = os.path.join(cfg.source_dataset_path, 'trainval', 'images')
             out_label_path = os.path.join(cfg.source_dataset_path, 'trainval', 'labelTxt')
-            os.makedirs(out_img_path)
-            os.makedirs(out_label_path)
+            os.makedirs(out_img_path,exist_ok=True)
+            os.makedirs(out_label_path,exist_ok=True)
             # TODO support Windows etc.
             if is_win():
-                shutil.copytree(os.path.join(cfg.source_dataset_path, 'train', 'images'),out_img_path) 
-                shutil.copytree(os.path.join(cfg.source_dataset_path, 'val', 'images'),out_img_path)
-                shutil.copytree(os.path.join(cfg.source_dataset_path, 'train', 'labelTxt'),out_label_path)
-                shutil.copytree(os.path.join(cfg.source_dataset_path, 'val', 'labelTxt'),out_label_path)
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'train', 'images'),out_img_path,dirs_exist_ok=True) 
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'val', 'images'),out_img_path,dirs_exist_ok=True)
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'train', 'labelTxt'),out_label_path,dirs_exist_ok=True)
+                shutil.copytree(os.path.join(cfg.source_dataset_path, 'val', 'labelTxt'),out_label_path,dirs_exist_ok=True)
             else:
                 os.system(f"cp {os.path.join(cfg.source_dataset_path, 'train', 'images', '*')} {out_img_path}")
                 os.system(f"cp {os.path.join(cfg.source_dataset_path, 'val', 'images', '*')} {out_img_path}")
