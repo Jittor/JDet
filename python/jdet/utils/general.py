@@ -160,3 +160,7 @@ def search_ckpt(work_dir):
         return None
     files = sorted(files,key=lambda x:int(x.split("_")[-1].split(".pkl")[0]))
     return files[-1]  
+
+def is_win():
+    import platform
+    return platform.system() == "Windows"
