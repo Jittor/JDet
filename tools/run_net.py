@@ -2,6 +2,7 @@ import argparse
 import jittor as jt
 from jdet.runner import Runner 
 from jdet.config import init_cfg
+from jdet.config.config import update_cfg
 
 
 def main():
@@ -19,6 +20,14 @@ def main():
         help="train,val,test",
         type=str,
     )
+    
+    parser.add_argument(
+        "--resume",
+        default=None,
+        help="resume path",
+        type=str,
+    )
+
     parser.add_argument(
         "--no_cuda",
         action='store_true'
@@ -33,7 +42,10 @@ def main():
     
     if args.config_file:
         init_cfg(args.config_file)
-    
+
+    if args.resume:
+        update_cfg(resume_path=args.resume)
+
     runner = Runner()
 
     if args.task == "train":

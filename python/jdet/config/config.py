@@ -152,6 +152,9 @@ def init_cfg(filename):
 def get_cfg():
     return _cfg
 
+def update_cfg(**kwargs):
+    _cfg.update(kwargs)
+
 def save_cfg(save_file):
     with open(save_file,"w") as f:
         f.write(yaml.dump(_cfg.dump()))
