@@ -62,6 +62,15 @@ class GlidingHead(nn.Module):
                      beta=1.0 / 3.0, 
                      loss_weight=16.0
                      ),
+                 with_bbox=True,
+                 with_shared_head=False,
+                 start_bbox_type='hbb',
+                 end_bbox_type='poly',
+                 with_avg_pool=False,
+                 pos_weight=-1,
+                 reg_class_agnostic=False,
+                 ratio_thr=0.8,
+                 max_per_img=2000,
      ):
         super().__init__()
         self.representation_dim = representation_dim
@@ -75,16 +84,15 @@ class GlidingHead(nn.Module):
         self.nms_thresh = nms_thresh
         self.detections_per_img = detections_per_img
         
-        # TODO: Add these attr to config
-        self.with_bbox = True
-        self.with_shared_head = False
-        self.start_bbox_type = 'hbb'
-        self.end_bbox_type = 'poly'
-        self.with_avg_pool = False
-        self.pos_weight = -1
-        self.reg_class_agnostic = False
-        self.ratio_thr = 0.8
-        self.max_per_img = 2000
+        self.with_bbox = with_bbox
+        self.with_shared_head = with_shared_head
+        self.start_bbox_type = start_bbox_type
+        self.end_bbox_type = end_bbox_type
+        self.with_avg_pool = with_avg_pool
+        self.pos_weight = pos_weight
+        self.reg_class_agnostic = reg_class_agnostic
+        self.ratio_thr = ratio_thr
+        self.max_per_img = max_per_img
 
         self.assigner = build_from_cfg(assigner, BOXES)
         self.sampler = build_from_cfg(sampler, BOXES)

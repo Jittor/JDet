@@ -2,7 +2,7 @@
 model = dict(
     type='GlidingVertex',
     backbone=dict(
-        type='Resnet50',
+        type='Resnet101',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
@@ -128,10 +128,10 @@ dataset = dict(
             dict(
                 type='RotatedRandomFlip', 
                 prob=0.5),
-            dict(
-                type="RandomRotateAug",
-                random_rotate_on=True,
-            ),
+            # dict(
+            #     type="RandomRotateAug",
+            #     random_rotate_on=True,
+            # ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -146,7 +146,7 @@ dataset = dict(
         num_workers=4,
         shuffle=True,
         filter_empty_gt=False,
-        balance_category=True
+        balance_category=False
     ),
     val=dict(
         type="DOTADataset",

@@ -2,7 +2,7 @@
 model = dict(
     type='GlidingVertex',
     backbone=dict(
-        type='Resnet50',
+        type='Resnet101',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),

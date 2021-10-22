@@ -103,6 +103,15 @@ model = dict(
             beta=1.0 / 3.0, 
             loss_weight=16.0
             ),
+        with_bbox=True,
+        with_shared_head=False,
+        start_bbox_type='hbb',
+        end_bbox_type='poly',
+        with_avg_pool=False,
+        pos_weight=-1,
+        reg_class_agnostic=False,
+        ratio_thr=0.8,
+        max_per_img=2000,
         )
     )
 dataset = dict(
