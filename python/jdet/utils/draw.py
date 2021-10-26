@@ -9,6 +9,8 @@ from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
 import os.path as osp
 import matplotlib.colors as mpl_colors
+import matplotlib
+matplotlib.use("Agg")
 
 from collections.abc import Iterable
 
