@@ -7,9 +7,9 @@ import jdet
 import pickle
 import datetime
 from jdet.config import get_cfg,save_cfg
+from jdet.utils.visualization import visualize_results
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import COCO_CLASSES
-from jdet.utils.visualization import draw_rboxes, visualize_results,visual_gts
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.data_merge import data_merge_result
 import os
@@ -80,7 +80,7 @@ class Runner:
         self.logger.print_log("Start running")
         while not self.finish:
             self.train()
-            if False and check_interval(self.epoch,self.eval_interval):
+            if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 self.model.eval()
                 self.val()
@@ -166,7 +166,6 @@ class Runner:
             results = self.model(images,targets)
             if save_dir:
                 visualize_results(results,COCO_CLASSES,[t["img_file"] for t in targets],save_dir)
-                # visual_gts(targets,save_dir)                
 
     @jt.no_grad()
     @jt.single_process_scope()
