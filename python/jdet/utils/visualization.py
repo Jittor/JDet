@@ -1,7 +1,7 @@
 import os 
 import glob 
 import numpy as np
-from draw import draw_bboxes
+from jdet.utils.draw import draw_bboxes
 
 def read_dota(dota_dir):
     files = glob.glob(os.path.join(dota_dir,"*.txt"))
