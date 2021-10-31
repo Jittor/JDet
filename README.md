@@ -109,11 +109,12 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Faster R-CNN
 - :heavy_check_mark: SSD
 - :heavy_check_mark: ROI Transformer
+- :clock3: fcos
+- :clock3: Oriented R-CNN
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
-- :clock3: fcos
 - :heavy_plus_sign: CSL
 - :heavy_plus_sign: DCL
 - :heavy_plus_sign: GWD
