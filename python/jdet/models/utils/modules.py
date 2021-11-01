@@ -168,7 +168,10 @@ class ConvModule(nn.Module):
                 norm_channels = out_channels
             else:
                 norm_channels = in_channels
-            self.norm = build_from_cfg(norm_cfg, BRICKS,in_channels=norm_channels)
+            if norm_cfg.get("type","BN") == "GN":
+                self.norm = build_from_cfg(norm_cfg, BRICKS,num_channels=norm_channels)
+            else:
+                self.norm = build_from_cfg(norm_cfg, BRICKS,in_channels=norm_channels)
         else:
             self.norm = None
 
