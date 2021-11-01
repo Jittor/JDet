@@ -29,5 +29,6 @@ submit_zips
 *.swp
 *.pkl
 *.pk
+*.sh
 test_configs
 projects/*/test_datas*

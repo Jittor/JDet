@@ -2,7 +2,7 @@
 model = dict(
     type='S2ANet',
     backbone=dict(
-        type='Resnet50',
+        type='Resnet101',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
@@ -15,7 +15,7 @@ model = dict(
         num_outs=5),
     bbox_head=dict(
         type='S2ANetHead',
-        num_classes=16,
+        num_classes=38,
         in_channels=256,
         feat_channels=256,
         stacked_convs=2,
@@ -80,11 +80,14 @@ model = dict(
                 debug=False))
         )
     )
+
+data_root = "/data/lxl/dataset/fair_1024"
+train_root = f"{data_root}/trainval_1024_200_0.5-1.0-1.5"
 dataset = dict(
     train=dict(
-        type="DOTADataset",
-        anno_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        image_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        type="FAIRDataset",
+        annotations_file=f'{train_root}/labels.pkl',
+        images_dir=f'{train_root}/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -92,6 +95,10 @@ dataset = dict(
                 max_size=1024
             ),
             dict(type='RotatedRandomFlip', prob=0.5),
+            dict(
+                type="RandomRotateAug",
+                random_rotate_on=True,
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -102,15 +109,16 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=8,
-        num_workers=8,
+        batch_size=2,
+        num_workers=4,
         shuffle=True,
-        filter_empty_gt=False
+        filter_empty_gt=False,
+        balance_category=True
     ),
     val=dict(
-        type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        type="FAIRDataset",
+        annotations_file=f'{train_root}/labels.pkl',
+        images_dir=f'{train_root}/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -132,8 +140,8 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        img_files='/mnt/disk/lxl/dataset/DOTA_1024/test_split/test1024.pkl',
-        img_prefix='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        dataset_type="FAIR",
+        images_dir=f'{data_root}/test_1024_200_0.5-1.0-1.5/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -156,7 +164,7 @@ dataset = dict(
 
 optimizer = dict(
     type='SGD', 
-    lr=0.01, #0.0,#0.01*(1/8.), 
+    lr=0.01/4., #0.0,#0.01*(1/8.), 
     momentum=0.9, 
     weight_decay=0.0001,
     grad_clip=dict(
@@ -168,7 +176,7 @@ scheduler = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    milestones=[8, 11])
+    milestones=[7, 10])
 
 
 logger = dict(
@@ -176,8 +184,7 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 1
+eval_interval = 12
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/lxl/JDet/work_dirs/s2anet_r50_fpn_1x_dota_bs8"
-# resume_path = "/home/lxl/workspace/JDet/s2anet_r50_fpn_1x_converted-11c9c5f4.pth"
+
