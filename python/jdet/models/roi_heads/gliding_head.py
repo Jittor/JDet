@@ -3,7 +3,7 @@ from jittor import nn
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
 
-from jdet.models.utils.gliding_transforms import *
+from jdet.models.utils.transforms import *
 
 @HEADS.register_module()
 class GlidingHead(nn.Module):
@@ -133,25 +133,10 @@ class GlidingHead(nn.Module):
             nn.init.gauss_(l.weight,std=0.001)
             nn.init.constant_(l.bias, 0)
 
-    def get_bbox_dim(self, bbox_type, with_score=False):
-        
-        if bbox_type == 'hbb':
-            dim = 4
-        elif bbox_type == 'obb':
-            dim = 5
-        elif bbox_type == 'poly':
-            dim = 8
-        else:
-            raise ValueError(f"don't know {bbox_type} bbox dim")
-
-        if with_score:
-            dim += 1
-        return dim
-
     def arb2roi(self, bbox_list, bbox_type='hbb'):
 
         assert bbox_type in ['hbb', 'obb', 'poly']
-        bbox_dim = self.get_bbox_dim(bbox_type)
+        bbox_dim = get_bbox_dim(bbox_type)
 
         rois_list = []
         for img_id, bboxes in enumerate(bbox_list):
@@ -166,7 +151,7 @@ class GlidingHead(nn.Module):
     
     def get_results(self, multi_bboxes, multi_scores, score_factors=None, bbox_type='hbb'):
         
-        bbox_dim = self.get_bbox_dim(bbox_type)
+        bbox_dim = get_bbox_dim(bbox_type)
         num_classes = multi_scores.size(1) - 1
 
         # exclude background category

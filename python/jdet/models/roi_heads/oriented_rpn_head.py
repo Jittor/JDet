@@ -4,10 +4,11 @@ from jittor import nn
 from jdet.utils.registry import BOXES, LOSSES, build_from_cfg,HEADS
 from jdet.utils.general import multi_apply
 from jdet.models.boxes.anchor_target import images_to_levels, anchor_inside_flags
+from jdet.models.utils.transforms import *
 
 @HEADS.register_module()
-class GlidingRPNHead(nn.Module):
-    """RPN head.
+class OrientedRPNHead(nn.Module):
+    """Oriented-RCNN RPN head.
     Args:
         in_channels (int): Number of channels in the input feature map.
         init_cfg (dict or list[dict], optional): Initialization config dict.
@@ -15,19 +16,23 @@ class GlidingRPNHead(nn.Module):
 
     def __init__(self,
                  in_channels,
-                 num_classes=2,
+                 num_classes=1,
                  min_bbox_size = -1,
                  nms_thresh = 0.3,
                  nms_pre = 1200,
                  nms_post = 1200,
                  feat_channels=256,
+                 bbox_type='obb',
+                 reg_dim=6,
+                 background_label=0,
+                 reg_decoded_bbox=False,
                  anchor_generator=dict(
                      type='AnchorGenerator',
                      scales=[4, 8, 16, 32],
                      ratios=[0.5, 1.0, 2.0],
                      strides=[8, 16, 32, 64,128]),
                  bbox_coder=dict(
-                     type='GVDeltaXYWHBBoxCoder',
+                     type='OrientedDeltaXYWHBBoxCoder',
                      target_means=(.0, .0, .0, .0),
                      target_stds=(1.0, 1.0, 1.0, 1.0)),
                  loss_cls=dict(
@@ -37,19 +42,19 @@ class GlidingRPNHead(nn.Module):
                      type='L1Loss', loss_weight=1.0),
                  assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.7,
+                    pos_iou_thr=0.8,
                     neg_iou_thr=0.3,
                     min_pos_iou=0.3,
                     ignore_iof_thr=-1),
-                sampler=dict(
+                 sampler=dict(
                     type='RandomSampler',
                     num=256,
                     pos_fraction=0.5,
                     neg_pos_ub=-1,
-                    add_gt_as_proposals=False)
+                    add_gt_as_proposals=False),
                 ):
-        super(GlidingRPNHead, self).__init__()
-        
+        super(OrientedRPNHead, self).__init__()
+
         self.min_bbox_size = min_bbox_size
         self.nms_thresh  = nms_thresh
         self.nms_pre = nms_pre
@@ -58,6 +63,25 @@ class GlidingRPNHead(nn.Module):
         self.feat_channels = feat_channels
         self.num_classes = num_classes
         self.unmap_outputs = True
+        self.bbox_type = bbox_type
+        self.reg_dim = reg_dim
+
+        self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
+        # TODO better way to determine whether sample or not
+        self.sampling = loss_cls['type'] not in [
+            'FocalLoss', 'GHMC', 'QualityFocalLoss'
+        ]
+        if self.use_sigmoid_cls:
+            self.cls_out_channels = num_classes
+        else:
+            self.cls_out_channels = num_classes + 1
+
+        self.reg_decoded_bbox = reg_decoded_bbox
+        self.background_label = (
+            num_classes if background_label is None else background_label)
+        # background_label should be either 0 or num_classes
+        assert (self.background_label == 0
+                or self.background_label == num_classes)
 
         self.bbox_coder = build_from_cfg(bbox_coder,BOXES)
         self.loss_cls = build_from_cfg(loss_cls,LOSSES)
@@ -75,7 +99,7 @@ class GlidingRPNHead(nn.Module):
             self.in_channels, self.feat_channels, 3, padding=1)
         self.rpn_cls = nn.Conv2d(self.feat_channels,
                                  self.num_anchors * self.num_classes, 1)
-        self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 4, 1)
+        self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 6, 1)
 
     def unmap(self, data, count, inds, fill=0):
         """ Unmap a subset of item (data) back to the original set of items (of
@@ -132,15 +156,14 @@ class GlidingRPNHead(nn.Module):
             rpn_cls_score = cls_scores[idx]
             rpn_bbox_pred = bbox_preds[idx]
             assert rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:]
-            rpn_cls_score = rpn_cls_score.permute(1, 2, 0)
-            rpn_cls_score = rpn_cls_score.reshape(-1, 2)
+            rpn_cls_score = rpn_cls_score.permute(1, 2, 0).reshape(-1, self.cls_out_channels)
             # We set FG labels to [0, num_class-1] and BG label to
             # num_class in RPN head since mmdet v2.5, which is unified to
             # be consistent with other head since mmdet v2.0. In mmdet v2.0
             # to v2.4 we keep BG label as 0 and FG label as 1 in rpn head.
             scores = nn.softmax(rpn_cls_score,dim=1)[:, 1]
 
-            rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+            rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, self.reg_dim)
             anchors = mlvl_anchors[idx]
 
             if self.nms_pre > 0 and scores.shape[0] > self.nms_pre:
@@ -169,7 +192,8 @@ class GlidingRPNHead(nn.Module):
             if not valid_mask.all():
                 proposals = proposals[valid_mask]
                 scores = scores[valid_mask]
-
+        
+        # TODO maybe it's wrong, need arb_batched_nms
         dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
         keep = jt.nms(dets, self.nms_thresh)
         dets = dets[keep, :]
@@ -218,7 +242,6 @@ class GlidingRPNHead(nn.Module):
             ]
             # W,H
             img_shape = target['img_size']
-
             proposals = self._get_bboxes_single(cls_score_list, bbox_pred_list,mlvl_anchors, img_shape)
             result_list.append(proposals)
         return result_list
@@ -231,6 +254,7 @@ class GlidingRPNHead(nn.Module):
 
         gt_bboxes = target["hboxes"]
         gt_bboxes_ignore = target["hboxes_ignore"]
+        gt_labels = None
         flat_anchors = jt.concat(anchors_list)
         valid_flags = jt.concat(valid_flag_list)
 
@@ -239,15 +263,24 @@ class GlidingRPNHead(nn.Module):
             return (None, ) * 6
         anchors = flat_anchors[inside_flags, :]
 
+        anchor_bbox_type = get_bbox_type(anchors)
+        gt_bbox_type = get_bbox_type(gt_bboxes)
+
         # assign gt and sample anchors
-        assign_result = self.assigner.assign(anchors, gt_bboxes, gt_bboxes_ignore)
+        assign_result = self.assigner.assign(anchors, gt_bboxes, gt_bboxes_ignore, None if self.sampling else gt_labels)
         sampling_result = self.sampler.sample(assign_result, anchors, gt_bboxes)
+
+        if anchor_bbox_type != gt_bbox_type:
+            if gt_bboxes.numel() == 0:
+                sampling_result.pos_gt_bboxes = jt.empty(gt_bboxes.shape).view(-1, get_bbox_dim(gt_bbox_type))
+            else:
+                sampling_result.pos_gt_bboxes = gt_bboxes[sampling_result.pos_assigned_gt_inds, :]
 
         num_valid_anchors = anchors.shape[0]
         bbox_targets = jt.zeros_like(anchors)
         bbox_weights = jt.zeros_like(anchors)
         # 1 is background label
-        labels = jt.zeros((num_valid_anchors, ), dtype="int64")
+        labels = jt.full((num_valid_anchors, ), self.background_label).long()
         label_weights = jt.zeros((num_valid_anchors,)).float()
 
         pos_inds = sampling_result.pos_inds
@@ -303,7 +336,7 @@ class GlidingRPNHead(nn.Module):
 
         return labels_list, label_weights_list, bbox_targets_list,bbox_weights_list, num_total_pos, num_total_neg
 
-    def loss_single(self, cls_score, bbox_pred, labels, label_weights,
+    def loss_single(self, cls_score, bbox_pred, anchors, labels, label_weights,
                     bbox_targets, bbox_weights, num_total_samples):
         """Compute loss of a single scale level.
         Args:
@@ -333,9 +366,15 @@ class GlidingRPNHead(nn.Module):
         loss_cls = self.loss_cls(cls_score, labels, weight=label_weights, avg_factor=num_total_samples)
 
         # regression loss
-        bbox_targets = bbox_targets.reshape(-1, 4)
-        bbox_weights = bbox_weights.reshape(-1, 4)
-        bbox_pred = bbox_pred.permute(0, 2, 3, 1).reshape(-1, 4)
+        bbox_targets = bbox_targets.reshape(-1, self.reg_dim)
+        bbox_weights = bbox_weights.reshape(-1, self.reg_dim)
+        bbox_pred = bbox_pred.permute(0, 2, 3, 1).reshape(-1, self.reg_dim)
+
+        if self.reg_decoded_bbox:
+            anchor_dim = anchors.size(-1)
+            anchors = anchors.reshape(-1, anchor_dim)
+            bbox_pred = self.bbox_coder.decode(anchors, bbox_pred)
+
         loss_bbox = self.loss_bbox(bbox_pred,bbox_targets,bbox_weights,avg_factor=num_total_samples)
         return loss_cls, loss_bbox
 
@@ -361,13 +400,21 @@ class GlidingRPNHead(nn.Module):
 
         labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,num_total_pos, num_total_neg = self.get_targets(anchor_list, valid_flag_list, targets)
 
+        # anchor number of multi levels
+        num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
+        # concat all level anchors and flags to a single tensor
+        concat_anchor_list = []
+        for i in range(len(anchor_list)):
+            concat_anchor_list.append(jt.cat(anchor_list[i]))
+        all_anchor_list = images_to_levels(concat_anchor_list, num_level_anchors)
+
         num_total_samples =  num_total_pos + num_total_neg 
 
         losses_cls, losses_bbox = multi_apply(
             self.loss_single,
             cls_scores,
             bbox_preds,
-            # all_anchor_list,
+            all_anchor_list,
             labels_list,
             label_weights_list,
             bbox_targets_list,
@@ -376,7 +423,7 @@ class GlidingRPNHead(nn.Module):
 
         return dict(loss_rpn_cls=losses_cls, loss_rpn_bbox=losses_bbox)
 
-    def execute(self,features,targets):
+    def execute(self, features, targets):
 
         outs = multi_apply(self.forward_single, features)
         

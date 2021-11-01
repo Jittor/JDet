@@ -34,6 +34,20 @@ def get_bbox_type(bboxes, with_score=False):
         return 'poly'
     return 'notype'
 
+def get_bbox_dim(bbox_type, with_score=False):
+    if bbox_type == 'hbb':
+        dim = 4
+    elif bbox_type == 'obb':
+        dim = 5
+    elif bbox_type == 'poly':
+        dim = 8
+    else:
+        raise ValueError(f"don't know {bbox_type} bbox dim")
+
+    if with_score:
+        dim += 1
+    return dim
+
 def poly2obb(polys):
 
     polys_np = polys.numpy()

@@ -1,7 +1,7 @@
 import os 
 import glob 
 import numpy as np
-from draw import draw_bboxes
+from jdet.utils.draw import draw_bboxes
 
 def read_dota(dota_dir):
     files = glob.glob(os.path.join(dota_dir,"*.txt"))
@@ -49,6 +49,15 @@ def visualize_dota(dota_dir,image_dir,save_dir):
                   with_text=True,
                   font_size=10,
                   out_file=save_file)
+
+def visualize_results(results,classnames,files,save_dir):
+    os.makedirs(save_dir,exist_ok=True)
+    for (det,labels),img_file in zip(results,files):
+        bboxes = det[:,:-1]
+        scores = det[:,-1]
+        save_file = os.path.join(save_dir,os.path.split(img_file)[-1])
+        draw_bboxes(img_file,bboxes,labels=labels,scores=scores,class_names=classnames,out_file=save_file)
+
 
 def main():
     dota_dir = "C:/Users/lxl/Desktop/dota_results"
