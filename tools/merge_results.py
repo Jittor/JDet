@@ -99,9 +99,105 @@ def main():
     # name = "dota_merge"
     result_dirs = [
         "temp/orpn_fair",
-        "temp/merge7_fair"
+        "temp/merge7_fair",
     ]
-    name = "fair_merge8"
+    # result_dirs = ['/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance_ms_fair/test/submit_12/after_nms',
+    #                 "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance_ms_fair_2/test/submit_12/after_nms",
+    #                 "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota_bs2_fair2/test/submit_12/after_nms",
+    #                 "/home/lxl/workspace/JDet3/work_dirs/s2anet_r2_50_fpn_1x_dota_rotate_balance_ms_fair/test/submit_12/after_nms",
+    #                 "temp/orpn_fair",
+    #                 ]
+    # result_dirs = ['/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance_ms_fair/test/submit_12/after_nms',
+    #                 "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance_ms_fair_2/test/submit_12/after_nms",
+    #                 # "/home/lxl/workspace/JDet/work_dirs/s2anet_r50_fpn_1x_dota_bs2_fair2/test/submit_12/after_nms",
+    #                 "/home/lxl/workspace/JDet3/work_dirs/s2anet_r2_50_fpn_1x_dota_rotate_balance_ms_fair/test/submit_12/after_nms",
+    #                 "temp/orpn_fair",
+    #                 ]
+    # result_dirs = [
+    #     "temp/orpn_fair",
+    #     "temp/merge7_fair",
+    #     "temp/orpn_fair_aug_10",
+    #     "temp/orpn_fair_aug_11",
+    #     "temp/orpn_fair_aug_12",
+    #     "temp/orpn_fair_expand02_aug_10",
+    #     "temp/orpn_fair_expand02_aug_11",
+    #     "temp/orpn_fair_expand02_aug_12",
+    #     "temp/orpn_fair_nex2_aug_12",
+    # ]
+
+    result_dirs = [
+        "temp/orpn_fair",
+        "temp/merge7_fair",
+        "temp/orpn_fair_aug_10",
+        "temp/orpn_fair_aug_11",
+        "temp/orpn_fair_aug_12",
+        "temp/orpn_fair_expand02_aug_10",
+        "temp/orpn_fair_expand02_aug_11",
+        "temp/orpn_fair_expand02_aug_12",
+        "temp/orpn_fair_nex2_aug_10",
+        "temp/orpn_fair_nex2_aug_11",
+        "temp/orpn_fair_nex2_aug_12",
+    ]
+
+    result_dirs = [
+        "temp/orpn_fair",
+        "temp/merge7_fair",
+        # "temp/orpn_fair_aug_10",
+        # "temp/orpn_fair_aug_11",
+        "temp/orpn_fair_aug_12",
+        # "temp/orpn_fair_expand02_aug_10",
+        # "temp/orpn_fair_expand02_aug_11",
+        "temp/orpn_fair_expand02_aug_12",
+        # "temp/orpn_fair_nex2_aug_10",
+        # "temp/orpn_fair_nex2_aug_11",
+        "temp/orpn_fair_nex2_aug_12",
+    ]
+
+    result_dirs = [
+        "temp/orpn_fair",
+        "temp/merge7_fair",
+        "temp/orpn_fair_aug_10",
+        "temp/orpn_fair_aug_11",
+        "temp/orpn_fair_aug_12",
+        "temp/orpn_fair_expand02_aug_10",
+        "temp/orpn_fair_expand02_aug_11",
+        "temp/orpn_fair_expand02_aug_12",
+        "temp/orpn_fair_nex2_aug_12",
+        "temp/orpn_res2net"
+    ]
+
+    result_dirs = [
+        "temp/orpn_fair",
+        "temp/merge7_fair",
+        "temp/orpn_fair_aug_10",
+        "temp/orpn_fair_aug_11",
+        "temp/orpn_fair_aug_12",
+        "temp/orpn_fair_expand02_aug_10",
+        "temp/orpn_fair_expand02_aug_11",
+        "temp/orpn_fair_expand02_aug_12",
+        "temp/orpn_fair_nex2_aug_12",
+        "temp/orpn_res2net",
+        "temp/orpn_resnext"
+    ]
+
+    result_dirs = [
+        "temp/orpn_fair",
+        "temp/merge7_fair",
+        "temp/orpn_fair_aug_10",
+        "temp/orpn_fair_aug_11",
+        "temp/orpn_fair_aug_12",
+        "temp/orpn_fair_expand02_aug_10",
+        "temp/orpn_fair_expand02_aug_11",
+        "temp/orpn_fair_expand02_aug_12",
+        "temp/orpn_fair_nex2_aug_12",
+        "temp/orpn_res2net",
+        "temp/orpn_res2net_10",
+        "temp/orpn_res2net_11",
+        "temp/orpn_resnext",
+        "temp/orpn_resnext_10",
+        "temp/orpn_resnext_11",
+    ]
+    name = "fair_merge16"
     image_dirs = "/mnt/disk/lxl/dataset/fair_1024/test_1024_200_0.5-1.0-1.5/images/"
     dataset_type = "fair"
 
