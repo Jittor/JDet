@@ -67,10 +67,12 @@ class OrientedRPNHead(nn.Module):
         self.reg_dim = reg_dim
 
         self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
+        
         # TODO better way to determine whether sample or not
         self.sampling = loss_cls['type'] not in [
             'FocalLoss', 'GHMC', 'QualityFocalLoss'
         ]
+
         if self.use_sigmoid_cls:
             self.cls_out_channels = num_classes
         else:
@@ -161,15 +163,24 @@ class OrientedRPNHead(nn.Module):
             # num_class in RPN head since mmdet v2.5, which is unified to
             # be consistent with other head since mmdet v2.0. In mmdet v2.0
             # to v2.4 we keep BG label as 0 and FG label as 1 in rpn head.
-            scores = nn.softmax(rpn_cls_score,dim=1)[:, 1]
 
+            if self.use_sigmoid_cls:
+                rpn_cls_score = rpn_cls_score.reshape(-1)
+                scores = rpn_cls_score.sigmoid()
+            else:
+                rpn_cls_score = rpn_cls_score.reshape(-1, 2)
+                # we set FG labels to [0, num_class-1] and BG label to
+                # num_class in other heads since mmdet v2.0, However we
+                # keep BG label as 0 and FG label as 1 in rpn head
+                scores = rpn_cls_score.softmax(dim=1)[:, 1]
+                
             rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, self.reg_dim)
             anchors = mlvl_anchors[idx]
 
             if self.nms_pre > 0 and scores.shape[0] > self.nms_pre:
                 # sort is faster than topk
                 # _, topk_inds = scores.topk(cfg.nms_pre)
-                rank_inds,ranked_scores = scores.argsort(descending=True)
+                rank_inds, ranked_scores = scores.argsort(descending=True)
                 topk_inds = rank_inds[:self.nms_pre]
                 scores = ranked_scores[:self.nms_pre]
                 rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
@@ -251,7 +262,6 @@ class OrientedRPNHead(nn.Module):
         """Compute regression and classification targets for anchors in a
         single image.
         """
-
         gt_bboxes = target["hboxes"]
         gt_bboxes_ignore = target["hboxes_ignore"]
         gt_labels = None
@@ -277,8 +287,9 @@ class OrientedRPNHead(nn.Module):
                 sampling_result.pos_gt_bboxes = gt_bboxes[sampling_result.pos_assigned_gt_inds, :]
 
         num_valid_anchors = anchors.shape[0]
-        bbox_targets = jt.zeros_like(anchors)
-        bbox_weights = jt.zeros_like(anchors)
+        bbox_targets = jt.zeros((anchors.size(0), self.reg_dim))
+        bbox_weights = jt.zeros((anchors.size(0), self.reg_dim))
+
         # 1 is background label
         labels = jt.full((num_valid_anchors, ), self.background_label).long()
         label_weights = jt.zeros((num_valid_anchors,)).float()
@@ -359,11 +370,16 @@ class OrientedRPNHead(nn.Module):
             dict[str, Tensor]: A dictionary of loss components.
         """
         
+        # TODO check if the loss is right
         # classification loss
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
-        cls_score = cls_score.permute(0, 2, 3,1).reshape(-1, 2)
-        loss_cls = self.loss_cls(cls_score, labels, weight=label_weights, avg_factor=num_total_samples)
+        cls_score = cls_score.permute(0, 2, 3, 1).reshape(-1, self.cls_out_channels)
+        
+        # binary_labels = jt.init.eye(2)[labels, :]
+        # print(cls_score.shape)
+        # print(binary_labels)
+        loss_cls = self.loss_cls(cls_score, labels, label_weights, avg_factor=num_total_samples)
 
         # regression loss
         bbox_targets = bbox_targets.reshape(-1, self.reg_dim)
@@ -375,7 +391,7 @@ class OrientedRPNHead(nn.Module):
             anchors = anchors.reshape(-1, anchor_dim)
             bbox_pred = self.bbox_coder.decode(anchors, bbox_pred)
 
-        loss_bbox = self.loss_bbox(bbox_pred,bbox_targets,bbox_weights,avg_factor=num_total_samples)
+        loss_bbox = self.loss_bbox(bbox_pred, bbox_targets, bbox_weights, avg_factor=num_total_samples)
         return loss_cls, loss_bbox
 
     def loss(self,
@@ -398,14 +414,15 @@ class OrientedRPNHead(nn.Module):
             multi_level_flags = self.anchor_generator.valid_flags(featmap_sizes, target['pad_shape'])
             valid_flag_list.append(multi_level_flags)
 
+        # label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
         labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,num_total_pos, num_total_neg = self.get_targets(anchor_list, valid_flag_list, targets)
-
+        
         # anchor number of multi levels
         num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
         # concat all level anchors and flags to a single tensor
         concat_anchor_list = []
         for i in range(len(anchor_list)):
-            concat_anchor_list.append(jt.cat(anchor_list[i]))
+            concat_anchor_list.append(jt.concat(anchor_list[i]))
         all_anchor_list = images_to_levels(concat_anchor_list, num_level_anchors)
 
         num_total_samples =  num_total_pos + num_total_neg 
