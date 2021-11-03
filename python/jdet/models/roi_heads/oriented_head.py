@@ -6,6 +6,8 @@ from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cf
 from jdet.models.utils.transforms import *
 from jdet.models.utils.modules import ConvModule
 
+from jittor.misc import _pair
+
 @HEADS.register_module()
 class OrientedHead(nn.Module):
 
@@ -81,6 +83,11 @@ class OrientedHead(nn.Module):
         self.pos_weight = pos_weight
         self.score_thresh = score_thresh
         
+        # TODO Add to config
+        roi_feat_size = 7
+        self.roi_feat_size = _pair(roi_feat_size)
+        self.roi_feat_area = self.roi_feat_size[0] * self.roi_feat_size[1]
+
         self.start_bbox_type = start_bbox_type
         self.end_bbox_type = end_bbox_type
         assert self.start_bbox_type in ['hbb', 'obb', 'poly']
@@ -92,8 +99,7 @@ class OrientedHead(nn.Module):
         if self.with_avg_pool:
             self.avg_pool = nn.AvgPool2d(self.roi_feat_size)
         else:
-            # in_channels *= self.roi_feat_area
-            in_channels *= 49
+            in_channels *= self.roi_feat_area
             
         if self.with_cls:
             self.fc_cls = nn.Linear(in_channels, num_classes + 1)
@@ -262,7 +268,7 @@ class OrientedHead(nn.Module):
         if test:
             rois = self.arb2roi(sampling_results, bbox_type=self.start_bbox_type)
         else:
-            rois = self.arb2roi([res.bboxes for res in sampling_results])
+            rois = self.arb2roi([res.bboxes for res in sampling_results], bbox_type=self.start_bbox_type)
         
         x = self.bbox_roi_extractor(x[:self.bbox_roi_extractor.num_inputs], rois)
 
@@ -331,7 +337,7 @@ class OrientedHead(nn.Module):
                 if self.reg_class_agnostic:
                     pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), self.reg_dim)[pos_inds.astype(jt.bool)]
                 else:
-                    pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1, self.reg_dim)[pos_inds.astype(jt.bool), labels[pos_inds.type(jt.bool)]]
+                    pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1, self.reg_dim)[pos_inds.astype(jt.bool), labels[pos_inds.astype(jt.bool)]]
                 
                 losses['orcnn_bbox_loss'] = self.loss_bbox(
                     pos_bbox_pred,
@@ -400,7 +406,7 @@ class OrientedHead(nn.Module):
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
         
-        scores = nn.softmax(cls_score, dim=1)
+        scores = nn.softmax(cls_score, dim=1) if cls_score is not None else None
 
         if bbox_pred is not None:
             bboxes = self.bbox_coder.decode(rois[:, 1:], bbox_pred, max_shape=img_shape)
@@ -439,11 +445,11 @@ class OrientedHead(nn.Module):
             gt_obboxes_ignore = []
 
             for target in targets:
-                gt_obboxes.append(target['polys'])
+                gt_obboxes.append(target['rboxes'])
                 gt_bboxes.append(target['hboxes'])
                 gt_labels.append(target['labels'] - 1)
                 gt_bboxes_ignore.append(target['hboxes_ignore'])
-                gt_obboxes_ignore.append(target['polys_ignore'])
+                gt_obboxes_ignore.append(target['rboxes_ignore'])
 
             # assign gts and sample proposals
             if self.with_bbox:
@@ -458,7 +464,7 @@ class OrientedHead(nn.Module):
                 sampling_results = []
 
                 for i in range(num_imgs):
-
+                    
                     assign_result = self.assigner.assign(proposal_list[i], target_bboxes[i], target_bboxes_ignore[i], gt_labels[i])
 
                     sampling_result = self.sampler.sample(
@@ -488,29 +494,23 @@ class OrientedHead(nn.Module):
             result = []
             for i in range(len(targets)):
 
-                scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, [proposal_list[i]], test=True)
+                scores, bbox_deltas, rois = self.forward_single(x, [proposal_list[i]], test=True)
                 img_shape = targets[i]['img_size']
                 scale_factor = targets[i]['scale_factor']
                 
-                det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, fixes, ratios, img_shape, scale_factor)
+                det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, img_shape, scale_factor)
 
                 poly = det_bboxes[:, :8]
                 scores = det_bboxes[:, 8]
                 labels = det_labels
 
                 # visualization
-
                 img_vis = cv2.imread(targets[i]["img_file"])
-                img_vis_ori = cv2.imread(targets[i]["img_file"])
                 filename = targets[i]["img_file"].split('/')[-1]
                 for j in range(poly.shape[0]):
                     box = poly[j]
                     draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
-                for j in range(polys_ori.shape[0]):
-                    box = polys_ori[j]
-                    draw_poly(img_vis_ori, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
                 cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_{filename}', img_vis)
-                cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_ori_{filename}', img_vis_ori)
 
                 result.append((poly, scores, labels))
             

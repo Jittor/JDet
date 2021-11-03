@@ -56,9 +56,9 @@ model = dict(
             ignore_iof_thr=-1,
             match_low_quality=False,
             assigned_labels_filled=-1,
-            iou_calculator=dict(type='BboxOverlaps2D')),
+            iou_calculator=dict(type='BboxOverlaps2D_rotated')),
         sampler=dict(
-            type='RandomSampler',
+            type='RandomSamplerRotated',
             num=512,
             pos_fraction=0.25,
             neg_pos_ub=-1,
@@ -69,7 +69,8 @@ model = dict(
             target_stds=[0.1, 0.1, 0.2, 0.2, 0.1]),
         bbox_roi_extractor=dict(
             type='OrientedSingleRoIExtractor',
-            roi_layer=dict(type='ROIAlignRotated', output_size=7, sampling_num=2),
+            # roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
+            roi_layer=dict(type='ROIAlignRotated', output_size=7, sampling_ratio=2),
             out_channels=256,
             extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
@@ -94,8 +95,10 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        # annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        annotations_file='/home/czh/OBBDetection/DOTA_single_jdet/trainval/labels.pkl',
+        images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -127,10 +130,8 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        # annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        annotations_file='/home/czh/OBBDetection/DOTA_single_jdet/trainval/labels.pkl',
-        images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -188,7 +189,7 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 work_dir = '/mnt/disk/czh/gliding'
-max_epoch = 1
-eval_interval = 1
+max_epoch = 12
+# eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50

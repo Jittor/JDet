@@ -336,7 +336,8 @@ class MidpointOffsetCoder:
         pw = pred_bboxes[..., 2] - pred_bboxes[..., 0]
         ph = pred_bboxes[..., 3] - pred_bboxes[..., 1]
 
-        hbb, poly = obb2hbb(gt), obb2poly(gt)
+        # hbb, poly = obb2hbb(gt), obb2poly(gt)
+        hbb, poly = gt, hbb2poly(gt)
 
         gx = (hbb[..., 0] + hbb[..., 2]) * 0.5
         gy = (hbb[..., 1] + hbb[..., 3]) * 0.5
@@ -345,8 +346,8 @@ class MidpointOffsetCoder:
 
         x_coor, y_coor = poly[:, 0::2], poly[:, 1::2]
 
-        _, y_min = y_coor.argmin(dim=1, keepdim=True)
-        _, x_max = x_coor.argmax(dim=1, keepdim=True)
+        _, y_min = y_coor.argmin(dim=1, keepdims=True)
+        _, x_max = x_coor.argmax(dim=1, keepdims=True)
 
         _x_coor = x_coor.clone()
         _x_coor[jt.abs(y_coor-y_min) > 0.1] = -1000
@@ -426,13 +427,12 @@ class MidpointOffsetCoder:
         center_polys = polys - center
    
         diag_len = jt.sqrt(center_polys[..., 0::2] ** 2 + center_polys[..., 1::2] ** 2)
-        _, max_diag_len = diag_len.argmax(dim=-1, keepdim=True)
+        _, max_diag_len = diag_len.argmax(dim=-1, keepdims=True)
         diag_scale_factor = max_diag_len / diag_len
         center_polys = center_polys * diag_scale_factor.repeat_interleave(2, dim=-1)
         rectpolys = center_polys + center
         obboxes = rectpoly2obb(rectpolys).flatten(-2)
         return obboxes
-
 
 @BOXES.register_module()
 class OrientedDeltaXYWHTCoder:
@@ -458,9 +458,12 @@ class OrientedDeltaXYWHTCoder:
         abs_dtheta1 = jt.abs(dtheta1)
         abs_dtheta2 = jt.abs(dtheta2)
 
-        gw_regular = jt.where(abs_dtheta1 < abs_dtheta2, gw, gh)
-        gh_regular = jt.where(abs_dtheta1 < abs_dtheta2, gh, gw)
-        dtheta = jt.where(abs_dtheta1 < abs_dtheta2, dtheta1, dtheta2)
+        gw_regular = gw * (abs_dtheta1 < abs_dtheta2) + gh * (1 - (abs_dtheta1 < abs_dtheta2))
+        gh_regular = gh * (abs_dtheta1 < abs_dtheta2) + gw * (1 - (abs_dtheta1 < abs_dtheta2))
+        dtheta = dtheta1 * (abs_dtheta1 < abs_dtheta2) + dtheta2 * (1 - (abs_dtheta1 < abs_dtheta2))
+        # gw_regular = jt.where(abs_dtheta1 < abs_dtheta2, gw, gh)
+        # gh_regular = jt.where(abs_dtheta1 < abs_dtheta2, gh, gw)
+        # dtheta = jt.where(abs_dtheta1 < abs_dtheta2, dtheta1, dtheta2)
         dx = (jt.cos(-ptheta) * (gx - px) + jt.sin(-ptheta) * (gy - py)) / pw
         dy = (-jt.sin(-ptheta) * (gx - px) + jt.cos(-ptheta) * (gy - py)) / ph
         dw = jt.log(gw_regular / pw)
@@ -509,5 +512,5 @@ class OrientedDeltaXYWHTCoder:
         gtheta = regular_theta(dtheta + ptheta)
 
         new_bboxes = jt.stack([gx, gy, gw, gh, gtheta], dim=-1)
-        new_bboxes = regular_obb(bboxes)
+        new_bboxes = regular_obb(new_bboxes)
         return new_bboxes.view_as(pred_bboxes)

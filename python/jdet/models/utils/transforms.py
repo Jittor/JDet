@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import jittor as jt
+import numpy as np
 
 pi = 3.141592
 
@@ -14,9 +15,13 @@ def regular_theta(theta, mode='180', start=-pi/2):
 
 def regular_obb(obboxes):
     x, y, w, h, theta = obboxes.unbind(dim=-1)
-    w_regular = jt.where(w > h, w, h)
-    h_regular = jt.where(w > h, h, w)
-    theta_regular = jt.where(w > h, theta, theta+pi/2)
+    
+    w_regular = w * (w > h) + h * (1 - (w > h))
+    h_regular = h * (w > h) + w * (1 - (w > h))
+    theta_regular = theta * (w > h) + (theta + pi / 2) * (1 - (w > h))
+    # w_regular = jt.where(w > h, w, h)
+    # h_regular = jt.where(w > h, h, w)
+    # theta_regular = jt.where(w > h, theta, theta+pi/2)
     theta_regular = regular_theta(theta_regular)
     return jt.stack([x, y, w_regular, h_regular, theta_regular], dim=-1)
 
@@ -78,7 +83,8 @@ def poly2obb(polys):
 
 
 def rectpoly2obb(polys):
-    theta = jt.atan2(-(polys[..., 3] - polys[..., 1]),
+
+    theta = jt.arctan2(-(polys[..., 3] - polys[..., 1]),
                         polys[..., 2] - polys[..., 0])
     Cos, Sin = jt.cos(theta), jt.sin(theta)
     Matrix = jt.stack([Cos, -Sin, Sin, Cos], dim=-1)
