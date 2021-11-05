@@ -1,5 +1,9 @@
 from .box_ops import delta2bbox,bbox2delta,delta2bbox_rotated,bbox2delta_rotated
 from jdet.utils.registry import BOXES
+from jdet.models.utils.gliding_transforms import *
+
+import jittor as jt
+import math
 
 @BOXES.register_module()
 class DeltaXYWHBBoxCoder:
@@ -135,3 +139,178 @@ class DeltaXYWHABBoxCoder:
                                             max_shape, wh_ratio_clip, self.clip_border)
 
         return decoded_bboxes
+
+@BOXES.register_module()
+class GVFixCoder:
+    def __init__(self):
+        pass
+
+    def encode(self, polys):
+
+        assert polys.size(1) == 8
+        
+        max_x_idx, max_x = polys[:,  ::2].argmax(1)
+        min_x_idx, min_x = polys[:,  ::2].argmin(1)
+        max_y_idx, max_y = polys[:, 1::2].argmax(1)
+        min_y_idx, min_y = polys[:, 1::2].argmin(1)
+
+        hbboxes = jt.stack([min_x, min_y, max_x, max_y], dim=1)
+
+        polys = polys.view(-1, 4, 2)
+        num_polys = polys.size(0)
+        polys_ordered = jt.zeros_like(polys)
+        polys_ordered[:, 0] = polys[range(num_polys), min_y_idx]
+        polys_ordered[:, 1] = polys[range(num_polys), max_x_idx]
+        polys_ordered[:, 2] = polys[range(num_polys), max_y_idx]
+        polys_ordered[:, 3] = polys[range(num_polys), min_x_idx]
+
+        t_x = polys_ordered[:, 0, 0]
+        r_y = polys_ordered[:, 1, 1]
+        d_x = polys_ordered[:, 2, 0]
+        l_y = polys_ordered[:, 3, 1]
+
+        dt = (t_x - hbboxes[:, 0]) / (hbboxes[:, 2] - hbboxes[:, 0])
+        dr = (r_y - hbboxes[:, 1]) / (hbboxes[:, 3] - hbboxes[:, 1])
+        dd = (hbboxes[:, 2] - d_x) / (hbboxes[:, 2] - hbboxes[:, 0])
+        dl = (hbboxes[:, 3] - l_y) / (hbboxes[:, 3] - hbboxes[:, 1])
+
+        h_mask = (polys_ordered[:, 0, 1] - polys_ordered[:, 1, 1] == 0) | \
+                (polys_ordered[:, 1, 0] - polys_ordered[:, 2, 0] == 0)
+        fix_deltas = jt.stack([dt, dr, dd, dl], dim=1)
+        fix_deltas[h_mask, :] = 1
+        return fix_deltas
+
+    def decode(self, hbboxes, fix_deltas):
+        x1 = hbboxes[:, 0::4]
+        y1 = hbboxes[:, 1::4]
+        x2 = hbboxes[:, 2::4]
+        y2 = hbboxes[:, 3::4]
+        w = hbboxes[:, 2::4] - hbboxes[:, 0::4]
+        h = hbboxes[:, 3::4] - hbboxes[:, 1::4]
+
+        pred_t_x = x1 + w * fix_deltas[:, 0::4]
+        pred_r_y = y1 + h * fix_deltas[:, 1::4]
+        pred_d_x = x2 - w * fix_deltas[:, 2::4]
+        pred_l_y = y2 - h * fix_deltas[:, 3::4]
+
+        polys = jt.stack([pred_t_x, y1,
+                             x2, pred_r_y,
+                             pred_d_x, y2,
+                             x1, pred_l_y], dim=-1)
+        polys = polys.flatten(1)
+        return polys
+
+    
+@BOXES.register_module()
+class GVRatioCoder:
+    def __init__(self):
+        pass
+
+    def encode(self, polys):
+        assert polys.size(1) == 8
+        hbboxes = poly2hbb(polys)
+        h_areas = (hbboxes[:, 2] - hbboxes[:, 0]) * \
+                (hbboxes[:, 3] - hbboxes[:, 1])
+
+        polys = polys.view(polys.size(0), 4, 2)
+
+        areas = jt.zeros(polys.size(0), dtype=polys.dtype)
+        for i in range(4):
+            areas += 0.5 * (polys[:, i, 0] * polys[:, (i+1)%4, 1] -
+                            polys[:, (i+1)%4, 0] * polys[:, i, 1])
+        areas = jt.abs(areas)
+
+        ratios = areas / h_areas
+        return ratios[:, None]
+
+    def decode(self, bboxes, bboxes_pred):
+        raise NotImplementedError
+
+@BOXES.register_module()
+class GVDeltaXYWHBBoxCoder:
+
+    def __init__(self,
+                 target_means=(0., 0., 0., 0.),
+                 target_stds=(1., 1., 1., 1.)):
+        self.means = target_means
+        self.stds = target_stds
+
+    def encode(self, bboxes, gt_bboxes):
+
+        assert bboxes.size(0) == gt_bboxes.size(0)
+        assert bboxes.size(-1) == gt_bboxes.size(-1) == 4
+        assert bboxes.size() == gt_bboxes.size()
+
+        proposals = bboxes.float()
+        gt = gt_bboxes.float()
+        px = (proposals[..., 0] + proposals[..., 2]) * 0.5
+        py = (proposals[..., 1] + proposals[..., 3]) * 0.5
+        pw = proposals[..., 2] - proposals[..., 0]
+        ph = proposals[..., 3] - proposals[..., 1]
+
+        gx = (gt[..., 0] + gt[..., 2]) * 0.5
+        gy = (gt[..., 1] + gt[..., 3]) * 0.5
+        gw = gt[..., 2] - gt[..., 0]
+        gh = gt[..., 3] - gt[..., 1]
+
+        dx = (gx - px) / pw
+        dy = (gy - py) / ph
+        dw = jt.log(gw / pw)
+        dh = jt.log(gh / ph)
+        deltas = jt.stack([dx, dy, dw, dh], dim=-1)
+
+        means = jt.array(self.means, dtype=deltas.dtype).unsqueeze(0)
+        stds = jt.array(self.stds, dtype=deltas.dtype).unsqueeze(0)
+        deltas = (deltas - means) / stds
+
+        return deltas
+
+    def decode(self,
+               bboxes,
+               pred_bboxes,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000):
+
+        assert pred_bboxes.size(0) == bboxes.size(0)
+
+        means = jt.array(self.means, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 4)
+        stds = jt.array(self.stds, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 4)
+        denorm_deltas = pred_bboxes * stds + means
+
+        dx = denorm_deltas[:, 0::4]
+        dy = denorm_deltas[:, 1::4]
+        dw = denorm_deltas[:, 2::4]
+        dh = denorm_deltas[:, 3::4]
+        
+        max_ratio = np.abs(np.log(wh_ratio_clip))
+        dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+        dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+
+        # Compute center of each roi
+        px = ((bboxes[:, 0] + bboxes[:, 2]) * 0.5).unsqueeze(1)
+        py = ((bboxes[:, 1] + bboxes[:, 3]) * 0.5).unsqueeze(1)
+        # Compute width/height of each roi
+        pw = (bboxes[:, 2] - bboxes[:, 0]).unsqueeze(1)
+        ph = (bboxes[:, 3] - bboxes[:, 1]).unsqueeze(1)
+
+        # Use exp(network energy) to enlarge/shrink each roi
+        gw = pw * dw.exp()
+        gh = ph * dh.exp()
+        # Use network energy to shift the center of each roi
+        gx = px + pw * dx
+        gy = py + ph * dy
+        # Convert center-xy/width/height to top-left, bottom-right
+        x1 = gx - gw * 0.5
+        y1 = gy - gh * 0.5
+        x2 = gx + gw * 0.5
+        y2 = gy + gh * 0.5
+        
+        if max_shape is not None:
+            x1 = x1.clamp(min_v=0, max_v=max_shape[1])
+            y1 = y1.clamp(min_v=0, max_v=max_shape[0])
+            x2 = x2.clamp(min_v=0, max_v=max_shape[1])
+            y2 = y2.clamp(min_v=0, max_v=max_shape[0])
+
+        bboxes = jt.stack([x1, y1, x2, y2], dim=-1).view_as(pred_bboxes)
+
+        return bboxes

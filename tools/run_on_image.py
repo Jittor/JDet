@@ -31,7 +31,7 @@ def main():
     args = parser.parse_args()
 
     images = list_images(args.images)
-    assert len(images)==0, f"thers is not images"
+    assert len(images)==0, f"theres is not images"
 
     if args.config_file:
         init_cfg(args.config_file)

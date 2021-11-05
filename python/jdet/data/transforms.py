@@ -469,7 +469,7 @@ class Pad:
         
         new_image = Image.new(image.mode,(pad_w,pad_h),(self.pad_val,)*len(image.split()))
         new_image.paste(image,(0,0,image.size[0],image.size[1]))
-        target["pad_shape"] = (pad_h,pad_w,3)
+        target["pad_shape"] = new_image.size
         
         return new_image,target
     

@@ -9,6 +9,7 @@ import shutil
 from tqdm import tqdm
 import numpy as np
 from jdet.data.devkits.dota_to_fair import dota_to_fair
+from jdet.utils.general import is_win
 
 def flip_box(box, target):
     ans = [box[i] for i in range(8)]
@@ -139,10 +140,22 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir="")
     if (os.path.exists(zip_path)):
         os.remove(zip_path)
     if (dataset_type == 'FAIR'):
-        os.system(f"cd {os.path.join(final_path, '..')} && zip -r -q {name+'.zip'} 'test'")
-        os.system(f"mv {os.path.join(final_path, '..', name+'.zip')} {zip_path}")
+        if is_win():
+            files = glob.glob(os.path.join(final_path,"*"))
+            with zipfile.ZipFile(zip_path, 'w',zipfile.ZIP_DEFLATED) as t:
+                for f in files:
+                    t.write(f, os.path.join("test",os.path.split(f)[-1]))# TODO
+        else:
+            os.system(f"cd {os.path.join(final_path, '..')} && zip -r -q {name+'.zip'} 'test'")
+            os.system(f"mv {os.path.join(final_path, '..', name+'.zip')} {zip_path}")
     else:
-        os.system(f"zip -rj -q {zip_path} {os.path.join(final_path,'*')}")
+        if is_win():
+            files = glob.glob(os.path.join(final_path,"*"))
+            with zipfile.ZipFile(zip_path, 'w',zipfile.ZIP_DEFLATED) as t:
+                for f in files:
+                    t.write(f, os.path.split(f)[-1])
+        else:
+            os.system(f"zip -rj -q {zip_path} {os.path.join(final_path,'*')}")
 
 if __name__ == "__main__":
     work_dir = "/mnt/disk/lxl/JDet/work_dirs/gliding_r101_fpn_1x_dota_bs2_tobgr_steplr_rotate_balance_ms"

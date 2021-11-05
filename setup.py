@@ -19,7 +19,7 @@ setup(
     url="http://jittor.com",
     python_requires='>=3.7',
     packages=find_packages(path),
-    package_dir={'': path},
+    package_dir={'': "python"},
     install_requires=[
         "shapely",
         "pyyaml",
@@ -31,7 +31,6 @@ setup(
         "tensorboardX",
         "opencv-python",
         "tqdm",
-        "pycocotools",
         "terminaltables",
     ],
 )
