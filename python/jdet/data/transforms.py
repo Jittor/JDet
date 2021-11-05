@@ -399,6 +399,16 @@ class RotatedRandomFlip(RandomFlip):
             assert False
         return flipped
 
+    def _flip_masks(self,masks,w,h):
+        flipped = masks.copy()
+        if self.direction == 'horizontal':
+            flipped = flipped[..., ::-1]
+        elif self.direction == 'vertical':
+            assert False
+        elif self.direction == 'diagonal':
+            assert False
+        return flipped
+
     def _flip_polys(self,bboxes,w,h):
         flipped = bboxes.copy()
         if self.direction == 'horizontal':
@@ -413,7 +423,7 @@ class RotatedRandomFlip(RandomFlip):
 
     def _flip_boxes(self,target,size):
         w,h = size 
-        for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
+        for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore", "gt_masks"]:
             if key not in target:
                 continue
             bboxes = target[key]
@@ -422,6 +432,9 @@ class RotatedRandomFlip(RandomFlip):
                 continue 
             if "polys" in key:
                 target[key] = self._flip_polys(bboxes,w,h)
+                continue
+            if "masks" in key:
+                target[key] = self._flip_masks(bboxes,w,h)
                 continue
             flipped = bboxes.copy()
             if self.direction == 'horizontal':

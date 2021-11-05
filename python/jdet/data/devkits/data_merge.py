@@ -76,7 +76,10 @@ def prepare_fasterrcnn(result_pkl,save_path, classes):
     results = jt.load(result_pkl)
     data = {}
     for result,target in tqdm(results):
-        img_name = os.path.splitext(os.path.split(target['img_meta'][0]["img_file"])[-1])[0]
+        if target.haskey('img_file'):
+            img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
+        else:
+            img_name = os.path.splitext(os.path.split(target['img_meta'][0]["img_file"])[-1])[0]
         for idx, res in enumerate(result):
             for i in range(res.shape[0]):
                 bbox = res[i]
