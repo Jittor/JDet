@@ -14,6 +14,11 @@ model = dict(
     rpn = dict(
         type = "OrientedRPNHead",
         in_channels=256,
+        num_classes=1,
+        min_bbox_size = 0,
+        nms_thresh = 0.8,
+        nms_pre = 2000,
+        nms_post = 2000,
         feat_channels=256,
         anchor_generator=dict(
             type='AnchorGenerator',
@@ -95,10 +100,10 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        # annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        annotations_file='/home/czh/OBBDetection/DOTA_single_jdet/trainval/labels.pkl',
-        images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        # annotations_file='/home/czh/OBBDetection/DOTA_single_jdet/trainval/labels.pkl',
+        # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -153,8 +158,8 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
-        images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -175,7 +180,7 @@ dataset = dict(
     )
 )
 
-optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(type='SGD',  lr=0.02, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
     type='StepLR',

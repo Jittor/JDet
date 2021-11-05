@@ -256,9 +256,9 @@ class OrientedHead(nn.Module):
         labels = valid_mask.nonzero()[:, 1]
 
         if bboxes.numel() == 0:
-            bboxes =jt.zeros((0, bbox_dim + 1), dtype=multi_bboxes.dtype)
+            bboxes = jt.zeros((0, 9), dtype=multi_bboxes.dtype)
             labels = jt.zeros((0, ), dtype="int64")
-            return obb2poly(bboxes), labels
+            return bboxes, labels
 
         dets = jt.concat([obb2poly(bboxes), scores.unsqueeze(1)], dim=1)
         return dets, labels
