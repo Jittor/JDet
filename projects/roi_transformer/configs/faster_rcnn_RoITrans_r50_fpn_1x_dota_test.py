@@ -1,7 +1,6 @@
 pretrained_weights = "test_datas_roi_transformer/init_pretrained.pk_jt.pk"
 model = dict(
     type='RoITransformer',
-    useCOCO=True,
     pretrained='modelzoo://resnet50',
     backbone=dict(
         type='Resnet50',
