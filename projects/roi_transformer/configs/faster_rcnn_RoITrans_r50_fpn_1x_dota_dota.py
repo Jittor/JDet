@@ -1,7 +1,6 @@
+pretrained_weights = "test_datas_roi_transformer/init_pretrained.pk_jt.pk"
 model = dict(
     type='RoITransformer',
-    useMask=False,
-    useCOCO=False,
     pretrained='modelzoo://resnet50',
     backbone=dict(
         type='Resnet50',
@@ -151,15 +150,9 @@ dataset = dict(
         type=dataset_type,
         annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        #coco_annotation_flie = '/mnt/disk/zwy/dota1_1024/trainval1024/DOTA_trainval1024.json',
+        coco_annotation_flie = '/mnt/disk/zwy/dota1_1024/trainval1024/DOTA_trainval1024.json',
         version='1',
-        filter_min_size=32,
         transforms=[
-            dict(
-                type = "RotatedRandomFlip",
-                prob = 0.5,
-                direction="horizontal",
-            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -175,15 +168,9 @@ dataset = dict(
         type=dataset_type,
         annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        #coco_annotation_flie = '/mnt/disk/zwy/dota1_1024/trainval1024/DOTA_trainval1024.json',
+        coco_annotation_flie = '/mnt/disk/zwy/dota1_1024/trainval1024/DOTA_trainval1024.json',
         version='1',
-        filter_min_size=32,
         transforms=[
-            dict(
-                type = "RotatedRandomFlip",
-                prob = 0.5,
-                direction="horizontal",
-            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -195,8 +182,11 @@ dataset = dict(
         ],
         ),
     test=dict(
-        type="ImageDataset",        
+        type=dataset_type,
+        # dataset_type="DOTA",
+        # anno_file=data_root + 'test1024/DOTA_test1024.json',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        version='1',
         transforms=[
             dict(
                 type = "Pad",
@@ -207,6 +197,7 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=True),
         ],
+        test_mode=True,
     )
 )
 # optimizer
@@ -233,4 +224,4 @@ max_epoch = 12
 eval_interval = 13   #TODO: implement eval
 checkpoint_interval = 1
 log_interval = 20
-#resume_path = 'work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'
+resume_path = '../../work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'
