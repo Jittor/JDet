@@ -46,7 +46,6 @@ def main():
     init_cfg("configs/faster_rcnn_RoITrans_r50_fpn_1x_dota_dota.py")
     cfg = get_cfg()
     train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
-    return
     iter = 0
     model = build_from_cfg(cfg.model,MODELS)
     model.load(cfg.pretrained_weights)
