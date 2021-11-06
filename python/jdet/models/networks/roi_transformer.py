@@ -1,8 +1,6 @@
 import jittor as jt
-import numpy as np
 import jittor.nn as nn
 from jdet.utils.registry import BOXES, MODELS, build_from_cfg, BACKBONES, HEADS, NECKS, ROI_EXTRACTORS
-from jdet.utils.general import to_jt_var
 from jdet.ops.bbox_transfomrs import bbox2roi, gt_mask_bp_obbs_list, roi2droi, choose_best_Rroi_batch, dbbox2roi, dbbox2result
 import copy
 
@@ -10,8 +8,6 @@ import copy
 class RoITransformer(nn.Module):
     def __init__(self,
                  backbone,
-                 useCOCO=False,
-                 useMask=False,
                  neck=None,
                  rpn_head=None,
                  bbox_roi_extractor=None,
@@ -23,8 +19,6 @@ class RoITransformer(nn.Module):
                  pretrained=None):
         super(RoITransformer, self).__init__()
 
-        self.useCOCO = useCOCO
-        self.useMask = useMask or useCOCO
         self.backbone = build_from_cfg(backbone, BACKBONES)
         self.neck = build_from_cfg(neck, NECKS)
         self.rpn_head = build_from_cfg(rpn_head, HEADS)
@@ -39,44 +33,13 @@ class RoITransformer(nn.Module):
     def execute_train(self, images, targets=None):
         self.backbone.train()
 
-        if self.useCOCO:
-            image_meta = targets['img_meta']
-            gt_bboxes = targets['gt_bboxes']
-            gt_labels = targets['gt_labels']
-            gt_bboxes_ignore = targets['gt_bboxes_ignore']
-            gt_masks = targets['gt_masks']
-        else:
-            image_meta = []
-            gt_labels = []
-            gt_bboxes = []
-            gt_bboxes_ignore = []
-            if self.useMask:
-                gt_masks = []
-            else:
-                gt_obbs = []
-            for target in targets:
-                meta = dict(
-                    ori_shape = target['ori_img_size'],
-                    img_shape = target['img_size'],
-                    pad_shape = target['pad_shape'],
-                    img_file = target['img_file'],
-                    mean = target['mean'].numpy(),
-                    std = target['std'].numpy(),
-                    to_bgr = target['to_bgr'],
-                    # TODO:fix scale_factor and flip imformation.
-                    scale_factor = 1.0
-                )
-                image_meta.append(meta)
-                gt_bboxes.append(target['hboxes'])
-                gt_labels.append(target['labels'])
-                gt_bboxes_ignore.append(target['hboxes_ignore'])
-                if self.useMask:
-                    gt_masks.append(target['gt_masks'].numpy())
-                else:
-                    gt_obbs.append(target['rboxes'].numpy())
+        image_meta = targets['img_meta']
+        gt_bboxes = targets['gt_bboxes']
+        gt_labels = targets['gt_labels']
+        gt_bboxes_ignore = targets['gt_bboxes_ignore']
+        gt_masks = targets['gt_masks']
 
-        if self.useMask:
-            gt_obbs = gt_mask_bp_obbs_list(gt_masks)
+        gt_obbs = gt_mask_bp_obbs_list(gt_masks)
 
         losses = dict()
         features = self.backbone(images)
@@ -114,12 +77,8 @@ class RoITransformer(nn.Module):
             features[:self.bbox_roi_extractor.num_inputs], rois)
         cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
-        if self.useMask:
-            rbbox_targets = self.bbox_head.get_target(
-                sampling_results, gt_masks, gt_labels, self.train_cfg.rcnn[0], use_obb=False)
-        else:
-            rbbox_targets = self.bbox_head.get_target(
-                sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn[0], use_obb=True)
+        rbbox_targets = self.bbox_head.get_target(
+            sampling_results, gt_masks, gt_labels, self.train_cfg.rcnn[0])
         loss_bbox = self.bbox_head.loss(cls_score, bbox_pred, *rbbox_targets)
         for name, value in loss_bbox.items():
             losses['s{}.{}'.format(0, name)] = (value)
@@ -175,26 +134,9 @@ class RoITransformer(nn.Module):
         Rets:
             losses (dict): losses
         '''
-        if self.useCOCO:
-            img_meta = targets[0]['img_meta']
-            img_shape = img_meta[0]['img_shape']
-            scale_factor = img_meta[0]['scale_factor']
-        else:
-            img_meta = []
-            img_shape = []
-            scale_factor = []
-            for target in targets:
-                ori_img_size = target['ori_img_size']
-                meta = dict(
-                    ori_shape = ori_img_size,
-                    img_shape = ori_img_size,
-                    pad_shape = ori_img_size,
-                    scale_factor = target['scale_factor'],
-                    img_file = target['img_file']
-                )
-                img_meta.append(meta)
-                img_shape.append(target['img_size'])
-                scale_factor.append(target['scale_factor'])
+        img_meta = targets[0]['img_meta']
+        img_shape = img_meta[0]['img_shape']
+        scale_factor = img_meta[0]['scale_factor']
         x = self.backbone(images)
         if(self.neck):
             x = self.neck(x)
