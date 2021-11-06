@@ -77,7 +77,7 @@ def prepare_fasterrcnn(result_pkl,save_path, classes):
     results = jt.load(result_pkl)
     data = {}
     for result,target in tqdm(results):
-        if target.haskey('img_file'):
+        if 'img_file' in target.keys():
             img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
         else:
             img_name = os.path.splitext(os.path.split(target['img_meta'][0]["img_file"])[-1])[0]
