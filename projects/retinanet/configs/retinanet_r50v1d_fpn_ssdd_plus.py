@@ -41,8 +41,8 @@ model = dict(
 )
 dataset = dict(
     val=dict(
-        type="SSDDPlusDataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD/train_800',
+        type="SSDDDataset",
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD_plus/train_800',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -60,8 +60,8 @@ dataset = dict(
         shuffle=False
     ),
     train=dict(
-        type="SSDDPlusDataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD/train_800',
+        type="SSDDDataset",
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD_plus/train_800',
         transforms=[
             dict(
                 type="RotatedResize",
