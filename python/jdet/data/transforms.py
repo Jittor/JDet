@@ -449,7 +449,7 @@ class Pad:
 
     def __call__(self,image,target=None):
         if self.size is not None:
-            pad_w,pad_h = size
+            pad_w,pad_h = self.size
         else:
             pad_h = int(np.ceil(image.size[1] / self.size_divisor)) * self.size_divisor
             pad_w = int(np.ceil(image.size[0] / self.size_divisor)) * self.size_divisor

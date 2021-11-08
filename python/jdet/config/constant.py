@@ -94,3 +94,5 @@ FAIR_CLASSES_ = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919',
         'other-vehicle', 'Basketball_Court', 'Tennis_Court', 'Football_Field', 
         'Baseball_Field', 'Intersection', 'Roundabout', 'Bridge'
     ]
+
+SSDD_CLASSES = ['ship']
