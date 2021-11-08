@@ -115,6 +115,13 @@ class DOTADataset(CustomDataset):
                 gt = np.concatenate([idx2,gt_polys,gt_labels],axis=1)
                 gts.append(gt)
             diffcult_polys[img_idx] = target["polys_ignore"]/scale_factor
+        if len(dets) == 0:
+            aps = {}
+            for i,classname in tqdm(enumerate(self.CLASSES),total=len(self.CLASSES)):
+                aps["eval/"+str(i+1)+"_"+classname+"_AP"]=0 
+            map = sum(list(aps.values()))/len(aps)
+            aps["eval/0_meanAP"]=map
+            return aps
         dets = np.concatenate(dets)
         gts = np.concatenate(gts)
         aps = {}

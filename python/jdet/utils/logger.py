@@ -23,7 +23,7 @@ class TensorboardLogger:
     def __init__(self,work_dir):
         self.cfg = get_cfg()
         tensorboard_dir = os.path.join(work_dir,"tensorboard")
-        self.writer = SummaryWriter(tensorboard_dir)
+        self.writer = SummaryWriter(tensorboard_dir,flush_secs=10)
 
     def log(self,data):
         step = data["iter"]
