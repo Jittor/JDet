@@ -83,7 +83,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="SSDDDataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD_plus/train_800',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD/train_800',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -108,7 +108,7 @@ dataset = dict(
     ),
     val=dict(
         type="SSDDDataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD_plus/val_800',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD/val_800',
         transforms=[
             dict(
                 type="RotatedResize",

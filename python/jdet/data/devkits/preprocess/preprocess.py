@@ -8,7 +8,7 @@ from jdet.data.devkits.convert_data_to_mmdet import convert_data_to_mmdet
 from jdet.data.devkits.fair_to_dota import fair_to_dota
 from jdet.utils.general import is_win
 
-from jdet.data.devkits.ssdd_plus_to_dota import ssdd_plus_to_dota
+from jdet.data.devkits.ssdd_to_dota import ssdd_to_dota
 
 
 def clear(cfg):
@@ -20,7 +20,7 @@ def clear(cfg):
         os.system(f"rm -rf {os.path.join(cfg.target_dataset_path)}")
 
 def run(cfg):
-    if cfg.type=='SSDD+':
+    if cfg.type=='SSDD+' or cfg.type=='SSDD':
         for task in cfg.convert_tasks:
             print('==============')
             print("convert to dota:", task)
@@ -28,12 +28,23 @@ def run(cfg):
             if task == 'test':
                 out_path = os.path.join(cfg.target_dataset_path, 'val')
             out_path += '_' + str(cfg.resize)
-            ssdd_plus_to_dota(
-                os.path.join(cfg.source_ssdd_plus_dataset_path, f'JPEGImages_{task}'),
-                os.path.join(cfg.source_ssdd_plus_dataset_path, f'Annotations_{task}'),
-                out_path,
-                cfg.resize
-            )
+            if cfg.type=='SSDD+':
+                ssdd_to_dota(
+                    os.path.join(cfg.source_dataset_path, f'JPEGImages_{task}'),
+                    os.path.join(cfg.source_dataset_path, f'Annotations_{task}'),
+                    out_path,
+                    cfg.resize,
+                    plus=True
+                )
+            else:
+                ssdd_to_dota(
+                    os.path.join(cfg.source_dataset_path, f'JPEGImages_{task}'),
+                    os.path.join(cfg.source_dataset_path, f'Annotations_{task}'),
+                    out_path,
+                    cfg.resize,
+                    plus=False
+                )
+
             convert_data_to_mmdet(out_path, os.path.join(out_path, 'labels.pkl'), type=cfg.type)
         return
 

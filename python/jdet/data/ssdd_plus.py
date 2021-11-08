@@ -3,7 +3,7 @@ from jdet.utils.registry import DATASETS
 from jdet.config.constant import SSDD_CLASSES
 
 @DATASETS.register_module()
-class SSDDPlusDataset(DOTADataset):
+class SSDDDataset(DOTADataset):
     def __init__(self,*arg,**kwargs):
         super().__init__(*arg,**kwargs)
         self.CLASSES = SSDD_CLASSES
