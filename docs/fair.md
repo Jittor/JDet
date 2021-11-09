@@ -15,9 +15,9 @@ $FAIR_PATH$
 ## Data Preprocessing
 Images in FAIR is relatively big, we need to crop each image into several sub-images before training and testing.
 ```
-cd $JDet_PATH$/python/jdet/data/devkits/preprocess
+cd $JDet_PATH$
 ```
-We can set how the FAIR is preprocessed by editing the `fair_preprocess_config.py`:
+We can set how the FAIR is preprocessed by editing the `configs/preprocess/fair_preprocess_config.py`:
 ```python
 type='FAIR'
 source_fair_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/FAIR/fair'
@@ -55,7 +55,7 @@ We need to set `source_dataset_path` to `$FAIR_PATH$`, and set `target_dataset_p
 Then we can set the cropping paramters through `subimage_size` and `overlap_size`, and set `multi_scale` for multi scale training or testing, the tool will first resize the origin image by different scale fators, and cropping each scaled image by `subimage_size` and `overlap_size`.
 Finally, run the following script for preprocessing：
 ```
-python preprocess.py --config-file fair_preprocess_config.py
+python tools/preprocess.py --config-file configs/preprocess/fair_preprocess_config.py
 ```
 For the way of configuring the processed FAIR dataset in the model config file, please refer to `$JDet_PATH$/configs/retinanet_r50v1d_fpn_fair.py`:
 ```
