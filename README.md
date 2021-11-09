@@ -50,6 +50,8 @@ source .bashrc
 DOTA Dataset documents are avaliable in the [dota.md](docs/dota.md)
 
 FAIR Dataset documents are avaliable in the [fair.md](docs/fair.md)
+
+SSDD/SSDD+ Dataset documents are avaliable in the [ssdd.md](docs/ssdd.md)
 ### Config
 Config documents are avaliable in the [config.md](docs/config.md)
 ### Train
