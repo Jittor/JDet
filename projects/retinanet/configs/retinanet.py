@@ -125,7 +125,7 @@ max_epoch = 26
 eval_interval = 10
 log_interval = 50
 checkpoint_interval = 1
-pretrained_weights="weights/pretrained.pk_jt.pk"
+pretrained_weights="test_datas_retinanet/yx_init_pretrained.pk_jt.pk"
 merge_nms_threshold_type = 1
 
 parameter_groups_generator = dict(

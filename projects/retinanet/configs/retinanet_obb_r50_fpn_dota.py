@@ -97,7 +97,5 @@ max_epoch = 12
 eval_interval = 10
 log_interval = 50
 checkpoint_interval = 1
-# pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"
-# pretrained_weights="weights/obb_jt.pk"
 pretrained_weights="weights/obb_epoch_1.pk"
 merge_nms_threshold_type = 1
