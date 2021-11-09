@@ -49,7 +49,7 @@ tasks=[
     )
 ]
 ```
-The `type` means the type of dataset which cloud be selected in ['DOTA', 'DOTA1_5', 'FAIR'].
+The `type` means the type of dataset which cloud be selected in ['DOTA', 'DOTA1_5', 'DOTA2', 'FAIR'].
 We need to set `source_dataset_path` to `$DOTA_PATH$`, and set `target_dataset_path` to `$PROCESSED_DOTA_PATH$`.
 Then we can set the cropping paramters through `subimage_size` and `overlap_size`, and set `multi_scale` for multi scale training or testing, the tool will first resize the origin image by different scale fators, and cropping each scaled image by `subimage_size` and `overlap_size`.
 Finally, run the following script for preprocessing：
