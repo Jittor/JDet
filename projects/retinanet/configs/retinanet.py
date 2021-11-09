@@ -63,8 +63,6 @@ dataset = dict(
     train=dict(
         type="DOTADataset",
         dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
-        # annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/trainval.pkl',
-        # images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/images/',
         transforms=[
             dict(
                 type="RotatedResize",

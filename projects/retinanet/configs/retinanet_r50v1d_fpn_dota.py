@@ -42,8 +42,7 @@ model = dict(
 dataset = dict(
     val=dict(
         type="DOTADataset",
-        annotations_file='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
-        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/images/',
+        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -62,10 +61,7 @@ dataset = dict(
     ),
     train=dict(
         type="DOTADataset",
-        annotations_file='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/trainval.pkl',
-        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/trainval_600_150/images/',
-        # annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/trainval.pkl',
-        # images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/images/',
+        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
