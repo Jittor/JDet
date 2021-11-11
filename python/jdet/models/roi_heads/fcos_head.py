@@ -314,8 +314,15 @@ class FCOSHead(nn.Module):
         flatten_bbox_preds = jt.concat([flatten_bbox_preds, flatten_theta_preds], dim=1)
 
         # FG cat_id: [1, num_classes], BG cat_id: 0
-        pos_inds = jt.where(flatten_labels >0)[0]
+        # pos_inds = jt.where(flatten_labels >0)[0]
+        bg_class_ind = self.num_classes
+        pos_inds = ((flatten_labels >= 0)
+                    & (flatten_labels < bg_class_ind)).nonzero().reshape(-1)
+
         num_pos = len(pos_inds)
+
+        flatten_labels+=1
+        flatten_labels[flatten_labels==bg_class_ind+1]=0
         loss_cls = self.loss_cls( flatten_cls_scores, flatten_labels,
             avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
 
@@ -476,10 +483,9 @@ class FCOSHead(nn.Module):
             mlvl_bboxes[..., :4] = mlvl_bboxes[..., :4] / scale_factor
         mlvl_scores = jt.concat(mlvl_scores)
         padding = jt.zeros((mlvl_scores.shape[0], 1),dtype=mlvl_scores.dtype)
-        # remind that we set FG labels to [1, num_class]
-        # BG cat_id: 0
-        mlvl_scores = jt.concat([padding,mlvl_scores], dim=1)
+
         mlvl_centerness = jt.concat(mlvl_centerness)
+        mlvl_scores = jt.concat([padding,mlvl_scores], dim=1)
 
         det_bboxes, det_labels  = multiclass_nms_rotated(
             mlvl_bboxes,
@@ -650,11 +656,12 @@ class FCOSHead(nn.Module):
         areas[inside_regress_range == 0] = INF
         min_area_inds,min_area  = areas.argmin(dim=1)
 
-        labels = gt_labels[min_area_inds]
-        labels[min_area == INF] = 0  # set as BG
-        bbox_targets = bbox_targets[range(num_points), min_area_inds]
+        labels = gt_labels[min_area_inds]-1
+        labels[min_area == INF] = self.num_classes  # set as BG
 
-        theta_targets = gt_thetas[range(num_points), min_area_inds]
+        bbox_targets = bbox_targets[jt.index((num_points,),dim=0), min_area_inds]
+
+        theta_targets = gt_thetas[jt.index((num_points,),dim=0), min_area_inds]
         bbox_targets = jt.concat([bbox_targets, theta_targets], dim=1)
         return labels, bbox_targets
 

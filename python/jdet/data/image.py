@@ -1,6 +1,7 @@
 
 from PIL import Image
 import numpy as np 
+import os
 
 from jdet.utils.registry import DATASETS
 from .transforms import Compose
@@ -76,6 +77,9 @@ class ImageDataset(Dataset):
         return images
 
     def __getitem__(self,index):
+        if "BATCH_IDX" in os.environ:
+            index = int(os.environ['BATCH_IDX'])
+
         img = Image.open(self.images_file[index]).convert("RGB")
         targets = dict(
             ori_img_size=img.size,

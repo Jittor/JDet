@@ -615,9 +615,10 @@ def boxes_x0y0x1y1_to_xywh(boxes):
 from jdet.models.utils.gliding_transforms import regular_obb,regular_theta
 
 def mintheta_obb(obboxes):
+    pi = 3.141592
     x, y, w, h, theta = obboxes.unbind(dim=-1)
     theta1 = regular_theta(theta)
-    theta2 = regular_theta(theta + np.pi/2)
+    theta2 = regular_theta(theta + pi/2)
     abs_theta1 = jt.abs(theta1)
     abs_theta2 = jt.abs(theta2)
 

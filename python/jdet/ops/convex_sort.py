@@ -188,7 +188,7 @@ def convex_sort_gpu(pts,masks,circular):
     dim3 threads(512);
     convex_sort_kernel<<<blocks, threads>>>(nbs, npts, index_size, circular,in0_p, in1_p, in2_p,in3_p, in4_p,out0_p);
     """
-    convex_index_t, = jt.code(outputs=[convex_index_t],inputs=[x_t,y_t,masks_t,start_index_t,order_t],cuda_header=CUDA_HEAD,cuda_src=SRC)
+    jt.code(outputs=[convex_index_t],inputs=[x_t,y_t,masks_t,start_index_t,order_t],cuda_header=CUDA_HEAD,cuda_src=SRC)
     return convex_index_t
 
 

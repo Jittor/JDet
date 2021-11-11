@@ -3,4 +3,7 @@ from .single_stage import SingleStageDetector
 
 @MODELS.register_module()
 class FCOS(SingleStageDetector):
-    pass
+    
+    def train(self):
+        super().train()
+        self.backbone.train()
