@@ -46,14 +46,18 @@ source .bashrc
 
 ## Getting Started
 
-### Data
-DOTA Dataset documents are avaliable in the [dota.md](docs/dota.md)
+### Datasets
+The following datasets are supported in JDet, please check the corresponding document before use. 
 
-FAIR Dataset documents are avaliable in the [fair.md](docs/fair.md)
+DOTA1.0/DOTA1.5/DOTA2.0 Dataset: [dota.md](docs/dota.md).
 
-SSDD/SSDD+ Dataset documents are avaliable in the [ssdd.md](docs/ssdd.md)
+FAIR Dataset: [fair.md](docs/fair.md)
+
+SSDD/SSDD+: [ssdd.md](docs/ssdd.md)
+
+You can also build your own dataset by convert your datas to DOTA format.
 ### Config
-Config documents are avaliable in the [config.md](docs/config.md)
+JDet defines the used model, dataset and training/testing method by `config-file`, please check the [config.md](docs/config.md) to learn how it works.
 ### Train
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=train
@@ -64,8 +68,8 @@ If you want to test the downloaded trained models, please set ```resume_path={yo
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=test
 ```
-## Build a New Project
-In this document, we will introduce how to build a new project(model) with JDet.
+### Build a New Project
+In this section, we will introduce how to build a new project(model) with JDet.
 We need to install JDet first, and build a new project by:
 ```sh
 mkdir $PROJECT_PATH$
