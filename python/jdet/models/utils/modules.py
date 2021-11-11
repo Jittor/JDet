@@ -169,11 +169,13 @@ class ConvModule(nn.Module):
             else:
                 norm_channels = in_channels
             if norm_cfg.get("type","BN") == "GN":
-                self.norm = build_from_cfg(norm_cfg, BRICKS,num_channels=norm_channels)
+                self.gn = build_from_cfg(norm_cfg, BRICKS,num_channels=norm_channels)
+                self.norm = "gn"
             else:
-                self.norm = build_from_cfg(norm_cfg, BRICKS,in_channels=norm_channels)
+                self.bn = build_from_cfg(norm_cfg, BRICKS,in_channels=norm_channels)
+                self.norm = "bn"
         else:
-            self.norm = None
+            self.norm = "None"
 
         # build activation layer
         if self.with_activation:
@@ -214,7 +216,7 @@ class ConvModule(nn.Module):
                     x = self.padding_layer(x)
                 x = self.conv(x)
             elif layer == 'norm' and norm and self.with_norm:
-                x = self.norm(x)
+                x = getattr(self,self.norm)(x)
             elif layer == 'act' and activate and self.with_activation:
                 x = self.activate(x)
         return x

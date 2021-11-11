@@ -26,8 +26,12 @@ def convex_areas(pts, masks):
     ext_pts = jt.concat([pts, ext_zeros], dim=1)
     polys = jt.gather(ext_pts, 1, index)
 
-    xyxy = polys[:, 0:-1, 0] * polys[:, 1:, 1] - \
-           polys[:, 0:-1, 1] * polys[:, 1:, 0]
+    xyxy_1 = (polys[:, 0:-1, 0] * polys[:, 1:, 1])
+    xyxy_2 = (polys[:, 0:-1, 1] * polys[:, 1:, 0])
+    xyxy_1.sync()
+    xyxy_2.sync()
+
+    xyxy = xyxy_1 - xyxy_2
     areas = 0.5 * jt.abs(xyxy.sum(dim=-1))
     return areas
 

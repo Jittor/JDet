@@ -394,8 +394,11 @@ class RotatedRandomFlip(RandomFlip):
             flipped[..., 0::5] = w - flipped[..., 0::5] - 1
             flipped[..., 4::5] = norm_angle(np.pi - flipped[..., 4::5])
         elif self.direction == 'vertical':
-            assert False
+            flipped[..., 1::5] = h - flipped[..., 1::5] - 1
+            flipped[..., 4::5] = norm_angle( - flipped[..., 4::5])
         elif self.direction == 'diagonal':
+            assert False
+        else:
             assert False
         return flipped
 
