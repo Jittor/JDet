@@ -38,8 +38,8 @@ python setup.py install
 ```
 If you don't have permission for install,please add ```--user```.
 
-Or use ```PYTHONPATH```
-You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```
+Or use ```PYTHONPATH```: 
+You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```, and run
 ```shell
 source .bashrc
 ```
@@ -50,6 +50,8 @@ source .bashrc
 DOTA Dataset documents are avaliable in the [dota.md](docs/dota.md)
 
 FAIR Dataset documents are avaliable in the [fair.md](docs/fair.md)
+
+SSDD/SSDD+ Dataset documents are avaliable in the [ssdd.md](docs/ssdd.md)
 ### Config
 Config documents are avaliable in the [config.md](docs/config.md)
 ### Train
