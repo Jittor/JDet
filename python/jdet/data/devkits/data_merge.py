@@ -1,6 +1,6 @@
 import shutil
 import jittor as jt 
-from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, FAIR_CLASSES_
+from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, DOTA2_CLASSES, FAIR_CLASSES_
 from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.devkits.result_merge import mergebypoly
@@ -102,6 +102,8 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
         classes = DOTA1_CLASSES
     elif (dataset_type == 'DOTA1_5'):
         classes = DOTA1_5_CLASSES
+    elif (dataset_type == 'DOTA2'):
+        classes = DOTA2_CLASSES
     elif (dataset_type == 'FAIR'):
         classes = FAIR_CLASSES_
     else:
@@ -116,7 +118,7 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
-    assert dataset_type in ["FAIR", "DOTA", "DOTA1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, and DOTA1_5 are supported"
+    assert dataset_type in ["FAIR", "DOTA", "DOTA1_5", "DOTA2"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, DOTA1_5 and DOTA2 are supported"
     print("Merge results...")
     save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")
     final_path = os.path.join(work_dir, f"test/submit_{epoch}/after_nms")

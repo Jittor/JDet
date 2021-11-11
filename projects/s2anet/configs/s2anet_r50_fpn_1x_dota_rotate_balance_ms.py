@@ -86,8 +86,7 @@ train_root = f"{data_root}/trainval_1024_200_0.5-1.0-1.5"
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        annotations_file=f'{train_root}/labels.pkl',
-        images_dir=f'{train_root}/images/',
+        dataset_dir=train_root,
         transforms=[
             dict(
                 type="RotatedResize",
@@ -117,8 +116,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        annotations_file=f'{train_root}/labels.pkl',
-        images_dir=f'{train_root}/images/',
+        dataset_dir=train_root,
         transforms=[
             dict(
                 type="RotatedResize",
@@ -187,5 +185,3 @@ max_epoch = 12
 eval_interval = 3
 checkpoint_interval = 1
 log_interval = 50
-work_dir = "/mnt/disk/lxl/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance_ms"
-

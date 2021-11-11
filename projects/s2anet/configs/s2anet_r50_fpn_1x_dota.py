@@ -83,8 +83,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -109,8 +108,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -181,6 +179,3 @@ eval_interval = 2
 checkpoint_interval = 1
 # log_interval : iter interval
 log_interval = 50
-work_dir = "work_dirs/s2anet_r50_fpn_1x_dota"
-pretrained_weights = "/mnt/disk/lxl/JDet/work_dirs/s2anet_r50_fpn_1x_dota_rotate_balance/checkpoints/ckpt_12.pkl"
-

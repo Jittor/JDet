@@ -8,14 +8,16 @@ from jdet.models.boxes.box_ops import rotated_box_to_bbox
 
 @MODELS.register_module()
 class RetinaNet(nn.Module):
-    """
-    """
 
     def __init__(self,backbone,neck=None,rpn_net=None):
         super(RetinaNet,self).__init__()
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
         self.rpn_net = build_from_cfg(rpn_net,HEADS)
+
+    def train(self):
+        super().train()
+        self.backbone.train()
 
     def draw(self, images, results, targets, out_path):
         for i in range(images.shape[0]):

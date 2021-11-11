@@ -14,7 +14,7 @@ from jittor import nn
 
 from jdet.utils.registry import BACKBONES
 
-__all__ = ['ResNet', 'Resnet18', 'Resnet34', 'Resnet26', 'Resnet38', 'Resnet50', 'Resnet101', 'Resnet152', 'Resnext50_32x4d', 'Resnext101_32x8d', 'Wide_resnet50_2', 'Wide_resnet101_2']
+__all__ = ['ResNet', 'Resnet18', 'Resnet34', 'Resnet26', 'Resnet38', 'Resnet50', 'Resnet101', 'Resnet152', 'Resnext50_32x4d', 'Resnext101_32x8d', 'Wide_resnet50_2', 'Wide_resnet101_2', 'Resnet18_v1d', 'Resnet34_v1d', 'Resnet50_v1d', 'Resnet101_v1d', 'Resnet152_v1d']
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     conv=nn.Conv(in_planes, out_planes, kernel_size=3, stride=stride, padding=dilation, groups=groups, bias=False, dilation=dilation)
@@ -263,4 +263,133 @@ def Wide_resnet101_2(pretrained=False, **kwargs):
     kwargs['width_per_group'] = (64 * 2)
     model = _resnet(Bottleneck, [3, 4, 23, 3], **kwargs)
     if pretrained: model.load("jittorhub://wide_resnet101_2.pkl")
+    return model
+
+class ResNet_v1d(nn.Module):
+    def __init__(self, block, layers, return_stages=["layer4"],frozen_stages=-1,norm_eval=True,num_classes=None, groups=1, width_per_group=64, replace_stride_with_dilation=None, norm_layer=None):
+        super(ResNet_v1d, self).__init__()
+        if (norm_layer is None):
+            norm_layer = nn.BatchNorm
+        self.frozen_stages = frozen_stages
+        self.norm_eval = norm_eval
+        self._norm_layer = norm_layer
+        self.inplanes = 64
+        self.dilation = 1
+        if (replace_stride_with_dilation is None):
+            replace_stride_with_dilation = [False, False, False]
+        if (len(replace_stride_with_dilation) != 3):
+            raise ValueError('replace_stride_with_dilation should be None or a 3-element tuple, got {}'.format(replace_stride_with_dilation))
+        self.groups = groups
+        self.base_width = width_per_group
+        self.C1 = nn.Sequential(
+            nn.Conv(3, 32, kernel_size=3, stride=2, padding=1, bias=False),
+            norm_layer(32),
+            nn.Relu(),
+            nn.Conv(32, 32, kernel_size=3, stride=1, padding=1, bias=False),
+            norm_layer(32),
+            nn.Relu(),
+            nn.Conv(32, 64, kernel_size=3, stride=1, padding=1, bias=False),
+            norm_layer(64),
+            nn.Relu(),
+        )
+
+        self.relu = nn.Relu()
+        self.maxpool = nn.Pool(kernel_size=3, stride=2, padding=1, op='maximum')
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        self.num_classes=num_classes
+        self.return_stages = return_stages
+        if num_classes is not None:
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            self.fc = nn.Linear((512 * block.expansion), num_classes)
+
+    def _make_layer(self, block, planes, blocks, stride=1, dilate=False):
+        norm_layer = self._norm_layer
+        downsample = None
+        previous_dilation = self.dilation
+        if dilate:
+            self.dilation *= stride
+            stride = 1
+        if ((stride != 1) or (self.inplanes != (planes * block.expansion))):
+            downsample = nn.Sequential(nn.Pool(stride, stride=stride, op="mean"), conv1x1(self.inplanes, (planes * block.expansion), 1), norm_layer((planes * block.expansion)))
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer))
+        self.inplanes = (planes * block.expansion)
+        for _ in range(1, blocks):
+            layers.append(block(self.inplanes, planes, groups=self.groups, base_width=self.base_width, dilation=self.dilation, norm_layer=norm_layer))
+        return nn.Sequential(*layers)        
+
+    def execute(self, x):
+        outputs = []
+        x = self.C1(x)
+        x = self.maxpool(x)
+        for i in range(1,5):
+            name = f"layer{i}"
+            x = getattr(self,name)(x)
+            if name in self.return_stages:
+                outputs.append(x)
+        if self.num_classes is not None:
+            x = self.avgpool(x)
+            x = jt.reshape(x, (x.shape[0], -1))
+            x = self.fc(x)
+            if "fc" in self.return_stages:
+                outputs.append(x)
+        return outputs
+
+    def _freeze_stages(self):
+        if self.frozen_stages >= 0:
+            self.bn1.eval()
+            for m in [self.conv1, self.bn1]:
+                for param in m.parameters():
+                    param.stop_grad()  
+
+        for i in range(1, self.frozen_stages + 1):
+            m = getattr(self, 'layer{}'.format(i))
+            m.eval()
+            for param in m.parameters():
+                param.stop_grad()  
+
+    def train(self):
+        super(ResNet_v1d, self).train()
+        self._freeze_stages()
+        if self.norm_eval:
+            for m in self.modules():
+                # trick: eval have effect on BatchNorm only
+                if isinstance(m, nn.BatchNorm):
+                    m.eval()
+
+def _resnet_v1d(block, layers, **kwargs):
+    model = ResNet_v1d(block, layers, **kwargs)
+    return model
+
+@BACKBONES.register_module()
+def Resnet18_v1d(pretrained=False, **kwargs):
+    model = _resnet_v1d(BasicBlock, [2, 2, 2, 2], **kwargs)
+    if pretrained: model.load("jittorhub://resnet18.pkl")
+    return model
+
+@BACKBONES.register_module()
+def Resnet34_v1d(pretrained=False, **kwargs):
+    model = _resnet_v1d(BasicBlock, [3, 4, 6, 3], **kwargs)
+    if pretrained: model.load("jittorhub://resnet34.pkl")
+    return model
+
+@BACKBONES.register_module()
+def Resnet50_v1d(pretrained=False, **kwargs):
+    model = _resnet_v1d(Bottleneck, [3, 4, 6, 3], **kwargs)
+    # if pretrained: model.load("jittorhub://resnet50.pkl")
+    return model
+
+@BACKBONES.register_module()
+def Resnet101_v1d(pretrained=False, **kwargs):
+    model = _resnet_v1d(Bottleneck, [3, 4, 23, 3], **kwargs)
+    if pretrained: model.load("jittorhub://resnet101.pkl")
+    return model
+
+@BACKBONES.register_module()
+def Resnet152_v1d(pretrained=False, **kwargs):
+    model = _resnet_v1d(Bottleneck, [3, 8, 36, 3], **kwargs)
+    if pretrained: model.load("jittorhub://resnet152.pkl")
     return model

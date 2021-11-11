@@ -2,7 +2,7 @@
 model = dict(
     type='S2ANet',
     backbone=dict(
-        type='Resnet101',
+        type='Resnet50',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
@@ -15,7 +15,7 @@ model = dict(
         num_outs=5),
     bbox_head=dict(
         type='S2ANetHead',
-        num_classes=38,
+        num_classes=2,
         in_channels=256,
         feat_channels=256,
         stacked_convs=2,
@@ -80,13 +80,10 @@ model = dict(
                 debug=False))
         )
     )
-
-data_root = "/data/lxl/dataset/fair_1024"
-train_root = f"{data_root}/trainval_1024_200_0.5-1.0-1.5"
 dataset = dict(
     train=dict(
-        type="FAIRDataset",
-        dataset_dir=train_root,
+        type="SSDDDataset",
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD_plus/train_800',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -94,10 +91,6 @@ dataset = dict(
                 max_size=1024
             ),
             dict(type='RotatedRandomFlip', prob=0.5),
-            dict(
-                type="RandomRotateAug",
-                random_rotate_on=True,
-            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -111,12 +104,11 @@ dataset = dict(
         batch_size=2,
         num_workers=4,
         shuffle=True,
-        filter_empty_gt=False,
-        balance_category=True
+        filter_empty_gt=False
     ),
     val=dict(
-        type="FAIRDataset",
-        dataset_dir=train_root,
+        type="SSDDDataset",
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/SAR/datasets/processed_SSDD_plus/val_800',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -135,28 +127,6 @@ dataset = dict(
         batch_size=2,
         num_workers=4,
         shuffle=False
-    ),
-    test=dict(
-        type="ImageDataset",
-        dataset_type="FAIR",
-        images_dir=f'{data_root}/test_1024_200_0.5-1.0-1.5/images/',
-        transforms=[
-            dict(
-                type="RotatedResize",
-                min_size=1024,
-                max_size=1024
-            ),
-            dict(
-                type = "Pad",
-                size_divisor=32),
-            dict(
-                type = "Normalize",
-                mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375],
-                to_bgr=False,),
-        ],
-        num_workers=4,
-        batch_size=1,
     )
 )
 
@@ -182,7 +152,9 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 12
+# eval_interval : epoch interval
+eval_interval = 1
+# ckpt_interval : epoch interval
 checkpoint_interval = 1
+# log_interval : iter interval
 log_interval = 50
-
