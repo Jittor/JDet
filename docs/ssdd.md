@@ -23,9 +23,9 @@ Only the 8 folders above(JPEGImages_train, JPEGImages_test, Annotations_train, A
 ## Data Preprocessing
 We need to rescale each image into a consistent size before training and testing.
 ```
-cd $JDet_PATH$/python/jdet/data/devkits/preprocess
+cd $JDet_PATH$
 ```
-We can set how the SSDD/SSDD+ is preprocessed by editing the `ssdd_preprocess_config.py`/`ssdd_plus_preprocess_config.py`, we use `ssdd_plus_preprocess_config.py` as an example:
+We can set how the SSDD/SSDD+ is preprocessed by editing the `configs/preprocess/ssdd_preprocess_config.py` or `configs/preprocess/ssdd_plus_preprocess_config.py`, we use `ssdd_plus_preprocess_config.py` as an example:
 ```python
 type='SSDD+'
 resize = 800
@@ -37,7 +37,7 @@ We need to set `source_dataset_path` to `$SSDD_PATH$/Official-SSDD-OPEN/RBox_SSD
 Then we can set the resize paramters through `resize`.
 Finally, run the following script for preprocessing：
 ```
-python preprocess.py --config-file ssdd_plus_preprocess_config.py
+python tools/preprocess.py --config-file configs/preprocess/ssdd_plus_preprocess_config.py
 ```
 For the way of configuring the processed SSDD/SSDD+ dataset in the model config file, please refer to `$JDet_PATH$/projects/s2anet/configs/s2anet_r50_fpn_1x_ssdd.py`/`$JDet_PATH$/projects/s2anet/configs/s2anet_r50_fpn_1x_ssdd_plus.py`:
 ```
