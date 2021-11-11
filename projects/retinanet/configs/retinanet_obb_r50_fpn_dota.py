@@ -5,7 +5,7 @@ model = dict(
         frozen_stages=1,
         return_stages =  ["layer1","layer2","layer3","layer4"],
         pretrained = True,
-        norm_layer="FrozenBatchNorm"),
+        ),
     neck = dict(
         type= "FPN",
         in_channels= [256,512,1024,2048],
@@ -97,7 +97,5 @@ max_epoch = 12
 eval_interval = 10
 log_interval = 50
 checkpoint_interval = 1
-# pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"
-# pretrained_weights="weights/obb_jt.pk"
 pretrained_weights="weights/obb_epoch_1.pk"
 merge_nms_threshold_type = 1

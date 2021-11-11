@@ -7,7 +7,7 @@ from PIL import Image
 
 from jdet.models.boxes.box_ops import poly_to_rotated_box_single
 from tqdm import tqdm
-from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, FAIR_CLASSES_
+from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, DOTA2_CLASSES, FAIR_CLASSES_, SSDD_CLASSES
 
 
 def parse_ann_info(label_base_path, img_name, label_ids):
@@ -42,8 +42,12 @@ def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
         label_ids = {name: i + 1 for i, name in enumerate(DOTA1_CLASSES)}
     elif (type == 'DOTA1_5'):
         label_ids = {name: i + 1 for i, name in enumerate(DOTA1_5_CLASSES)}
+    elif (type == 'DOTA2'):
+        label_ids = {name: i + 1 for i, name in enumerate(DOTA2_CLASSES)}
     elif(type == 'FAIR'):
         label_ids = {name: i + 1 for i, name in enumerate(FAIR_CLASSES_)}
+    elif(type == 'SSDD' or type == 'SSDD+'):
+        label_ids = {name: i + 1 for i, name in enumerate(SSDD_CLASSES)}
     else:
         assert(False) #unsupported
     img_path = os.path.join(src_path, 'images')

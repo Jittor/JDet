@@ -77,6 +77,12 @@ DOTA1_5_CLASSES = ['plane', 'baseball-diamond', 'bridge', 'ground-track-field',
                'basketball-court', 'storage-tank', 'soccer-ball-field',
                'roundabout', 'harbor', 'swimming-pool', 'helicopter', 'container-crane']
 
+DOTA2_CLASSES = ['plane', 'baseball-diamond', 'bridge', 'ground-track-field',
+               'small-vehicle', 'large-vehicle', 'ship', 'tennis-court',
+               'basketball-court', 'storage-tank', 'soccer-ball-field',
+               'roundabout', 'harbor', 'swimming-pool', 'helicopter', 'container-crane',
+               'airport', 'helipad']
+
 FAIR_CLASSES = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919', 
         'A220', 'A321', 'A330', 'A350', 'ARJ21', 'other-airplane', 'Passenger Ship', 
         'Motorboat', 'Fishing Boat', 'Tugboat', 'Engineering Ship', 'Liquid Cargo Ship', 
@@ -94,3 +100,5 @@ FAIR_CLASSES_ = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919',
         'other-vehicle', 'Basketball_Court', 'Tennis_Court', 'Football_Field', 
         'Baseball_Field', 'Intersection', 'Roundabout', 'Bridge'
     ]
+
+SSDD_CLASSES = ['ship']

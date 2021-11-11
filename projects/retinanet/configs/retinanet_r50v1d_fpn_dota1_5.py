@@ -4,7 +4,7 @@ model = dict(
         type = "Resnet50_v1d",
         return_stages =  ["layer1","layer2","layer3","layer4"],
         pretrained = True,
-        norm_layer="FrozenBatchNorm"),
+        ),
     neck = dict(
         type= "FPN",
         in_channels= [256,512,1024,2048],

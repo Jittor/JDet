@@ -3,7 +3,7 @@ from jdet.data.devkits.voc_eval import voc_eval_dota
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np, rotated_box_to_poly_single
 from jdet.utils.general import check_dir
 from jdet.utils.registry import DATASETS
-from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES
+from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, DOTA2_CLASSES
 from jdet.data.custom import CustomDataset
 from jdet.ops.nms_poly import iou_poly
 import os
@@ -23,11 +23,13 @@ def s2anet_post(result):
 class DOTADataset(CustomDataset):
 
     def __init__(self,*arg,balance_category=False,version='1',**kwargs):
-        assert version in ['1', '1_5']
+        assert version in ['1', '1_5', '2']
         if (version == '1'):
             self.CLASSES = DOTA1_CLASSES
         elif (version == '1_5'):
             self.CLASSES = DOTA1_5_CLASSES
+        elif (version == '2'):
+            self.CLASSES = DOTA2_CLASSES
 
         super().__init__(*arg,**kwargs)
         if balance_category:
@@ -115,6 +117,13 @@ class DOTADataset(CustomDataset):
                 gt = np.concatenate([idx2,gt_polys,gt_labels],axis=1)
                 gts.append(gt)
             diffcult_polys[img_idx] = target["polys_ignore"]/scale_factor
+        if len(dets) == 0:
+            aps = {}
+            for i,classname in tqdm(enumerate(self.CLASSES),total=len(self.CLASSES)):
+                aps["eval/"+str(i+1)+"_"+classname+"_AP"]=0 
+            map = sum(list(aps.values()))/len(aps)
+            aps["eval/0_meanAP"]=map
+            return aps
         dets = np.concatenate(dets)
         gts = np.concatenate(gts)
         aps = {}
