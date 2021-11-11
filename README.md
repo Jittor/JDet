@@ -38,8 +38,8 @@ python setup.py install
 ```
 If you don't have permission for install,please add ```--user```.
 
-Or use ```PYTHONPATH```
-You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```
+Or use ```PYTHONPATH```: 
+You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```, and run
 ```shell
 source .bashrc
 ```
