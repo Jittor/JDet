@@ -9,11 +9,8 @@ python3.7 tools/run_net.py --config-file=configs/faster_rcnn_RoITrans_r50_fpn_1x
 ```
 
 ## Performance
-configs/faster_rcnn_RoITrans_r50_fpn_1x_dota_old.py
-mAP on OBB task in DOTA1.0: <b>0.7356144</b>
-
 configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py
-mAP on OBB task in DOTA1.0: <b>0.7469626</b>
+mAP on OBB task in DOTA1.0: <b>0.7384232</b>
 
 ## References
 https://github.com/dingjiansw101/aerialdetection

@@ -109,7 +109,7 @@ def main():
         print(loss_list)
     else:
         data = pk.load(open("test_datas_roi_transformer/test_data.pk", "rb"))
-        targetss = data["targetss"]
+        targetss = jdet.utils.general.to_jt_var(data["targetss"])
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         # targetss = jdet.utils.general.to_jt_var(data["targetss"])
         # s0_rbbox_loss_cls = data["s0_rbbox_loss_cls"]
@@ -121,9 +121,9 @@ def main():
         for batch_idx in range(len(imagess)):
             images = imagess[batch_idx]
             targets = targetss[batch_idx]
-            targets['gt_labels'] = jdet.utils.general.to_jt_var(targets['gt_labels'])
-            targets['gt_bboxes_ignore'] = jdet.utils.general.to_jt_var(targets['gt_bboxes_ignore'])
-            targets['gt_bboxes'] = jdet.utils.general.to_jt_var(targets['gt_bboxes'])
+            # targets['gt_labels'] = jdet.utils.general.to_jt_var(targets['gt_labels'])
+            # targets['gt_bboxes_ignore'] = jdet.utils.general.to_jt_var(targets['gt_bboxes_ignore'])
+            # targets['gt_bboxes'] = jdet.utils.general.to_jt_var(targets['gt_bboxes'])
 
             losses = model(images,targets)
             # l1 = losses['s0.rbbox_loss_cls'].data[0][0]

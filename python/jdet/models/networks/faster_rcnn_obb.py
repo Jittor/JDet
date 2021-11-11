@@ -39,11 +39,27 @@ class FasterRCNNOBB(nn.Module):
         '''
         self.backbone.train()
 
-        image_meta = targets['img_meta']
-        gt_bboxes = targets['gt_bboxes']
-        gt_labels = targets['gt_labels']
-        gt_bboxes_ignore = targets['gt_bboxes_ignore']
-        gt_masks = targets['gt_masks']
+        image_meta = []
+        gt_labels = []
+        gt_bboxes = []
+        gt_bboxes_ignore = []
+        gt_obbs = []
+        for target in targets:
+            meta = dict(
+                ori_shape = target['ori_img_size'],
+                img_shape = target['img_size'],
+                pad_shape = target['pad_shape'],
+                img_file = target['img_file'],
+                mean = target['mean'].numpy(),
+                std = target['std'].numpy(),
+                to_bgr = target['to_bgr'],
+                scale_factor = target['scale_factor']
+            )
+            image_meta.append(meta)
+            gt_bboxes.append(target['hboxes'])
+            gt_labels.append(target['labels'])
+            gt_bboxes_ignore.append(target['hboxes_ignore'])
+            gt_obbs.append(target['rboxes'].numpy())
 
         losses = dict()
         features = self.backbone(images)
@@ -82,7 +98,7 @@ class FasterRCNNOBB(nn.Module):
         cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
         rbbox_targets = self.bbox_head.get_target(
-            sampling_results, gt_masks, gt_labels, self.train_cfg.rcnn)
+            sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn, use_obb=True)
         loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
                                         *rbbox_targets)
         losses.update(loss_bbox)
@@ -96,7 +112,22 @@ class FasterRCNNOBB(nn.Module):
         Rets:
             losses (dict): losses
         '''
-        img_meta = targets[0]['img_meta']
+        img_meta = []
+        img_shape = []
+        scale_factor = []
+        for target in targets:
+            ori_img_size = target['ori_img_size']
+            meta = dict(
+                ori_shape = ori_img_size,
+                img_shape = ori_img_size,
+                pad_shape = ori_img_size,
+                scale_factor = target['scale_factor'],
+                img_file = target['img_file']
+            )
+            img_meta.append(meta)
+            img_shape.append(target['img_size'])
+            scale_factor.append(target['scale_factor'])
+
         x = self.backbone(images)
         if(self.neck):
             x = self.neck(x)
@@ -109,8 +140,6 @@ class FasterRCNNOBB(nn.Module):
         roi_feats = self.bbox_roi_extractor(
             x[:len(self.bbox_roi_extractor.featmap_strides)], rois)
         cls_score, bbox_pred = self.bbox_head(roi_feats)
-        img_shape = img_meta[0]['img_shape']
-        scale_factor = img_meta[0]['scale_factor']
         det_bboxes, det_labels = self.bbox_head.get_det_bboxes(
             rois,
             cls_score,

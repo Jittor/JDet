@@ -11,28 +11,6 @@ from .transforms import Compose
 from pycocotools.coco import COCO
 import copy
 
-def get_mask_from_bbox(gt_bbox, w, h):
-    return jt.code([h, w], jt.uint8, [jt.array(gt_bbox)],
-    cpu_header=r'''
-    #include<cmath>
-    #include<algorithm>
-    @alias(bbox, in0)
-    @alias(mask, out)
-''',
-    cpu_src=r'''
-double dcos = std::cos(@bbox(4));
-double dsin = std::sin(@bbox(4));
-double cx = @bbox(0), cy = @bbox(1);
-double w = @bbox(2), h = @bbox(3);
-int bw = mask_shape0, bh = mask_shape1;
-for(int i=0;i<bw;i++)
-    for(int j=0;j<bh;j++){
-        double x=(j-cx+0.5)*dcos+(i-cy+0.5)*dsin;
-        double y=(i-cy+0.5)*dcos-(j-cx+0.5)*dsin;
-        @mask(i,j)=(-w/2<x&&x<=w/2&&-h/2<y&&y<=h/2);
-    }
-''');
-
 @DATASETS.register_module()
 class CustomDataset(Dataset):
     '''
@@ -53,7 +31,7 @@ class CustomDataset(Dataset):
     ]
     '''
     CLASSES = None
-    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,filter_min_size=-1,use_mask=False):
+    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,filter_min_size=-1):
         super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
         if (dataset_dir is not None):
             assert(images_dir is None)
@@ -67,7 +45,6 @@ class CustomDataset(Dataset):
             self.annotations_file = os.path.abspath(annotations_file)
 
         self.transforms = Compose(transforms)
-        self.use_mask = use_mask
         
         self.img_infos = jt.load(self.annotations_file)
         if filter_empty_gt:
@@ -95,13 +72,6 @@ class CustomDataset(Dataset):
         hboxes,polys = rotated_box_to_bbox_np(anno["bboxes"])
         hboxes_ignore,polys_ignore = rotated_box_to_bbox_np(anno["bboxes_ignore"])
 
-        masks = None
-        if self.use_mask:
-            masks = []
-            for bbox in anno['bboxes']:
-                masks.append(get_mask_from_bbox(bbox, w=width, h=height))
-            masks = jt.stack(masks)
-
         ann = dict(
             rboxes=anno['bboxes'].astype(np.float32),
             hboxes=hboxes.astype(np.float32),
@@ -113,10 +83,9 @@ class CustomDataset(Dataset):
             classes=self.CLASSES,
             ori_img_size=(width,height),
             img_size=(width,height),
+            scale_factor=1.0,
             filename =  img_info["filename"],
             img_file = img_path)
-        if self.use_mask:
-            ann['gt_masks'] = masks.astype(np.uint8)
         return image,ann
 
     def collate_batch(self,batch):

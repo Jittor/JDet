@@ -9,7 +9,7 @@ python3.7 tools/run_net.py --config-file=configs/faster_rcnn_obb_r50_fpn_1x_dota
 ```
 
 ## Performance
-mAP on OBB task in DOTA1.0: <b>0.69380404</b>
+mAP on OBB task in DOTA1.0: <b>0.69631387</b>
 
 ## References
 https://github.com/dingjiansw101/aerialdetection

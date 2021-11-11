@@ -1,7 +1,5 @@
 model = dict(
     type='RoITransformer',
-    useMask=False,
-    useCOCO=False,
     pretrained='modelzoo://resnet50',
     backbone=dict(
         type='Resnet50',
@@ -125,7 +123,6 @@ model = dict(
         ]),
     test_cfg = dict(
         rpn=dict(
-            # TODO: test nms 2000
             nms_across_levels=False,
             nms_pre=2000,
             nms_post=2000,
@@ -142,8 +139,6 @@ model = dict(
 
 # dataset settings
 dataset_type = 'DOTADataset'
-img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 dataset = dict(
     imgs_per_gpu=2,
     workers_per_gpu=2,
@@ -151,7 +146,6 @@ dataset = dict(
         type=dataset_type,
         annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        #coco_annotation_flie = '/mnt/disk/zwy/dota1_1024/trainval1024/DOTA_trainval1024.json',
         version='1',
         filter_min_size=32,
         transforms=[
@@ -175,15 +169,9 @@ dataset = dict(
         type=dataset_type,
         annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
-        #coco_annotation_flie = '/mnt/disk/zwy/dota1_1024/trainval1024/DOTA_trainval1024.json',
         version='1',
         filter_min_size=32,
         transforms=[
-            dict(
-                type = "RotatedRandomFlip",
-                prob = 0.5,
-                direction="horizontal",
-            ),
             dict(
                 type = "Pad",
                 size_divisor=32),

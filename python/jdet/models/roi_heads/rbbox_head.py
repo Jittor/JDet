@@ -303,9 +303,6 @@ class BBoxHeadRbbox(nn.Module):
             print('strange size')
             import pdb
             pdb.set_trace()
-        hook.record('obbs', obbs)
-        hook.record('bbox_pred', bbox_pred)
-        hook.record('scores', scores)
         if bbox_pred is not None:
             dbboxes = delta2dbbox_v3(obbs, bbox_pred, self.target_means,
                                     self.target_stds, img_shape)
@@ -317,14 +314,10 @@ class BBoxHeadRbbox(nn.Module):
             dbboxes[:, 1::5] /= scale_factor
             dbboxes[:, 2::5] /= scale_factor
             dbboxes[:, 3::5] /= scale_factor
-        hook.record('dbboxes', dbboxes)
-        hook.record('scores', scores)
         det_bboxes, det_labels = multiclass_nms_rotated(dbboxes, scores,
                                                 cfg.score_thr, cfg.nms,
                                                 cfg.max_per_img)
         det_bboxes = jt.contrib.concat([rotated_box_to_poly(det_bboxes), det_bboxes[:,-1:]], -1)
-        hook.record('det_bboxes', det_bboxes)
-        hook.record('det_labels', det_labels)
         return det_bboxes, det_labels
 
     def get_det_rbboxes(self,

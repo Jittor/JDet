@@ -104,14 +104,22 @@ model = dict(
     )
 );
 # dataset settings
-dataset_type = 'DOTARCNNDataset'
-data_root = '/mnt/disk/zwy/dota1_1024/'
+dataset_type = 'DOTADataset'
 dataset = dict(
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        root=data_root + 'trainval1024/images/',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        version='1',
+        filter_min_size=32,
         transforms=[
+            dict(
+                type = "RotatedRandomFlip",
+                prob = 0,
+                direction="horizontal",
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -119,16 +127,16 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
         ],
-        shuffle=False,
         batch_size=2,
-        keep_flip=False
         ),
     val=dict(
         type=dataset_type,
-        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        root=data_root + 'trainval1024/images/',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        version='1',
+        filter_min_size=32,
         transforms=[
             dict(
                 type = "Pad",
@@ -137,13 +145,12 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
         ],
         ),
     test=dict(
-        type=dataset_type,
-        anno_file=data_root + 'test1024/DOTA_test1024.json',
-        root=data_root + 'test1024/images',
+        type="ImageDataset",        
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         transforms=[
             dict(
                 type = "Pad",
@@ -152,7 +159,7 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
         ],
     )
 )
@@ -160,11 +167,12 @@ dataset = dict(
 optimizer = dict(
     type='SGD', 
     lr=0.01, 
-    momentum=0.9, 
-    weight_decay=0.0001,
-    grad_clip=dict(
-        max_norm=35, 
-        norm_type=2))
+    # momentum=0.9, 
+    # weight_decay=0.0001,
+    #grad_clip=dict(
+    #    max_norm=35, 
+    #    norm_type=2)
+)
 
 # learning policy
 scheduler = dict(

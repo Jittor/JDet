@@ -282,14 +282,10 @@ def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1,
     return bbox_targets
 
 def dbbox2result(dbboxes, labels, num_classes):
-    if dbboxes.shape[0] == 0:
-        return [
-            np.zeros((0, 9), dtype=np.float32) for i in range(num_classes - 1)
-        ]
-    else:
-        dbboxes = dbboxes.numpy()
-        labels = labels.numpy()
-        return [dbboxes[labels == i, :] for i in range(num_classes - 1)]
+    # labels + 1 for dotadataset evaluation and data_merge.
+    dbboxes = dbboxes.numpy()
+    labels = labels.numpy()
+    return dbboxes[:, :8], dbboxes[:, -1].flatten(), labels + 1
 
 def delta2dbbox_v3(Rrois,
                 deltas,
