@@ -1,3 +1,4 @@
+import torch
 import argparse
 import jittor as jt
 from jdet.runner import Runner 
