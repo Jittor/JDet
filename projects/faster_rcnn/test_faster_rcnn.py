@@ -101,8 +101,6 @@ def main():
         data = pk.load(open("test_datas_faster_rcnn/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
-        for batch_idx in range(len(targetss)):
-            targetss[batch_idx]["gt_masks"] = data["targetss"][batch_idx]["gt_masks"]
         correct_loss = data["correct_loss"]
         thr = 0.2
         for batch_idx in range(len(imagess)):
