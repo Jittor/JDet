@@ -19,17 +19,6 @@ class RetinaNet(nn.Module):
         super().train()
         self.backbone.train()
 
-    def draw(self, images, results, targets, out_path):
-        for i in range(images.shape[0]):
-            img = images[i].data
-            img = np.transpose(((img + 2.117904) / 5 * 255), [1,2,0]).astype(np.uint8)
-            result = copy.deepcopy(results[i])
-            target = targets[i]
-            result[0][:, [0,2]] = result[0][:, [0,2]] / target["ori_img_size"][0] * target["img_size"][0]
-            result[0][:, [1,3]] = result[0][:, [1,3]] / target["ori_img_size"][1] * target["img_size"][1]
-            jdet.utils.visualization.visualize_r_result(img.copy(), result, out_path)
-            break
-
     def execute(self,images,targets):
         '''
         Args:

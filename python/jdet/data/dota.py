@@ -3,7 +3,7 @@ from jdet.data.devkits.voc_eval import voc_eval_dota
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np, rotated_box_to_poly_single
 from jdet.utils.general import check_dir
 from jdet.utils.registry import DATASETS
-from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, DOTA2_CLASSES
+from jdet.config.constant import get_classes_by_name
 from jdet.data.custom import CustomDataset
 from jdet.ops.nms_poly import iou_poly
 import os
@@ -24,13 +24,7 @@ class DOTADataset(CustomDataset):
 
     def __init__(self,*arg,balance_category=False,version='1',**kwargs):
         assert version in ['1', '1_5', '2']
-        if (version == '1'):
-            self.CLASSES = DOTA1_CLASSES
-        elif (version == '1_5'):
-            self.CLASSES = DOTA1_5_CLASSES
-        elif (version == '2'):
-            self.CLASSES = DOTA2_CLASSES
-
+        self.CLASSES = get_classes_by_name('DOTA'+version)
         super().__init__(*arg,**kwargs)
         if balance_category:
             self.img_infos = self._balance_categories()

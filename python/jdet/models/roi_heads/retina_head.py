@@ -10,7 +10,7 @@ import jittor as jt
 from jdet.utils.registry import build_from_cfg,BOXES
 import numpy as np
 import jdet
-from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh
+from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh, rotated_box_to_poly
 # from  import get_var
 
 @HEADS.register_module()
@@ -265,8 +265,8 @@ class RetinaHead(nn.Module):
                 boxes = boxes[order]
                 scores = scores[order]
                 labels = labels[order]
-            
-            results.append((jt.concat([boxes, scores.unsqueeze(1)], 1), labels))
+            polys = rotated_box_to_poly(boxes)
+            results.append((polys, scores, labels))
         return results
 
     def losses(self,all_bbox_pred_,all_cls_score_,all_gt_roi_locs_,all_gt_roi_labels_):
