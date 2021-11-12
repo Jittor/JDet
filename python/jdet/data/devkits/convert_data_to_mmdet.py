@@ -7,7 +7,7 @@ from PIL import Image
 
 from jdet.models.boxes.box_ops import poly_to_rotated_box_single
 from tqdm import tqdm
-from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, DOTA2_CLASSES, FAIR_CLASSES_, SSDD_CLASSES
+from jdet.config.constant import get_classes_by_name
 
 
 def parse_ann_info(label_base_path, img_name, label_ids):
@@ -38,18 +38,7 @@ def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
         out_path: output pkl file path
         trainval: trainval or test
     """
-    if (type == 'DOTA'):
-        label_ids = {name: i + 1 for i, name in enumerate(DOTA1_CLASSES)}
-    elif (type == 'DOTA1_5'):
-        label_ids = {name: i + 1 for i, name in enumerate(DOTA1_5_CLASSES)}
-    elif (type == 'DOTA2'):
-        label_ids = {name: i + 1 for i, name in enumerate(DOTA2_CLASSES)}
-    elif(type == 'FAIR'):
-        label_ids = {name: i + 1 for i, name in enumerate(FAIR_CLASSES_)}
-    elif(type == 'SSDD' or type == 'SSDD+'):
-        label_ids = {name: i + 1 for i, name in enumerate(SSDD_CLASSES)}
-    else:
-        assert(False) #unsupported
+    label_ids = {name: i + 1 for i, name in enumerate(get_classes_by_name(type))}
     img_path = os.path.join(src_path, 'images')
     label_path = os.path.join(src_path, 'labelTxt')
     img_lists = os.listdir(img_path)
