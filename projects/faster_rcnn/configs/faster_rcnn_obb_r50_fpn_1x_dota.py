@@ -102,7 +102,7 @@ model = dict(
     # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
     )
-);
+)
 # dataset settings
 dataset_type = 'DOTADataset'
 dataset = dict(
@@ -110,8 +110,7 @@ dataset = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         version='1',
         filter_min_size=32,
         transforms=[
@@ -133,8 +132,7 @@ dataset = dict(
         ),
     val=dict(
         type=dataset_type,
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         version='1',
         filter_min_size=32,
         transforms=[
@@ -187,6 +185,6 @@ logger = dict(
 # yapf:enable
 # runtime settings
 max_epoch = 12
-eval_interval = 1
+eval_interval = 6
 checkpoint_interval = 1
 log_interval = 20
