@@ -1,6 +1,6 @@
 import shutil
 import jittor as jt 
-from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, DOTA2_CLASSES, FAIR_CLASSES_
+from jdet.config.constant import get_classes_by_name
 from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.devkits.result_merge import mergebypoly
@@ -26,39 +26,14 @@ def flip_box(box, target):
             ans[i] = h - ans[i]
     return ans
 
-def prepare(result_pkl,save_path, classes):
-    check_dir(save_path)
-    results = jt.load(result_pkl)
-    data = {}
-    for result,target in tqdm(results):
-        dets,labels = result
-        img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
-        for det,label in zip(dets,labels):
-            bbox = det[:5]
-            score = det[5]
-            classname = classes[label]
-            bbox = rotated_box_to_poly_single(bbox)
-            bbox_ = flip_box(bbox, target)
-            temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
-                        img_name, score, 
-                        bbox_[0], bbox_[1], bbox_[2], bbox_[3], 
-                        bbox_[4], bbox_[5], bbox_[6], bbox_[7])
-            if classname not in data:
-                data[classname] = []
-            data[classname].append(temp_txt)
-    for classname,lines in data.items():
-        f_out = open(os.path.join(save_path, classname + '.txt'), 'w')
-        f_out.writelines(lines)
-        f_out.close()
-
-def prepare_gliding(result_pkl,save_path, classes):
+def prepare_data(result_pkl,save_path, classes):
     check_dir(save_path)
     results = jt.load(result_pkl)
     data = {}
     for result,target in tqdm(results):
         img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
         for bbox,score,label in zip(*result):
-            classname = classes[label-1]
+            classname = classes[label]
             bbox_ = flip_box(bbox, target)
             temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
                         img_name, score, 
@@ -73,6 +48,7 @@ def prepare_gliding(result_pkl,save_path, classes):
         f_out.close()
 
 def data_merge(result_pkl, save_path, final_path,dataset_type):
+<<<<<<< HEAD
     if (dataset_type == 'DOTA'):
         classes = DOTA1_CLASSES
     elif (dataset_type == 'DOTA1_5'):
@@ -89,6 +65,10 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
         prepare_gliding(result_pkl,save_path, classes)
     else:
         prepare(result_pkl,save_path, classes)
+=======
+    classes = get_classes_by_name(dataset_type)
+    prepare_data(result_pkl,save_path, classes)
+>>>>>>> master
     check_dir(final_path)
     mergebypoly(save_path,final_path)
 

@@ -4,6 +4,7 @@ from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
 
 from jdet.models.utils.gliding_transforms import *
+from jdet.ops.nms_poly import nms_poly
 
 @HEADS.register_module()
 class GlidingHead(nn.Module):
@@ -440,7 +441,10 @@ class GlidingHead(nn.Module):
             result = []
             for i in range(len(targets)):
 
-                scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, [proposal_list[i]], test=True)
+                x_ = []
+                for j in range(len(x)):
+                    x_.append(x[j][i:i+1])
+                scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x_, [proposal_list[i]], test=True)
                 img_shape = targets[i]['img_size']
                 scale_factor = targets[i]['scale_factor']
                 
@@ -448,7 +452,7 @@ class GlidingHead(nn.Module):
 
                 poly = det_bboxes[:, :8]
                 scores = det_bboxes[:, 8]
-                labels = det_labels
+                labels = det_labels - 1
 
                 result.append((poly, scores, labels))
             
