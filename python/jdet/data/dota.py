@@ -92,10 +92,8 @@ class DOTADataset(CustomDataset):
         gts = []
         diffcult_polys = {}
         for img_idx,(result,target) in enumerate(results):
-            if len(result)==2:
-                det_polys,det_scores,det_labels = s2anet_post(result)
-            else:
-                det_polys,det_scores,det_labels =  result
+            det_polys,det_scores,det_labels =  result
+            det_labels += 1
             if det_polys.size>0:
                 idx1 = np.ones((det_labels.shape[0],1))*img_idx
                 det = np.concatenate([idx1,det_polys,det_scores.reshape(-1,1),det_labels.reshape(-1,1)],axis=1)
