@@ -187,6 +187,6 @@ logger = dict(
 # yapf:enable
 # runtime settings
 max_epoch = 12
-eval_interval = 13 #TODO: implement evaluate
+eval_interval = 6
 checkpoint_interval = 1
 log_interval = 20
