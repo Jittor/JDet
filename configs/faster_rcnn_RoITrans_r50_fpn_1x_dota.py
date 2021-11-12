@@ -219,4 +219,3 @@ max_epoch = 12
 eval_interval = 6
 checkpoint_interval = 1
 log_interval = 20
-#resume_path = 'work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/checkpoints/ckpt_12.pkl'
