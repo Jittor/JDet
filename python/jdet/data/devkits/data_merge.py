@@ -48,27 +48,8 @@ def prepare_data(result_pkl,save_path, classes):
         f_out.close()
 
 def data_merge(result_pkl, save_path, final_path,dataset_type):
-<<<<<<< HEAD
-    if (dataset_type == 'DOTA'):
-        classes = DOTA1_CLASSES
-    elif (dataset_type == 'DOTA1_5'):
-        classes = DOTA1_5_CLASSES
-    elif (dataset_type == 'DOTA2'):
-        classes = DOTA2_CLASSES
-    elif (dataset_type == 'FAIR'):
-        classes = FAIR_CLASSES_
-    else:
-        assert(False)
-    if "gliding" in result_pkl:
-        prepare_gliding(result_pkl,save_path, classes)
-    elif "faster_rcnn" in result_pkl:
-        prepare_gliding(result_pkl,save_path, classes)
-    else:
-        prepare(result_pkl,save_path, classes)
-=======
     classes = get_classes_by_name(dataset_type)
     prepare_data(result_pkl,save_path, classes)
->>>>>>> master
     check_dir(final_path)
     mergebypoly(save_path,final_path)
 
