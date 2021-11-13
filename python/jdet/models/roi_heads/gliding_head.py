@@ -5,7 +5,6 @@ from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cf
 from jdet.ops.nms_poly import multiclass_poly_nms
 
 from jdet.models.utils.gliding_transforms import *
-from jdet.ops.nms_poly import nms_poly
 
 @HEADS.register_module()
 class GlidingHead(nn.Module):
