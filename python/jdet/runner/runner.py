@@ -127,7 +127,7 @@ class Runner:
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
     
-            if check_interval(self.iter,self.log_interval):
+            if check_interval(self.iter,self.log_interval) and self.iter>0:
                 batch_size = len(targets)*jt.world_size
                 ptime = time.time()-start_time
                 fps = batch_size*(batch_idx+1)/ptime

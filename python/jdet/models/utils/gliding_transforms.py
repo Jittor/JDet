@@ -14,9 +14,9 @@ def regular_theta(theta, mode='180', start=-pi/2):
 
 def regular_obb(obboxes):
     x, y, w, h, theta = obboxes.unbind(dim=-1)
-    w_regular = jt.where(w > h, w, h)
-    h_regular = jt.where(w > h, h, w)
-    theta_regular = jt.where(w > h, theta, theta+pi/2)
+    w_regular = jt.ternary(w > h, w, h)
+    h_regular = jt.ternary(w > h, h, w)
+    theta_regular = jt.ternary(w > h, theta, theta+pi/2)
     theta_regular = regular_theta(theta_regular)
     return jt.stack([x, y, w_regular, h_regular, theta_regular], dim=-1)
 
@@ -156,3 +156,21 @@ def bbox2type(bboxes, to_type):
         return bboxes
     trans_func = _type_func_map[(ori_type, to_type)]
     return trans_func(bboxes)
+
+def get_bbox_areas(bboxes):
+    btype = get_bbox_type(bboxes)
+    if btype == 'hbb':
+        wh = bboxes[..., 2:] - bboxes[..., :2]
+        areas = wh[..., 0] * wh[..., 1]
+    elif btype == 'obb':
+        areas = bboxes[..., 2] * bboxes[..., 3]
+    elif btype == 'poly':
+        pts = bboxes.view(*bboxes.size()[:-1], 4, 2)
+        roll_pts = torch.roll(pts, 1, dims=-2)
+        xyxy = torch.sum(pts[..., 0] * roll_pts[..., 1] -
+                         roll_pts[..., 0] * pts[..., 1], dim=-1)
+        areas = 0.5 * torch.abs(xyxy)
+    else:
+        raise ValueError('The type of bboxes is notype')
+
+    return areas

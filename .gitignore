@@ -32,3 +32,11 @@ submit_zips
 *.sh
 test_configs
 projects/*/test_datas*
+
+tools/analysis_dota.py
+
+submit*
+temp*
+configs/fair
+tools/convert_dataset.py
+tools/merge_results2.py

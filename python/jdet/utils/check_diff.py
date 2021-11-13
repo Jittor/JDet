@@ -1,6 +1,8 @@
 import jittor as jt 
 import numpy as np
 
+is_diff = False 
+
 def check_diff(w1_,w2_):
     w1 = jt.load(w1_)
     w2 = jt.load(w2_)
@@ -39,5 +41,53 @@ def check_init(jt_pkl,torch_pkl):
 
     
 
+
+def compare_data(data,name):
+    if not is_diff:
+        return
+    def __sync(data):
+        if isinstance(data,(tuple,list)):
+            return [__sync(d) for d in data]
+        elif isinstance(data,jt.Var):
+            return data.numpy()
+        else:
+            assert False
+
+    import pickle 
+    import numpy as np
+    data = __sync(data)
+    gt_data = pickle.load(open(f"/home/lxl/diff/{name}.pkl","rb"))
+    if isinstance(data,np.ndarray):
+        data = [data]
+        gt_data = [gt_data]
+    print("-"*10,name,"-"*10)
+    for d1,d2  in zip(data,gt_data):
+        print(d1.shape,d2.shape)
+        diff = np.abs(d1-d2)
+        if diff.max()>1e-2:
+            index = np.where(diff==diff.max())
+            print(index)
+            print(d1[diff==diff.max()],d2[diff==diff.max()])
+            print(diff.max())
+        np.testing.assert_allclose(d1,d2,atol=1e-2,rtol=1e-3)
+
+def load_data(data, name):
+    if not is_diff:
+        return data
+    def __sync(data):
+        if isinstance(data,(tuple,list)):
+            return [__sync(d) for d in data]
+        elif isinstance(data,np.ndarray):
+            return jt.array(data)
+        else:
+            assert False
+    
+    import pickle 
+    data = pickle.load(open(f"/home/lxl/diff/{name}.pkl","rb"))
+    return __sync(data)
+
+def compare_and_load(data,name):
+    compare_data(data,name)
+    return load_data(data,name)
 # check_init("jittor_init_weight.pkl","torch_init_weight.pkl")
 
