@@ -1,4 +1,3 @@
-pretrained_weights = "test_datas_roi_transformer/init_pretrained.pk_jt.pk"
 model = dict(
     type='RoITransformer',
     pretrained='modelzoo://resnet50',

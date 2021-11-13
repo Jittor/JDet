@@ -69,6 +69,7 @@ def main():
     # [0.6244182586669922, 0.15812541544437408, 0.7723376750946045, 89.84375, 0.35137325525283813, 1.906254529953003]]
     # thr = 0.1
     if (args.set_data):
+        os.makedirs("test_datas_faster_rcnn",exist_ok=True)
         jt.save(model.state_dict(), "test_datas_faster_rcnn/model.pk")
 
         imagess = []

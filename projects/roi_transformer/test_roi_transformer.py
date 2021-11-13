@@ -50,7 +50,6 @@ def main():
 
     iter = 0
     model = build_from_cfg(cfg.model,MODELS)
-    model.load(cfg.pretrained_weights)
     if (cfg.parameter_groups_generator):
         params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=model.named_parameters(), model=model)
     else:
@@ -60,6 +59,9 @@ def main():
     model.train()
 
     if (args.set_data):
+        os.makedirs("test_datas_roitrans",exist_ok=True)
+        model.save("test_datas_roitrans/init_pretrained.pk_jt.pk")
+
         imagess = []
         targetss = []
         # s0_rbbox_loss_cls = []
@@ -98,17 +100,16 @@ def main():
             # "s1_rbbox_loss_cls": s1_rbbox_loss_cls,
             # "s1_rbbox_loss_bbox": s1_rbbox_loss_bbox
             "losses" : loss_list
-        }
-        if (not os.path.exists("test_datas_roitrans")):
-            os.makedirs("test_datas_roitrans")
-        pk.dump(data, open("test_datas_roi_transformer/test_data.pk", "wb"))
+        }            
+        pk.dump(data, open("test_datas_roitrans/test_data.pk", "wb"))
         # print(s0_rbbox_loss_cls)
         # print(s0_rbbox_loss_bbox)
         # print(s1_rbbox_loss_cls)
         # print(s1_rbbox_loss_bbox)
         print(loss_list)
     else:
-        data = pk.load(open("test_datas_roi_transformer/test_data.pk", "rb"))
+        model.load("test_datas_roitrans/init_pretrained.pk_jt.pk")
+        data = pk.load(open("test_datas_roitrans/test_data.pk", "rb"))
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         # targetss = jdet.utils.general.to_jt_var(data["targetss"])
