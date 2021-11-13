@@ -33,3 +33,4 @@ submit_zips
 test_configs
 projects/*/test_datas*
 !docs/images/vis2.jpg
+!docs/images/vis.jpg
