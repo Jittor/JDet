@@ -2,6 +2,8 @@ import os
 import glob 
 import numpy as np
 from jdet.utils.draw import draw_bboxes
+from jdet.config.constant import DOTA1_CLASSES, DOTA_COLORS
+from tqdm import tqdm
 
 def read_dota(dota_dir):
     files = glob.glob(os.path.join(dota_dir,"*.txt"))
@@ -50,17 +52,67 @@ def visualize_dota(dota_dir,image_dir,save_dir):
                   font_size=10,
                   out_file=save_file)
 
-def visualize_results(results,classnames,files,save_dir):
+def visualize_results(results,classnames,files,save_dir,**kwargs):
     os.makedirs(save_dir,exist_ok=True)
-    for (bboxes, scores, labels),img_file in zip(results,files):
+    for (bboxes, scores, labels),img_file in tqdm(zip(results,files)):
         save_file = os.path.join(save_dir,os.path.split(img_file)[-1])
-        draw_bboxes(img_file,bboxes,labels=labels,scores=scores,class_names=classnames,out_file=save_file)
+        draw_bboxes(img_file,bboxes,labels=labels,scores=scores,class_names=classnames,out_file=save_file,**kwargs)
+
+def visualize_dota_ground_truth(gt_dir, classnames, save_dir,style=0):
+    img_dir = os.path.join(gt_dir, "images")
+    anno_dir = os.path.join(gt_dir, "labelTxt")
+    assert(os.path.exists(img_dir))
+    assert(os.path.exists(anno_dir))
+    assert(style in [1,2])
+    label_dict = {}
+    for i in range(len(classnames)):
+        label_dict[classnames[i]] = i
+    
+    names = []
+    for root, dirs, files in os.walk(img_dir):
+        for f in files:
+            if not f.endswith(".png"):
+                continue
+            names.append(f[:-4])
+    names = ["P2157"]
+    results = []
+    files = []
+    for i in tqdm(range(len(names))):
+        files.append(os.path.join(img_dir, names[i] + '.png'))
+        datas = open(os.path.join(anno_dir, names[i] + '.txt')).readlines()
+        bboxes = []
+        scores = []
+        labels = []
+        for data in datas:
+            ds = data.split(" ")
+            if len(ds) < 10:
+                continue
+            bboxes.append([int(i) for i in ds[:8]])
+            scores.append(1)
+            labels.append(label_dict[ds[8]])
+        if len(bboxes) == 0:
+            bboxes = np.zeros([0,8], dtype=np.float32)
+            scores = np.zeros([0], dtype=np.float32)
+            labels = np.zeros([0], dtype=np.int32)
+        else:
+            bboxes = np.array(bboxes, dtype=np.float32)
+            scores = np.array(scores, dtype=np.float32)
+            labels = np.array(labels, dtype=np.int32)
+        results.append((bboxes, scores, labels))
+    if style == 1:
+        visualize_results(results, classnames, files, save_dir,thickness=2)
+    elif style == 2:
+        visualize_results(results, classnames, files, save_dir, colors=DOTA_COLORS, with_text=False,thickness=2)
 
 def main():
-    dota_dir = "/home/cxjyxx_me/workspace/JAD/SAR/JDet/projects/gliding/submit_zips/temp2"
-    image_dir = "/home/cxjyxx_me/workspace/JAD/datasets/DOTA/test/images"
+    gt_dir = "/home/cxjyxx_me/workspace/JAD/datasets/DOTA/train"
     save_dir = "./temp"
-    visualize_dota(dota_dir,image_dir,save_dir)
+    visualize_dota_ground_truth(gt_dir, DOTA1_CLASSES, save_dir, style=1)
+
+    # dota_dir = "/home/cxjyxx_me/workspace/JAD/SAR/JDet/projects/gliding/submit_zips/temp2"
+    # image_dir = "/home/cxjyxx_me/workspace/JAD/datasets/DOTA/test/images"
+    # save_dir = "./temp"
+    # visualize_dota(dota_dir,image_dir,save_dir)
 
 if __name__ == "__main__":
     main()
