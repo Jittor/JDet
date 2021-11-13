@@ -1,7 +1,7 @@
 import jittor as jt
 import jittor.nn as nn
 from jdet.utils.registry import BOXES, MODELS, build_from_cfg, BACKBONES, HEADS, NECKS, ROI_EXTRACTORS
-from jdet.ops.bbox_transfomrs import bbox2roi, gt_mask_bp_obbs_list, roi2droi, choose_best_Rroi_batch, dbbox2roi, dbbox2result
+from jdet.ops.bbox_transforms import bbox2roi, gt_mask_bp_obbs_list, roi2droi, choose_best_Rroi_batch, dbbox2roi, dbbox2result
 import copy
 
 @MODELS.register_module()

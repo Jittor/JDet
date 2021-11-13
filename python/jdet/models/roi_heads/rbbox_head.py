@@ -3,7 +3,7 @@ import jittor.nn as nn
 
 from jdet.utils.registry import HEADS, LOSSES, build_from_cfg
 from jdet.utils.general import multi_apply
-from jdet.ops.bbox_transfomrs import bbox2delta, mask2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3, delta2dbbox_v2, choose_best_Rroi_batch
+from jdet.ops.bbox_transforms import bbox2delta, mask2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3, delta2dbbox_v2, choose_best_Rroi_batch
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import rotated_box_to_poly
 

@@ -1,9 +1,11 @@
+import pickle
 import jittor as jt 
 from jittor import nn
+from jdet.data.devkits.result_merge import py_cpu_nms_poly_fast
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
 
-from jdet.models.utils.transforms import *
+from jdet.ops.bbox_transforms import *
 from jdet.models.utils.modules import ConvModule
 
 from jittor.misc import _pair
@@ -154,8 +156,8 @@ class OrientedHead(nn.Module):
                         self.conv_out_channels,
                         3,
                         padding=1,
-                        conv_cfg=self.conv_cfg,
-                        norm_cfg=self.norm_cfg))
+                        conv_cfg=None,
+                        norm_cfg=None))
             last_layer_dim = self.conv_out_channels
 
         # add branch specific fc layers
@@ -196,6 +198,7 @@ class OrientedHead(nn.Module):
                 self.reg_last_dim *= self.roi_feat_area
 
         self.relu = nn.ReLU(inplace=True)
+
         # reconstruct fc_cls and fc_reg since input channels are changed
         if self.with_cls:
             self.fc_cls = nn.Linear(self.cls_last_dim, self.num_classes + 1)
@@ -260,7 +263,30 @@ class OrientedHead(nn.Module):
             labels = jt.zeros((0, ), dtype="int64")
             return bboxes, labels
 
+        # hbboxes = obb2hbb(bboxes)
+        # max_coordinate = hbboxes.max() - hbboxes.min()
+        # offsets = labels.astype(bboxes.dtype) * (max_coordinate + 1)
+        # bboxes_for_nms = bboxes.clone()
+        # bboxes_for_nms[:, :2] = bboxes_for_nms[:, :2] + offsets[:, None]
+
+        # print("bbox before nms")
+        # print(bboxes.shape)
+        # print(bboxes)
+
+        # print("test change")
+        # print(bboxes)
+        # print(poly2obb(obb2poly(bboxes)))
+
         dets = jt.concat([obb2poly(bboxes), scores.unsqueeze(1)], dim=1)
+
+        # keep = py_cpu_nms_poly_fast(np.array(dets), 0.1)
+        # dets = dets[keep]
+
+        # print("bbox after nms")
+        # print(dets.shape)
+        # print(dets)
+        
+        # dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
         return dets, labels
         
     def forward_single(self, x, sampling_results, test=False):
@@ -269,7 +295,15 @@ class OrientedHead(nn.Module):
             rois = self.arb2roi(sampling_results, bbox_type=self.start_bbox_type)
         else:
             rois = self.arb2roi([res.bboxes for res in sampling_results], bbox_type=self.start_bbox_type)
-        
+
+        ### Test begin
+        # xx = []
+        # for i in range(len(x)):
+        #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_{i}.pkl', 'rb') as f:
+        #         xx.append(jt.array(pickle.load(f)))
+        # x = tuple(xx)
+        ### Test end
+
         x = self.bbox_roi_extractor(x[:self.bbox_roi_extractor.num_inputs], rois)
 
         # shared part
@@ -308,7 +342,6 @@ class OrientedHead(nn.Module):
 
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-
         return cls_score, bbox_pred, rois
     
     def loss(self, cls_score, bbox_pred, rois, labels, label_weights, bbox_targets, bbox_weights, reduction_override=None):
@@ -329,6 +362,16 @@ class OrientedHead(nn.Module):
             bg_class_ind = self.num_classes
             # 0~self.num_classes-1 are FG, self.num_classes is BG
             pos_inds = (labels >= 0) & (labels < bg_class_ind)
+                 
+            ### Test begin
+            # with open(f'/mnt/disk/czh/masknet/temp/pos_inds.pkl', 'rb') as f:
+            #     pos_inds = jt.array(pickle.load(f))
+            # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
+            #     bbox_pred = jt.array(pickle.load(f))
+            # with open(f'/mnt/disk/czh/masknet/temp/rois.pkl', 'rb') as f:
+            #     rois = jt.array(pickle.load(f))
+            ## Test end
+
             # do not perform bounding box regression for BG anymore.
             if pos_inds.any_():
                 
@@ -348,6 +391,9 @@ class OrientedHead(nn.Module):
             else:
                 losses['orcnn_bbox_loss'] = bbox_pred.sum() * 0
 
+        # print("loss situation 2")
+        # print(losses)
+
         return losses
 
     def get_bboxes_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes, pos_gt_labels):
@@ -359,7 +405,7 @@ class OrientedHead(nn.Module):
         # original implementation uses new_zeros since BG are set to be 0
         # now use empty & fill because BG cat_id = num_classes,
         # FG cat_id = [0, num_classes - 1]
-        labels = jt.full((num_samples,), self.num_classes, dtype="int64")
+        labels = jt.full((num_samples,), self.num_classes).long()
         label_weights = jt.zeros((num_samples,), dtype=pos_bboxes.dtype)
         bbox_targets = jt.zeros((num_samples, self.reg_dim), dtype=pos_bboxes.dtype)
         bbox_weights = jt.zeros((num_samples, self.reg_dim), dtype=pos_bboxes.dtype)
@@ -368,7 +414,11 @@ class OrientedHead(nn.Module):
             labels[:num_pos] = pos_gt_labels
             pos_weight = 1.0 if self.pos_weight <= 0 else self.pos_weight
             label_weights[:num_pos] = pos_weight
-            pos_bbox_targets = self.bbox_coder.encode(pos_bboxes, pos_gt_bboxes)
+            if not self.reg_decoded_bbox:
+                pos_bbox_targets = self.bbox_coder.encode(
+                    pos_bboxes, pos_gt_bboxes)
+            else:
+                pos_bbox_targets = pos_gt_bboxes
             bbox_targets[:num_pos, :] = pos_bbox_targets
             bbox_weights[:num_pos, :] = 1
 
@@ -383,7 +433,27 @@ class OrientedHead(nn.Module):
         neg_bboxes_list = [res.neg_bboxes for res in sampling_results]
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
         pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
-        
+
+        ### Test begin
+        # sampling_results_pos_bboxes = []
+        # sampling_results_neg_bboxes = []
+        # sampling_results_pos_gt_bboxes = []
+        # sampling_results_pos_gt_labels = []
+        # for i in range(len(sampling_results)):
+        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_pos_bboxes.pkl', 'rb') as f:
+        #         sampling_results_pos_bboxes.append(jt.array(pickle.load(f)))
+        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_neg_bboxes.pkl', 'rb') as f:
+        #         sampling_results_neg_bboxes.append(jt.array(pickle.load(f)))
+        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_pos_gt_bboxes.pkl', 'rb') as f:
+        #         sampling_results_pos_gt_bboxes.append(jt.array(pickle.load(f)))
+        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_pos_gt_labels.pkl', 'rb') as f:
+        #         sampling_results_pos_gt_labels.append(jt.array(pickle.load(f)))
+        # pos_bboxes_list = [res for res in sampling_results_pos_bboxes]
+        # neg_bboxes_list = [res for res in sampling_results_neg_bboxes]
+        # pos_gt_bboxes_list = [res for res in sampling_results_pos_gt_bboxes]
+        # pos_gt_labels_list = [res for res in sampling_results_pos_gt_labels]
+        ### Test end
+
         outputs = multi_apply(
             self.get_bboxes_target_single,
             pos_bboxes_list,
@@ -428,8 +498,12 @@ class OrientedHead(nn.Module):
                 bboxes /= scale_factor.repeat(2)
             bboxes = bboxes.view(bboxes.size(0), -1)
 
+        # print(bboxes.shape)
+
         det_bboxes, det_labels = self.get_results(bboxes, scores, bbox_type=self.end_bbox_type)
         
+        # print(det_bboxes.shape)
+
         det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
         return det_bboxes, det_labels
@@ -497,22 +571,37 @@ class OrientedHead(nn.Module):
                 scores, bbox_deltas, rois = self.forward_single(x, [proposal_list[i]], test=True)
                 img_shape = targets[i]['img_size']
                 scale_factor = targets[i]['scale_factor']
+
+                ### Test begin
                 
-                det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, img_shape, scale_factor)
+                # with open(f'/mnt/disk/czh/masknet/temp/cls_score.pkl', 'rb') as f:
+                #     scores = jt.array(pickle.load(f))
+                # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
+                #     bbox_deltas = jt.array(pickle.load(f))
+                # with open(f'/mnt/disk/czh/masknet/temp/rois.pkl', 'rb') as f:
+                #     rois = jt.array(pickle.load(f))
+                
+                ### Test end
+                
+                det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, img_shape, scale_factor, rescale=True)
 
                 poly = det_bboxes[:, :8]
                 scores = det_bboxes[:, 8]
                 labels = det_labels
 
                 # visualization
-                img_vis = cv2.imread(targets[i]["img_file"])
-                filename = targets[i]["img_file"].split('/')[-1]
-                for j in range(poly.shape[0]):
-                    box = poly[j]
-                    draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
-                cv2.imwrite(f'/mnt/disk/czh/gliding/visualization/test_{filename}', img_vis)
+                # img_vis = cv2.imread(targets[i]["img_file"])
+                # filename = targets[i]["img_file"].split('/')[-1]
+                # for j in range(poly.shape[0]):
+                #     box = poly[j]
+                #     draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
+                # cv2.imwrite(f'/mnt/disk/czh/orcnn/visualization/test_{filename}', img_vis)
 
+                # result.append((det_bboxes, det_labels))
                 result.append((poly, scores, labels))
+
+            # import sys
+            # sys.exit()
             
             return result
 

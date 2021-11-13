@@ -1,6 +1,6 @@
 from .box_ops import delta2bbox,bbox2delta,delta2bbox_rotated,bbox2delta_rotated
 from jdet.utils.registry import BOXES
-from jdet.models.utils.transforms import *
+from jdet.ops.bbox_transforms import *
 
 import jittor as jt
 import math
@@ -336,8 +336,7 @@ class MidpointOffsetCoder:
         pw = pred_bboxes[..., 2] - pred_bboxes[..., 0]
         ph = pred_bboxes[..., 3] - pred_bboxes[..., 1]
 
-        # hbb, poly = obb2hbb(gt), obb2poly(gt)
-        hbb, poly = gt, hbb2poly(gt)
+        hbb, poly = obb2hbb(gt), obb2poly(gt)
 
         gx = (hbb[..., 0] + hbb[..., 2]) * 0.5
         gy = (hbb[..., 1] + hbb[..., 3]) * 0.5
@@ -382,7 +381,7 @@ class MidpointOffsetCoder:
         means = jt.array(self.means, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 6)
         stds = jt.array(self.stds, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 6)
         denorm_deltas = pred_bboxes * stds + means
-        
+
         dx = denorm_deltas[:, 0::6]
         dy = denorm_deltas[:, 1::6]
         dw = denorm_deltas[:, 2::6]
@@ -425,7 +424,6 @@ class MidpointOffsetCoder:
         polys = jt.stack([ga, y1, x2, gb, _ga, y2, x1, _gb], dim=-1)
         center = jt.stack([gx, gy, gx, gy, gx, gy, gx, gy], dim=-1)
         center_polys = polys - center
-   
         diag_len = jt.sqrt(center_polys[..., 0::2] ** 2 + center_polys[..., 1::2] ** 2)
         _, max_diag_len = diag_len.argmax(dim=-1, keepdims=True)
         diag_scale_factor = max_diag_len / diag_len
@@ -499,11 +497,11 @@ class OrientedDeltaXYWHTCoder:
 
         px, py, pw, ph, ptheta = bboxes.unbind(dim=-1)
 
-        px = px.unsqueeze(1)
-        py = py.unsqueeze(1)
-        pw = pw.unsqueeze(1)
-        ph = ph.unsqueeze(1)
-        ptheta = ptheta.unsqueeze(1)
+        px = px.unsqueeze(1).expand_as(dx)
+        py = py.unsqueeze(1).expand_as(dy)
+        pw = pw.unsqueeze(1).expand_as(dw)
+        ph = ph.unsqueeze(1).expand_as(dh)
+        ptheta = ptheta.unsqueeze(1).expand_as(dtheta)
 
         gx = dx * pw * jt.cos(-ptheta) - dy * ph * jt.sin(-ptheta) + px
         gy = dx * pw * jt.sin(-ptheta) + dy * ph * jt.cos(-ptheta) + py

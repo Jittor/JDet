@@ -78,6 +78,7 @@ class Runner:
     
     def run(self):
         self.logger.print_log("Start running")
+        
         while not self.finish:
             self.train()
             if check_interval(self.epoch,self.eval_interval):
@@ -117,6 +118,12 @@ class Runner:
     def train(self):
 
         self.model.train()
+
+        # from jittor_utils import auto_diff
+        # hook = auto_diff.Hook("gliding")
+        # hook.hook_module(self.model)
+        # hook.hook_optimizer(self.optimizer)
+        # print("Hook...")
 
         start_time = time.time()
 
@@ -190,6 +197,13 @@ class Runner:
     @jt.no_grad()
     @jt.single_process_scope()
     def test(self):
+
+        # from jittor_utils import auto_diff
+        # hook = auto_diff.Hook("gliding")
+        # hook.hook_module(self.model)
+        # hook.hook_optimizer(self.optimizer)
+        # print("Hook...")
+
         if self.test_dataset is None:
             self.logger.print_log("Please set Test dataset")
         else:
@@ -248,14 +262,13 @@ class Runner:
     
     def load(self, load_path, model_only=False):
         resume_data = jt.load(load_path)
-        
+
         if (not model_only):
             meta = resume_data.get("meta",dict())
             self.epoch = meta.get("epoch",self.epoch)
             self.iter = meta.get("iter",self.iter)
             self.max_iter = meta.get("max_iter",self.max_iter)
             self.max_epoch = meta.get("max_epoch",self.max_epoch)
-
             self.scheduler.load_parameters(resume_data.get("scheduler",dict()))
             self.optimizer.load_parameters(resume_data.get("optimizer",dict()))
         if ("model" in resume_data):

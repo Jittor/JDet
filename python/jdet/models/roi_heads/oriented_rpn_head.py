@@ -4,7 +4,7 @@ from jittor import nn
 from jdet.utils.registry import BOXES, LOSSES, build_from_cfg,HEADS
 from jdet.utils.general import multi_apply
 from jdet.models.boxes.anchor_target import images_to_levels, anchor_inside_flags
-from jdet.models.utils.transforms import *
+from jdet.ops.bbox_transforms import *
 
 @HEADS.register_module()
 class OrientedRPNHead(nn.Module):
@@ -26,6 +26,7 @@ class OrientedRPNHead(nn.Module):
                  reg_dim=6,
                  background_label=0,
                  reg_decoded_bbox=False,
+                 pos_weight=-1,
                  anchor_generator=dict(
                      type='AnchorGenerator',
                      scales=[4, 8, 16, 32],
@@ -65,6 +66,7 @@ class OrientedRPNHead(nn.Module):
         self.unmap_outputs = True
         self.bbox_type = bbox_type
         self.reg_dim = reg_dim
+        self.pos_weight = pos_weight
 
         self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
         
@@ -150,6 +152,8 @@ class OrientedRPNHead(nn.Module):
                 5-th column is a score between 0 and 1.
         """
         # bboxes from different level should be independent during NMS,
+
+        level_ids = []
         mlvl_scores = []
         mlvl_valid_anchors = []
         mlvl_bbox_pred = []
@@ -158,7 +162,7 @@ class OrientedRPNHead(nn.Module):
             rpn_cls_score = cls_scores[idx]
             rpn_bbox_pred = bbox_preds[idx]
             assert rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:]
-            rpn_cls_score = rpn_cls_score.permute(1, 2, 0).reshape(-1, self.cls_out_channels)
+            rpn_cls_score = rpn_cls_score.permute(1, 2, 0)
             # We set FG labels to [0, num_class-1] and BG label to
             # num_class in RPN head since mmdet v2.5, which is unified to
             # be consistent with other head since mmdet v2.0. In mmdet v2.0
@@ -189,27 +193,50 @@ class OrientedRPNHead(nn.Module):
             mlvl_scores.append(scores)
             mlvl_bbox_pred.append(rpn_bbox_pred)
             mlvl_valid_anchors.append(anchors)
-        
+            level_ids.append(jt.full((scores.size(0), ), idx).long())
+
         anchors = jt.concat(mlvl_valid_anchors)
         rpn_bbox_pred = jt.concat(mlvl_bbox_pred)
         scores = jt.concat(mlvl_scores)
 
         proposals = self.bbox_coder.decode(anchors, rpn_bbox_pred, max_shape=img_shape)
+        ids = jt.concat(level_ids)
 
         if self.min_bbox_size >= 0:
-            w = proposals[:, 2] - proposals[:, 0]
-            h = proposals[:, 3] - proposals[:, 1]
+            w, h = proposals[:, 2], proposals[:, 3]
             valid_mask = (w > self.min_bbox_size) & (h > self.min_bbox_size)
             if not valid_mask.all():
                 proposals = proposals[valid_mask]
                 scores = scores[valid_mask]
+                ids = ids[valid_mask]
         
-        # TODO maybe it's wrong, need arb_batched_nms
-        dets = jt.concat([proposals,scores.unsqueeze(1)],dim=1)
-        keep = jt.nms(dets, self.nms_thresh)
+        # print("proposals before nms: ")
+        # print(proposals.shape)
+        # print(proposals)
+
+        hproposals = obb2hbb(proposals)
+        max_coordinate = hproposals.max() - hproposals.min()
+        offsets = ids.astype(hproposals.dtype) * (max_coordinate + 1)
+        hproposals += offsets[:, None]
+
+        hproposals_concat = jt.concat([hproposals, scores.unsqueeze(1)], dim=1)
+        keep = jt.nms(hproposals_concat, self.nms_thresh)
+        
+        dets = jt.concat([proposals, scores.unsqueeze(1)], dim=1)
         dets = dets[keep, :]
-        dets = dets[:self.nms_post]
         
+        ### Test begin
+        # import pickle
+        # with open(f'/mnt/disk/czh/masknet/temp/proposal.pkl', 'rb') as f:
+        #     dets = jt.array(pickle.load(f))
+        ### Test end
+
+        # print("proposals after nms: ")
+        # print(dets.shape)
+        # print(dets)
+        
+        dets = dets[:self.nms_post]
+
         return dets
 
     def get_bboxes(self,
@@ -262,9 +289,19 @@ class OrientedRPNHead(nn.Module):
         """Compute regression and classification targets for anchors in a
         single image.
         """
-        gt_bboxes = target["hboxes"]
-        gt_bboxes_ignore = target["hboxes_ignore"]
+
+        gt_bboxes = target["rboxes"]
+        gt_bboxes_ignore = target["rboxes_ignore"]
         gt_labels = None
+
+        ### Test Begin
+        # flag = gt_bboxes[0, 0] > 900
+        # import pickle
+        # with open(f'/mnt/disk/czh/masknet/temp/rpn_gt_bboxes_{flag}.pkl', 'rb') as f:
+        #     gt_bboxes = jt.array(pickle.load(f))
+        # gt_bboxes_ignore = None
+        ### Test End
+        
         flat_anchors = jt.concat(anchors_list)
         valid_flags = jt.concat(valid_flag_list)
 
@@ -273,24 +310,46 @@ class OrientedRPNHead(nn.Module):
             return (None, ) * 6
         anchors = flat_anchors[inside_flags, :]
 
+        # assign gt and sample anchors
         anchor_bbox_type = get_bbox_type(anchors)
         gt_bbox_type = get_bbox_type(gt_bboxes)
+        target_bboxes = bbox2type(gt_bboxes, anchor_bbox_type)
+        target_bboxes_ignore = None if gt_bboxes_ignore is None or gt_bboxes_ignore.numel() == 0 else \
+                bbox2type(gt_bboxes_ignore, anchor_bbox_type)
 
-        # assign gt and sample anchors
-        assign_result = self.assigner.assign(anchors, gt_bboxes, gt_bboxes_ignore, None if self.sampling else gt_labels)
-        sampling_result = self.sampler.sample(assign_result, anchors, gt_bboxes)
+        assign_result = self.assigner.assign(anchors, target_bboxes, target_bboxes_ignore, None if self.sampling else gt_labels)
+        sampling_result = self.sampler.sample(assign_result, anchors, target_bboxes)
+
+
+        ### Test Begin
+        
+        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_gt_bboxes_{flag}.pkl', 'rb') as f:
+        #     sampling_result.pos_gt_bboxes = jt.array(pickle.load(f))
+        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_assigned_gt_inds_{flag}.pkl', 'rb') as f:
+        #     sampling_result.pos_assigned_gt_inds = jt.array(pickle.load(f))
+        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_bboxes_{flag}.pkl', 'rb') as f:
+        #     sampling_result.pos_bboxes = jt.array(pickle.load(f))
+        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_inds_{flag}.pkl', 'rb') as f:
+        #     sampling_result.pos_inds = jt.array(pickle.load(f))
+        # with open(f'/mnt/disk/czh/masknet/temp/sr_neg_inds_{flag}.pkl', 'rb') as f:
+        #     sampling_result.neg_inds = jt.array(pickle.load(f))
+
+        ### Test End
+
 
         if anchor_bbox_type != gt_bbox_type:
             if gt_bboxes.numel() == 0:
                 sampling_result.pos_gt_bboxes = jt.empty(gt_bboxes.shape).view(-1, get_bbox_dim(gt_bbox_type))
             else:
+                # print(sampling_result.pos_assigned_gt_inds)
+                # print(gt_bboxes)
                 sampling_result.pos_gt_bboxes = gt_bboxes[sampling_result.pos_assigned_gt_inds, :]
+                # print(sampling_result.pos_gt_bboxes)
 
         num_valid_anchors = anchors.shape[0]
         bbox_targets = jt.zeros((anchors.size(0), self.reg_dim))
         bbox_weights = jt.zeros((anchors.size(0), self.reg_dim))
 
-        # 1 is background label
         labels = jt.full((num_valid_anchors, ), self.background_label).long()
         label_weights = jt.zeros((num_valid_anchors,)).float()
 
@@ -298,24 +357,40 @@ class OrientedRPNHead(nn.Module):
         neg_inds = sampling_result.neg_inds
 
         if len(pos_inds) > 0:
-            # which is box delta
-            pos_bbox_targets = self.bbox_coder.encode(sampling_result.pos_bboxes, sampling_result.pos_gt_bboxes)
+            if not self.reg_decoded_bbox:
+                pos_bbox_targets = self.bbox_coder.encode(
+                    sampling_result.pos_bboxes, sampling_result.pos_gt_bboxes)
+            else:
+                pos_bbox_targets = sampling_result.pos_gt_bboxes
             bbox_targets[pos_inds, :] = pos_bbox_targets
             bbox_weights[pos_inds, :] = 1.0
-            labels[pos_inds] = 1
-            label_weights[pos_inds] = 1.0
-        
+            if gt_labels is None:
+                # only rpn gives gt_labels as None, this time FG is 1
+                labels[pos_inds] = 1
+            else:
+                labels[pos_inds] = gt_labels[
+                    sampling_result.pos_assigned_gt_inds]
+            if self.pos_weight <= 0:
+                label_weights[pos_inds] = 1.0
+            else:
+                label_weights[pos_inds] = self.pos_weight
         if len(neg_inds) > 0:
             label_weights[neg_inds] = 1.0
         
-        if self.unmap_outputs:
+        # map up to original set of anchors
+        if  self.unmap_outputs:
             num_total_anchors = flat_anchors.size(0)
-            labels = self.unmap(labels, num_total_anchors, inside_flags, fill=0)
-            label_weights = self.unmap(label_weights, num_total_anchors, inside_flags)
+            labels = self.unmap(
+                labels,
+                num_total_anchors,
+                inside_flags,
+                fill=self.background_label)  # fill bg label
+            label_weights = self.unmap(label_weights, num_total_anchors,
+                                  inside_flags)
             bbox_targets = self.unmap(bbox_targets, num_total_anchors, inside_flags)
             bbox_weights = self.unmap(bbox_weights, num_total_anchors, inside_flags)
 
-        return (labels, label_weights, bbox_targets, bbox_weights, pos_inds,neg_inds, sampling_result)
+        return (labels, label_weights, bbox_targets, bbox_weights, pos_inds, neg_inds, sampling_result)
 
     def get_targets(self,
                     anchor_list,
@@ -369,16 +444,12 @@ class OrientedRPNHead(nn.Module):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
-        
-        # TODO check if the loss is right
+
         # classification loss
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         cls_score = cls_score.permute(0, 2, 3, 1).reshape(-1, self.cls_out_channels)
         
-        # binary_labels = jt.init.eye(2)[labels, :]
-        # print(cls_score.shape)
-        # print(binary_labels)
         loss_cls = self.loss_cls(cls_score, labels, label_weights, avg_factor=num_total_samples)
 
         # regression loss
@@ -392,6 +463,7 @@ class OrientedRPNHead(nn.Module):
             bbox_pred = self.bbox_coder.decode(anchors, bbox_pred)
 
         loss_bbox = self.loss_bbox(bbox_pred, bbox_targets, bbox_weights, avg_factor=num_total_samples)
+
         return loss_cls, loss_bbox
 
     def loss(self,
@@ -437,6 +509,10 @@ class OrientedRPNHead(nn.Module):
             bbox_targets_list,
             bbox_weights_list,
             num_total_samples=num_total_samples)
+
+        # print("losses situation")
+        # print(f"losses cls: {losses_cls}")
+        # print(f"losses_bbox: {losses_bbox}")
 
         return dict(loss_rpn_cls=losses_cls, loss_rpn_bbox=losses_bbox)
 

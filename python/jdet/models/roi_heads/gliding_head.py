@@ -3,7 +3,7 @@ from jittor import nn
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
 
-from jdet.models.utils.transforms import *
+from jdet.ops.bbox_transforms import *
 
 @HEADS.register_module()
 class GlidingHead(nn.Module):

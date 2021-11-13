@@ -1,9 +1,10 @@
+import torch
 import argparse
 import jittor as jt
 from jdet.runner import Runner 
 from jdet.config import init_cfg
 from jdet.config.config import update_cfg
-
+import torch
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor Object Detection Training")

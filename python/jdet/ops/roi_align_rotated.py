@@ -29,8 +29,8 @@ __device__ scalar_t bilinear_interpolate(const scalar_t *bottom_data,
     return 0;
   }
 
-  if (y <= 0) y = 0;
-  if (x <= 0) x = 0;
+  if (y < 0) y = 0;
+  if (x < 0) x = 0;
 
   int y_low = (int)y;
   int x_low = (int)x;
@@ -86,14 +86,14 @@ __global__ void ROIAlignRotatedForward(const int nthreads, const scalar_t *botto
     int roi_batch_ind = offset_bottom_rois[0];
 
     // Do not using rounding; this implementation detail is critical
-    scalar_t roi_center_w = offset_bottom_rois[1] * spatial_scale;
-    scalar_t roi_center_h = offset_bottom_rois[2] * spatial_scale;
+    scalar_t roi_center_w = offset_bottom_rois[1] * spatial_scale - (scalar_t)0.5;
+    scalar_t roi_center_h = offset_bottom_rois[2] * spatial_scale - (scalar_t)0.5;
     scalar_t roi_width = offset_bottom_rois[3] * spatial_scale;
     scalar_t roi_height = offset_bottom_rois[4] * spatial_scale;
     // scalar_t theta = offset_bottom_rois[5] * M_PI / 180.0;
     scalar_t theta = offset_bottom_rois[5];
 
-    // Force malformed ROIs to be 1x1
+    // Force malformed ROIs to be 1x1 
     roi_width = max(roi_width, (scalar_t)1.);
     roi_height = max(roi_height, (scalar_t)1.);
     scalar_t bin_size_h = static_cast<scalar_t>(roi_height) / static_cast<scalar_t>(pooled_height);
@@ -117,7 +117,7 @@ __global__ void ROIAlignRotatedForward(const int nthreads, const scalar_t *botto
     scalar_t sinscalar_theta = sin(theta);
 
     // We do average (integral) pooling inside a bin
-    const scalar_t count = roi_bin_grid_h * roi_bin_grid_w;  // e.g. = 4
+    const scalar_t count = max(roi_bin_grid_h * roi_bin_grid_w, 1);  // e.g. = 4
 
     scalar_t output_val = 0.;
     for (int iy = 0; iy < roi_bin_grid_h; iy++) {  // e.g., iy = 0, 1
@@ -130,10 +130,10 @@ __global__ void ROIAlignRotatedForward(const int nthreads, const scalar_t *botto
                 static_cast<scalar_t>(roi_bin_grid_w);
 
         // Rotate by theta around the center and translate
-        // scalar_t x = xx * cosscalar_theta + yy * sinscalar_theta + roi_center_w;
-        // scalar_t y = yy * cosscalar_theta - xx * sinscalar_theta + roi_center_h;
-        scalar_t x = xx * cosscalar_theta - yy * sinscalar_theta + roi_center_w;
-        scalar_t y = xx * sinscalar_theta + yy * cosscalar_theta + roi_center_h;
+        scalar_t x = xx * cosscalar_theta + yy * sinscalar_theta + roi_center_w;
+        scalar_t y = yy * cosscalar_theta - xx * sinscalar_theta + roi_center_h;
+        // scalar_t x = xx * cosscalar_theta - yy * sinscalar_theta + roi_center_w;
+        // scalar_t y = xx * sinscalar_theta + yy * cosscalar_theta + roi_center_h;
 
         scalar_t val = bilinear_interpolate<scalar_t>(
             offset_bottom_data, height, width, y, x);
@@ -159,8 +159,8 @@ __device__ void bilinear_interpolate_gradient(const int height, const int width,
     return;
   }
 
-  if (y <= 0) y = 0;
-  if (x <= 0) x = 0;
+  if (y < 0) y = 0;
+  if (x < 0) x = 0;
 
   y_low = (int)y;
   x_low = (int)x;
@@ -207,8 +207,8 @@ __global__ void ROIAlignBackward(
     int roi_batch_ind = offset_bottom_rois[0];
 
     // Do not round
-    scalar_t roi_center_w = offset_bottom_rois[1] * spatial_scale;
-    scalar_t roi_center_h = offset_bottom_rois[2] * spatial_scale;
+    scalar_t roi_center_w = offset_bottom_rois[1] * spatial_scale - (scalar_t)0.5;
+    scalar_t roi_center_h = offset_bottom_rois[2] * spatial_scale - (scalar_t)0.5;
     scalar_t roi_width = offset_bottom_rois[3] * spatial_scale;
     scalar_t roi_height = offset_bottom_rois[4] * spatial_scale;
     // scalar_t theta = offset_bottom_rois[5] * M_PI / 180.0;
@@ -255,10 +255,10 @@ __global__ void ROIAlignBackward(
                 static_cast<scalar_t>(roi_bin_grid_w);
 
         // Rotate by theta around the center and translate
-        // scalar_t x = xx * cosTheta + yy * sinTheta + roi_center_w;
-        // T y = yy * cosTheta - xx * sinTheta + roi_center_h;
-        scalar_t x = xx * cosTheta - yy * sinTheta + roi_center_w;
-        scalar_t y = xx * sinTheta + yy * cosTheta + roi_center_h;
+        scalar_t x = xx * cosTheta + yy * sinTheta + roi_center_w;
+        scalar_t y = yy * cosTheta - xx * sinTheta + roi_center_h;
+        // scalar_t x = xx * cosTheta - yy * sinTheta + roi_center_w;
+        // scalar_t y = xx * sinTheta + yy * cosTheta + roi_center_h;
 
         scalar_t w1, w2, w3, w4;
         int x_low, x_high, y_low, y_high;

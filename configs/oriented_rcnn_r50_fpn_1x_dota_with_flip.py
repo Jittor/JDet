@@ -20,6 +20,7 @@ model = dict(
         nms_pre = 2000,
         nms_post = 2000,
         feat_channels=256,
+        pos_weight=-1,
         anchor_generator=dict(
             type='AnchorGenerator',
             scales=[8],
@@ -93,7 +94,7 @@ model = dict(
         end_bbox_type='obb',
         with_avg_pool=False,
         pos_weight=-1,
-        reg_class_agnostic=False,
+        reg_class_agnostic=True,
         )
     )
 
@@ -124,7 +125,7 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True,)
+                to_bgr=False,)
             
         ],
         batch_size=2,
@@ -150,7 +151,7 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=False,),
         ],
         batch_size=2,
         num_workers=4,
@@ -160,6 +161,7 @@ dataset = dict(
         type="ImageDataset",
         images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/trainval/images',
+        # images_dir='/home/czh/OBBDetection/DOTA_single_jdet/test/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -173,14 +175,14 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True,),
+                to_bgr=False,),
         ],
         num_workers=4,
         batch_size=1,
     )
 )
 
-optimizer = dict(type='SGD',  lr=0.02, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
     type='StepLR',
@@ -193,7 +195,7 @@ logger = dict(
     type="RunLogger")
 
 # when we the trained model from cshuan, image is rgb
-work_dir = '/mnt/disk/czh/gliding'
+work_dir = '/mnt/disk/czh/orcnn'
 max_epoch = 12
 # eval_interval = 1
 checkpoint_interval = 1

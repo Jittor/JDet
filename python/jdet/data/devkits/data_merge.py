@@ -3,7 +3,7 @@ import jittor as jt
 from jdet.config.constant import DOTA1_CLASSES, DOTA1_5_CLASSES, FAIR_CLASSES_
 from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
-from jdet.data.devkits.result_merge import mergebypoly
+from jdet.data.devkits.result_merge import mergebypoly, mergebyobb
 import os
 import shutil
 from tqdm import tqdm
@@ -72,6 +72,27 @@ def prepare_gliding(result_pkl,save_path, classes):
         f_out.writelines(lines)
         f_out.close()
 
+def prepare_orcnn(result_pkl,save_path, classes):
+    check_dir(save_path)
+    results = jt.load(result_pkl)
+    data = {}
+    for result,target in tqdm(results):
+        img_name = os.path.splitext(os.path.split(target["img_file"])[-1])[0]
+        for bbox,score,label in zip(*result):
+            classname = classes[label-1]
+            bbox_ = flip_box(bbox, target)
+            temp_txt = '{} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}\n'.format(
+                        img_name, score, 
+                        bbox_[0], bbox_[1], bbox_[2], bbox_[3], 
+                        bbox_[4], bbox_[5], bbox_[6], bbox_[7])
+            if classname not in data:
+                data[classname] = []
+            data[classname].append(temp_txt)
+    for classname,lines in data.items():
+        f_out = open(os.path.join(save_path, classname + '.txt'), 'w')
+        f_out.writelines(lines)
+        f_out.close()
+
 def prepare_fasterrcnn(result_pkl,save_path, classes):
     check_dir(save_path)
     results = jt.load(result_pkl)
@@ -106,14 +127,22 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
         classes = FAIR_CLASSES_
     else:
         assert(False)
+
     if "gliding" in result_pkl:
-        prepare_gliding(result_pkl,save_path, classes)
+        prepare_gliding(result_pkl, save_path, classes)
     elif "faster_rcnn" in result_pkl:
-        prepare_fasterrcnn(result_pkl,save_path, classes)
+        prepare_fasterrcnn(result_pkl, save_path, classes)
+    elif "orcnn" in result_pkl:
+        prepare_orcnn(result_pkl, save_path, classes)
     else:
-        prepare(result_pkl,save_path, classes)
+        prepare(result_pkl, save_path, classes)
+
     check_dir(final_path)
     mergebypoly(save_path,final_path)
+    # if "orcnn" in result_pkl:
+    #     mergebyobb(save_path, final_path)
+    # else:
+    #     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
     assert dataset_type in ["FAIR", "DOTA", "DOTA1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, and DOTA1_5 are supported"
