@@ -526,6 +526,8 @@ def rotated_box_to_poly_np(rrects):
     to
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     """
+    if rrects.shape[0] == 0:
+        return np.zeros([0,8], dtype=np.float32)
     polys = []
     for rrect in rrects:
         x_ctr, y_ctr, width, height, angle = rrect[:5]
@@ -548,8 +550,23 @@ def rotated_box_to_poly(rrects):
     to
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     """
-    #TODO: implement jt version
-    return jt.array(rotated_box_to_poly_np(rrects.data))
+    n = rrects.shape[0]
+    if n == 0:
+        return jt.zeros([0,8])
+    x_ctr = rrects[:, 0] 
+    y_ctr = rrects[:, 1] 
+    width = rrects[:, 2] 
+    height = rrects[:, 3] 
+    angle = rrects[:, 4]
+    tl_x, tl_y, br_x, br_y = -width / 2, -height / 2, width / 2, height / 2
+    rect = jt.stack([tl_x, br_x, br_x, tl_x, tl_x, br_x, br_x, tl_x, tl_y, tl_y, br_y, br_y, tl_y, tl_y, br_y, br_y], 1).reshape([n, 2, 8])
+    c = jt.cos(angle)
+    s = jt.sin(angle)
+    R = jt.stack([c, c, c, c, s, s, s, s, -s, -s, -s, -s, c, c, c, c], 1).reshape([n, 2, 8])
+    offset = jt.stack([x_ctr, x_ctr, x_ctr, x_ctr, y_ctr, y_ctr, y_ctr, y_ctr], 1)
+    poly = ((R * rect).sum(1) + offset).reshape([n, 2, 4]).permute([0,2,1]).reshape([n, 8])
+    return poly
+
 
 def rotated_box_to_bbox_np(rotatex_boxes):
     if rotatex_boxes.shape[0]==0:

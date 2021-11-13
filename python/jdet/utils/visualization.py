@@ -52,17 +52,14 @@ def visualize_dota(dota_dir,image_dir,save_dir):
 
 def visualize_results(results,classnames,files,save_dir):
     os.makedirs(save_dir,exist_ok=True)
-    for (det,labels),img_file in zip(results,files):
-        bboxes = det[:,:-1]
-        scores = det[:,-1]
+    for (bboxes, scores, labels),img_file in zip(results,files):
         save_file = os.path.join(save_dir,os.path.split(img_file)[-1])
         draw_bboxes(img_file,bboxes,labels=labels,scores=scores,class_names=classnames,out_file=save_file)
 
-
 def main():
-    dota_dir = "C:/Users/lxl/Desktop/dota_results"
-    image_dir = "D:/Dataset/DOTA/test/images"
-    save_dir = "C:/Users/lxl/Desktop/dota_vis"
+    dota_dir = "/home/cxjyxx_me/workspace/JAD/SAR/JDet/projects/gliding/submit_zips/temp2"
+    image_dir = "/home/cxjyxx_me/workspace/JAD/datasets/DOTA/test/images"
+    save_dir = "./temp"
     visualize_dota(dota_dir,image_dir,save_dir)
 
 if __name__ == "__main__":
