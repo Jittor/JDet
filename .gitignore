@@ -32,3 +32,4 @@ submit_zips
 *.sh
 test_configs
 projects/*/test_datas*
+!docs/images/vis.jpg
