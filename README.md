@@ -68,6 +68,14 @@ If you want to test the downloaded trained models, please set ```resume_path={yo
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=test
 ```
+### Test on images / Visualization
+You can test and visualize results on your own image sets by:
+```shell
+python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=vis_test
+```
+You can choose the visualization style you prefer, for more details about visualization, please refer to [visualization.md](docs/visualization.md).
+<img src="https://github.com/Jittor/JDet/blob/visualization/docs/images/vis2.jpg?raw=true" alt="Visualization" width="800"/>
+
 ### Build a New Project
 In this section, we will introduce how to build a new project(model) with JDet.
 We need to install JDet first, and build a new project by:

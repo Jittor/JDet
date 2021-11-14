@@ -195,6 +195,8 @@ def colors_val(colors):
     and read lines from it. If the file is not existing, the function
     will split the str by '|'.
     '''
+    if isinstance(colors, np.ndarray):
+        return colors
     if isinstance(colors, str):
         if osp.isfile(colors):
             with open(colors, 'r') as f:
@@ -280,6 +282,8 @@ def draw_bboxes(img,
     assert scores is None or (scores.shape[0]==bboxes.shape[0] and scores.ndim==1)
     assert bboxes.shape[1] in [4,5,8] and bboxes.ndim==2
 
+    if labels is None:
+        labels = np.zeros([bboxes.shape[0]], dtype=np.int32)
     if bboxes.shape[0] == 0:
         if out_file is not None:
             cv2.imwrite(out_file, img)
@@ -287,8 +291,7 @@ def draw_bboxes(img,
     if not scores is None:
         idx = np.argsort(scores)
         scores = scores[idx]
-        if not labels is None:
-            labels = labels[idx]
+        labels = labels[idx]
         bboxes = bboxes[idx]
 
     draw_funcs = {
@@ -305,7 +308,7 @@ def draw_bboxes(img,
 
     n_classes = labels.max()+1
 
-    if colors == 'random':
+    if isinstance(colors, str) and colors == 'random':
         colors = random_colors(n_classes)
     else:
         colors = colors_val(colors)
@@ -322,8 +325,7 @@ def draw_bboxes(img,
         valid_idx = scores >= score_thr
         bboxes = bboxes[valid_idx]
         scores = scores[valid_idx]
-        if not labels is None:
-            labels = labels[valid_idx]
+        labels = labels[valid_idx]
 
     for i in range(bboxes.shape[0]):
         if not with_text:
