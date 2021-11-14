@@ -92,16 +92,11 @@ def merge_results(result_dirs,save_dir,name="tmp", image_dirs=None, dataset_type
                 t.write(f, "Task1_"+os.path.split(f)[-1])
 
 def main():
-    # result_dirs = [
-    #     "temp/orpn1",
-    #     "temp/orpn2"
-    # ]
-    # name = "dota_merge"
     result_dirs = [
         "temp/orpn_fair",
-        "temp/merge7_fair"
+        "temp/merge7_fair",
     ]
-    name = "fair_merge8"
+    name = "fair_merge16"
     image_dirs = "/mnt/disk/lxl/dataset/fair_1024/test_1024_200_0.5-1.0-1.5/images/"
     dataset_type = "fair"
 

@@ -585,12 +585,13 @@ def multiclass_nms_rotated(multi_bboxes,
     scores = scores[keep]
     labels = labels[keep]
 
+    inds,_ = scores.argsort(descending=True)
+
     if keep.size(0) > max_num:
-        inds,_ = scores.argsort(descending=True)
         inds = inds[:max_num]
-        bboxes = bboxes[inds]
-        scores = scores[inds]
-        labels = labels[inds]
+    bboxes = bboxes[inds]
+    scores = scores[inds]
+    labels = labels[inds]
 
     return jt.contrib.concat([bboxes, scores[:, None]], 1), labels
     

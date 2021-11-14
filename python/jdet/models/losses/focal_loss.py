@@ -7,9 +7,9 @@ def binary_cross_entropy_with_logits(output, target, weight=None, pos_weight=Non
     max_val = jt.clamp(-output,min_v=0)
     if pos_weight is not None:
         log_weight = (pos_weight-1)*target + 1
-        loss = (1-target)*output+(log_weight*(jt.safe_log(jt.maximum((-max_val).exp()+(-output - max_val).exp(),1e-10))+max_val))
+        loss = (1-target)*output+(log_weight*(jt.log(jt.maximum((-max_val).exp()+(-output - max_val).exp(),1e-10))+max_val))
     else:
-        loss = (1-target)*output+max_val+jt.safe_log(jt.maximum((-max_val).exp()+(-output -max_val).exp(),1e-10))
+        loss = (1-target)*output+max_val+jt.log(jt.maximum((-max_val).exp()+(-output -max_val).exp(),1e-10))
     if weight is not None:
         loss *=weight.broadcast(loss,[1])
 
