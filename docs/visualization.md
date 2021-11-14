@@ -14,7 +14,7 @@ You can also visualize the ground truth annotations of different datasets, we ta
 ```python
 # vis_gt.py
 from jdet.utils.visualization import visualize_dota_ground_truth
-visualize_dota_ground_truth({DOTA_PATH}+"/train", DOTA1_CLASSES, {save_dir}, style={style)
+visualize_dota_ground_truth({DOTA_PATH}+"/train", DOTA1_CLASSES, {save_dir}, style={style})
 ```
 Where {DOTA_PATH} is the path of the origin DOTA dataset, {save_dir} is the path to output the drawed images and {style} defines the visualization styles.
 <img src="https://github.com/Jittor/JDet/blob/visualization/docs/images/vis2.jpg?raw=true" alt="Visualization" width="800"/>
