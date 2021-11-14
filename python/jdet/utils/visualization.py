@@ -74,7 +74,6 @@ def visualize_dota_ground_truth(gt_dir, classnames, save_dir,style=0):
             if not f.endswith(".png"):
                 continue
             names.append(f[:-4])
-    names = ["P2157"]
     results = []
     files = []
     for i in tqdm(range(len(names))):
