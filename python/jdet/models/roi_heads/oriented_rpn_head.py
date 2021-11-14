@@ -226,9 +226,11 @@ class OrientedRPNHead(nn.Module):
         dets = dets[keep, :]
         
         ### Test begin
+
         # import pickle
         # with open(f'/mnt/disk/czh/masknet/temp/proposal.pkl', 'rb') as f:
         #     dets = jt.array(pickle.load(f))
+
         ### Test end
 
         # print("proposals after nms: ")
@@ -289,7 +291,6 @@ class OrientedRPNHead(nn.Module):
         """Compute regression and classification targets for anchors in a
         single image.
         """
-
         gt_bboxes = target["rboxes"]
         gt_bboxes_ignore = target["rboxes_ignore"]
         gt_labels = None
@@ -310,6 +311,11 @@ class OrientedRPNHead(nn.Module):
             return (None, ) * 6
         anchors = flat_anchors[inside_flags, :]
 
+        # ### Test Begin
+        # with open(f'/mnt/disk/czh/masknet/temp/anchors_{flag}.pkl', 'rb') as f:
+        #     anchors = jt.array(pickle.load(f))
+        ### Test End
+                
         # assign gt and sample anchors
         anchor_bbox_type = get_bbox_type(anchors)
         gt_bbox_type = get_bbox_type(gt_bboxes)
@@ -341,10 +347,7 @@ class OrientedRPNHead(nn.Module):
             if gt_bboxes.numel() == 0:
                 sampling_result.pos_gt_bboxes = jt.empty(gt_bboxes.shape).view(-1, get_bbox_dim(gt_bbox_type))
             else:
-                # print(sampling_result.pos_assigned_gt_inds)
-                # print(gt_bboxes)
                 sampling_result.pos_gt_bboxes = gt_bboxes[sampling_result.pos_assigned_gt_inds, :]
-                # print(sampling_result.pos_gt_bboxes)
 
         num_valid_anchors = anchors.shape[0]
         bbox_targets = jt.zeros((anchors.size(0), self.reg_dim))
@@ -473,7 +476,6 @@ class OrientedRPNHead(nn.Module):
         """Compute losses of the head.
         Args:
         """
-
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         assert len(featmap_sizes) == self.anchor_generator.num_levels
 

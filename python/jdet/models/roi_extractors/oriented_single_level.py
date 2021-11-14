@@ -1,7 +1,7 @@
 import jittor as jt
 import jittor.nn as nn
 
-from jdet.ops import roi_align_rotated
+from jdet.ops import roi_align_rotated_v1
 from jdet.utils.registry import ROI_EXTRACTORS
 from jittor.misc import _pair
 
@@ -43,8 +43,9 @@ class OrientedSingleRoIExtractor(nn.Module):
     def build_roi_layers(self, layer_cfg, featmap_strides):
         cfg = layer_cfg.copy()
         layer_type = cfg.pop('type')
-        assert hasattr(roi_align_rotated, layer_type)
-        layer_cls = getattr(roi_align_rotated, layer_type)
+
+        assert hasattr(roi_align_rotated_v1, layer_type)
+        layer_cls = getattr(roi_align_rotated_v1, layer_type)
         roi_layers = nn.ModuleList(
             [layer_cls(spatial_scale=1 / s, **cfg) for s in featmap_strides])
         return roi_layers

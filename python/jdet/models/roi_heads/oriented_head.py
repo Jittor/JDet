@@ -434,26 +434,6 @@ class OrientedHead(nn.Module):
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
         pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
 
-        ### Test begin
-        # sampling_results_pos_bboxes = []
-        # sampling_results_neg_bboxes = []
-        # sampling_results_pos_gt_bboxes = []
-        # sampling_results_pos_gt_labels = []
-        # for i in range(len(sampling_results)):
-        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_pos_bboxes.pkl', 'rb') as f:
-        #         sampling_results_pos_bboxes.append(jt.array(pickle.load(f)))
-        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_neg_bboxes.pkl', 'rb') as f:
-        #         sampling_results_neg_bboxes.append(jt.array(pickle.load(f)))
-        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_pos_gt_bboxes.pkl', 'rb') as f:
-        #         sampling_results_pos_gt_bboxes.append(jt.array(pickle.load(f)))
-        #     with open(f'/mnt/disk/czh/masknet/temp/sampling_{i}_pos_gt_labels.pkl', 'rb') as f:
-        #         sampling_results_pos_gt_labels.append(jt.array(pickle.load(f)))
-        # pos_bboxes_list = [res for res in sampling_results_pos_bboxes]
-        # neg_bboxes_list = [res for res in sampling_results_neg_bboxes]
-        # pos_gt_bboxes_list = [res for res in sampling_results_pos_gt_bboxes]
-        # pos_gt_labels_list = [res for res in sampling_results_pos_gt_labels]
-        ### Test end
-
         outputs = multi_apply(
             self.get_bboxes_target_single,
             pos_bboxes_list,
@@ -525,6 +505,23 @@ class OrientedHead(nn.Module):
                 gt_bboxes_ignore.append(target['hboxes_ignore'])
                 gt_obboxes_ignore.append(target['rboxes_ignore'])
 
+            ### Test Start
+            
+            # import pickle
+            # for i in range(2):
+            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_proposal_{i}.pkl', 'rb') as f:
+            #         proposal_list[i] = jt.array(pickle.load(f))
+            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_gt_obboxes_{i}.pkl', 'rb') as f:
+            #         gt_obboxes.append(jt.array(pickle.load(f)))
+            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_gt_bboxes_{i}.pkl', 'rb') as f:
+            #         gt_bboxes.append(jt.array(pickle.load(f)))
+            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_gt_labels_{i}.pkl', 'rb') as f:
+            #         gt_labels.append(jt.array(pickle.load(f)))
+            # gt_bboxes_ignore = None
+            # gt_obboxes_ignore = None
+            
+            ### Test End
+
             # assign gts and sample proposals
             if self.with_bbox:
                 start_bbox_type = self.start_bbox_type
@@ -554,13 +551,36 @@ class OrientedHead(nn.Module):
                         else:
                             sampling_result.pos_gt_bboxes = gt_obboxes[i][sampling_result.pos_assigned_gt_inds, :]
 
+                    ### Test begin
+
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_is_gt_{i}.pkl', 'rb') as f:
+                    #     sampling_result.pos_is_gt = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_num_gts_{i}.pkl', 'rb') as f:
+                    #     sampling_result.num_gts = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_gt_bboxes_{i}.pkl', 'rb') as f:
+                    #     sampling_result.pos_gt_bboxes = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_gt_labels_{i}.pkl', 'rb') as f:
+                    #     sampling_result.pos_gt_labels = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_assigned_gt_inds_{i}.pkl', 'rb') as f:
+                    #     sampling_result.pos_assigned_gt_inds = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_bboxes_{i}.pkl', 'rb') as f:
+                    #     sampling_result.pos_bboxes = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_neg_bboxes_{i}.pkl', 'rb') as f:
+                    #     sampling_result.neg_bboxes = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_inds_{i}.pkl', 'rb') as f:
+                    #     sampling_result.pos_inds = jt.array(pickle.load(f))
+                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_neg_inds_{i}.pkl', 'rb') as f:
+                    #     sampling_result.neg_inds = jt.array(pickle.load(f))
+
+                    ### Test end
+
                     sampling_results.append(sampling_result)
                     
 
             scores, bbox_deltas, rois = self.forward_single(x, sampling_results, test=False)
 
             bbox_targets = self.get_bboxes_targets(sampling_results)
-
+            
             return self.loss(scores, bbox_deltas, rois, *bbox_targets)
             
         else:

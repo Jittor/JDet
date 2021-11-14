@@ -62,7 +62,7 @@ model = dict(
             ignore_iof_thr=-1,
             match_low_quality=False,
             assigned_labels_filled=-1,
-            iou_calculator=dict(type='BboxOverlaps2D_rotated')),
+            iou_calculator=dict(type='BboxOverlaps2D_rotated_v1')),
         sampler=dict(
             type='RandomSamplerRotated',
             num=512,
@@ -75,8 +75,7 @@ model = dict(
             target_stds=[0.1, 0.1, 0.2, 0.2, 0.1]),
         bbox_roi_extractor=dict(
             type='OrientedSingleRoIExtractor',
-            # roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
-            roi_layer=dict(type='ROIAlignRotated', output_size=7, sampling_ratio=2),
+            roi_layer=dict(type='ROIAlignRotated_v1', output_size=7, sampling_ratio=2),
             out_channels=256,
             extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
