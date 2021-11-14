@@ -1,7 +1,7 @@
 import jittor as jt
 from jittor import nn 
 
-from jdet.models.boxes.box_ops import mintheta_obb,distance2obb
+from jdet.models.boxes.box_ops import mintheta_obb,distance2obb,rotated_box_to_poly
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,LOSSES,build_from_cfg
 from jdet.models.utils.weight_init import normal_init,bias_init_with_prob
@@ -494,8 +494,12 @@ class FCOSHead(nn.Module):
             cfg.nms,
             cfg.max_per_img,
             score_factors=mlvl_centerness)
+        
+        boxes = det_bboxes[:, :5]
+        scores = det_bboxes[:, 5]
+        polys = rotated_box_to_poly(boxes)
 
-        return det_bboxes, det_labels
+        return polys,scores, det_labels
 
 
     def get_points(self, featmap_sizes, dtype, flatten=False):
