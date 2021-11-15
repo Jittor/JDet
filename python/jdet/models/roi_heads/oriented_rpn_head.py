@@ -291,11 +291,21 @@ class OrientedRPNHead(nn.Module):
         """Compute regression and classification targets for anchors in a
         single image.
         """
-        gt_bboxes = target["rboxes"]
-        gt_bboxes_ignore = target["rboxes_ignore"]
+        if target["rboxes"] is None:
+            gt_bboxes = None
+        else:
+            gt_bboxes = target["rboxes"].clone()
+            gt_bboxes[:, -1] *= -1
+
+        if target["rboxes_ignore"] is None or target["rboxes_ignore"].numel() == 0: 
+            gt_bboxes_ignore = None
+        else:
+            gt_bboxes_ignore = target["rboxes_ignore"].clone()
+            gt_bboxes_ignore[:, -1] *= -1
+
         gt_labels = None
 
-        ### Test Begin
+        # ## Test Begin
         # flag = gt_bboxes[0, 0] > 900
         # import pickle
         # with open(f'/mnt/disk/czh/masknet/temp/rpn_gt_bboxes_{flag}.pkl', 'rb') as f:

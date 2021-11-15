@@ -499,11 +499,26 @@ class OrientedHead(nn.Module):
             gt_obboxes_ignore = []
 
             for target in targets:
-                gt_obboxes.append(target['rboxes'])
-                gt_bboxes.append(target['hboxes'])
-                gt_labels.append(target['labels'] - 1)
-                gt_bboxes_ignore.append(target['hboxes_ignore'])
-                gt_obboxes_ignore.append(target['rboxes_ignore'])
+                if target["rboxes"] is None:
+                    obb = None
+                else:
+                    obb = target["rboxes"].clone()
+                    obb[:, -1] *= -1
+
+                if target["rboxes_ignore"] is None or target["rboxes_ignore"].numel() == 0:
+                    obb_ignore = None
+                else:
+                    obb_ignore = target["rboxes_ignore"].clone()
+                    obb_ignore[:, -1] *= -1
+
+                gt_obboxes.append(obb)
+                gt_obboxes_ignore.append(obb_ignore)
+                gt_bboxes.append(target["hboxes"])
+                gt_bboxes_ignore.append(target["hboxes_ignore"])
+                gt_labels.append(target["labels"] - 1)
+            
+            # print(gt_obboxes)
+            # print(gt_obboxes_ignore)
 
             ### Test Start
             
@@ -519,7 +534,7 @@ class OrientedHead(nn.Module):
             #         gt_labels.append(jt.array(pickle.load(f)))
             # gt_bboxes_ignore = None
             # gt_obboxes_ignore = None
-            
+
             ### Test End
 
             # assign gts and sample proposals
@@ -580,9 +595,10 @@ class OrientedHead(nn.Module):
             scores, bbox_deltas, rois = self.forward_single(x, sampling_results, test=False)
 
             bbox_targets = self.get_bboxes_targets(sampling_results)
-            
-            return self.loss(scores, bbox_deltas, rois, *bbox_targets)
-            
+
+            loss = self.loss(scores, bbox_deltas, rois, *bbox_targets)
+
+            return loss
         else:
             
             result = []
@@ -619,9 +635,6 @@ class OrientedHead(nn.Module):
 
                 # result.append((det_bboxes, det_labels))
                 result.append((poly, scores, labels))
-
-            # import sys
-            # sys.exit()
             
             return result
 

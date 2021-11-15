@@ -165,6 +165,14 @@ class MaxIoUAssigner:
         else:
             assigned_labels = None
 
+        # print("assign_result")
+        # print(num_gts)
+        # print(assigned_gt_inds.shape)
+        # print(assigned_gt_inds)
+        # print(max_overlaps.shape)
+        # print(max_overlaps)
+        # print(assigned_labels)
+
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
 
 @BOXES.register_module()
