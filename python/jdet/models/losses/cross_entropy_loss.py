@@ -77,13 +77,63 @@ def cross_entropy_loss(pred,target,weight=None,avg_factor=None,reduction="mean")
 
     return loss 
 
+def binary_cross_entropy_with_logits(output, target, pos_weight=None):
+    max_val = jt.clamp(-output,min_v=0)
+    if pos_weight is not None:
+        log_weight = (pos_weight-1)*target + 1
+        loss = (1-target)*output+(log_weight*(((-max_val).exp()+(-output - max_val).exp()).log()+max_val))
+    else:
+        loss = (1-target)*output+max_val+((-max_val).exp()+(-output -max_val).exp()).log()
+    
+    return loss 
+
+def binary_cross_entropy_loss(pred,
+                         label,
+                         weight=None,
+                         reduction='mean',
+                         avg_factor=None,
+                         class_weight=None):
+    """Calculate the binary CrossEntropy loss.
+
+    Args:
+        pred (torch.Tensor): The prediction with shape (N, 1).
+        label (torch.Tensor): The learning label of the prediction.
+        weight (torch.Tensor, optional): Sample-wise loss weight.
+        reduction (str, optional): The method used to reduce the loss.
+            Options are "none", "mean" and "sum".
+        avg_factor (int, optional): Average factor that is used to average
+            the loss. Defaults to None.
+        class_weight (list[float], optional): The weight for each class.
+
+    Returns:
+        torch.Tensor: The calculated loss
+    """
+    assert pred.ndim == label.ndim
+    assert class_weight is None 
+
+    loss = binary_cross_entropy_with_logits(pred, label.float())
+
+    if weight is not None:
+        loss *= weight
+
+    if avg_factor is None:
+        avg_factor = max(loss.shape[0],1)
+
+    if reduction == "mean":
+        loss = loss.sum()/avg_factor
+    elif reduction == "sum":
+        loss = loss.sum()
+
+    return loss 
+
 @LOSSES.register_module()
 class CrossEntropyLoss(nn.Module):
 
-    def __init__(self,reduction='mean', loss_weight=1.0):
+    def __init__(self,reduction='mean',use_bce=False, loss_weight=1.0):
         super(CrossEntropyLoss, self).__init__()
         self.reduction = reduction
         self.loss_weight = loss_weight
+        self.use_bce = use_bce
 
     def execute(self,
                 pred,
@@ -94,7 +144,10 @@ class CrossEntropyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        loss_bbox = self.loss_weight * cross_entropy_loss(
+        loss_func = cross_entropy_loss
+        if self.use_bce:
+            loss_func = binary_cross_entropy_loss
+        loss_bbox = self.loss_weight * loss_func(
             pred,
             target,
             weight,

@@ -1,6 +1,6 @@
 # JDet
 ## Introduction
-JDet is a object detection benchmark based on [Jittor](https://github.com/Jittor/jittor). 
+JDet is a object detection benchmark based on [Jittor](https://github.com/Jittor/jittor), and mainly focus on aerial image object detection (oriented object detection). 
 
 <!-- **Features**
 - Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
@@ -38,20 +38,26 @@ python setup.py install
 ```
 If you don't have permission for install,please add ```--user```.
 
-Or use ```PYTHONPATH```
-You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```
+Or use ```PYTHONPATH```: 
+You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```, and run
 ```shell
 source .bashrc
 ```
 
 ## Getting Started
 
-### Data
-DOTA Dataset documents are avaliable in the [dota.md](docs/dota.md)
+### Datasets
+The following datasets are supported in JDet, please check the corresponding document before use. 
 
-FAIR Dataset documents are avaliable in the [fair.md](docs/fair.md)
+DOTA1.0/DOTA1.5/DOTA2.0 Dataset: [dota.md](docs/dota.md).
+
+FAIR Dataset: [fair.md](docs/fair.md)
+
+SSDD/SSDD+: [ssdd.md](docs/ssdd.md)
+
+You can also build your own dataset by convert your datas to DOTA format.
 ### Config
-Config documents are avaliable in the [config.md](docs/config.md)
+JDet defines the used model, dataset and training/testing method by `config-file`, please check the [config.md](docs/config.md) to learn how it works.
 ### Train
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=train
@@ -62,8 +68,16 @@ If you want to test the downloaded trained models, please set ```resume_path={yo
 ```shell
 python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=test
 ```
-## Build a New Project
-In this document, we will introduce how to build a new project(model) with JDet.
+### Test on images / Visualization
+You can test and visualize results on your own image sets by:
+```shell
+python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=vis_test
+```
+You can choose the visualization style you prefer, for more details about visualization, please refer to [visualization.md](docs/visualization.md).
+<img src="https://github.com/Jittor/JDet/blob/visualization/docs/images/vis2.jpg?raw=true" alt="Visualization" width="800"/>
+
+### Build a New Project
+In this section, we will introduce how to build a new project(model) with JDet.
 We need to install JDet first, and build a new project by:
 ```sh
 mkdir $PROJECT_PATH$
@@ -83,13 +97,16 @@ python run_net.py --config-file=configs/base.py --task=test
 
 |    Models     | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper | Config     | Download   |
 | :-----------: | :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
-| S2ANet-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 74.11   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_bs2_steplr_3.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_bs2_steplr_3%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 74.11   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](configs/s2anet/s2anet_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_bs2_steplr_3%2Fckpt_12.pkl&dl=1) |
 | S2ANet-R50-FPN | DOTA1.0| 1024/200| flip+ra90+bc|-|  SGD   |   1x    | 76.40   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance%2Fckpt_12.pkl&dl=1) |
 | S2ANet-R50-FPN | DOTA1.0|1024/200| flip+ra90+bc+ms |ms|  SGD   |   1x    | 79.72   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance_ms%2Fckpt_12.pkl&dl=1) |
 | S2ANet-R101-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r101_fpn_1x_dota_bs2.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r101_fpn_1x_dota_without_torch_pretrained%2Fckpt_12.pkl&dl=1) |
 | Gliding-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 72.93  | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/ebeefa1edaf84a4d8a2a/?dl=1) |
 | Gliding-R50-FPN |DOTA1.0|1024/200|Flip+ra90+bc|-|  SGD   |   1x    | 74.93   | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip_rotate_balance_cate.py) | [model](https://cloud.tsinghua.edu.cn/f/395ecd3ddaf44bb58ac9/?dl=1) |
 | RetinaNet-R50-FPN |DOTA1.0|600/150|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) [pretrained](https://cloud.tsinghua.edu.cn/f/6b5db5fdd5304a5abf19/) |
+| FasterRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 69.631   | [arxiv](https://arxiv.org/abs/1506.01497)| [config](configs/faster_rcnn_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/29197095057348d0a392/?dl=1) |
+| RoITransformer-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 73.842   | [arxiv](https://arxiv.org/abs/1812.00155)| [config](configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/55fe6380928f4a6582f8/?dl=1) |
+| FCOS-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 70.40   | [iccv19](https://openaccess.thecvf.com/content_ICCV_2019/papers/Tian_FCOS_Fully_Convolutional_One-Stage_Object_Detection_ICCV_2019_paper.pdf)| [config](configs/fcos_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Ffcos_r50%2Fckpt_12.pkl&dl=1) |
 
 **Notice**:
 
@@ -109,7 +126,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Faster R-CNN
 - :heavy_check_mark: SSD
 - :heavy_check_mark: ROI Transformer
-- :clock3: fcos
+- :heavy_check_mark: fcos
 - :clock3: Oriented R-CNN
 - :clock3: ReDet
 - :clock3: YOLOv5

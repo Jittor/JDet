@@ -56,7 +56,7 @@ model = dict(
         pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
         pooler_sampling_ratio = 0,
         score_thresh=0.05,
-        nms_thresh=0.3,
+        nms_thresh=0.1,
         detections_per_img=2000,
         box_weights = (10., 10., 5., 5.),
         assigner=dict(
@@ -117,8 +117,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -150,8 +149,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",

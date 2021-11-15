@@ -26,6 +26,7 @@ def main():
     model.train()
     
     if (args.set_data):
+        os.makedirs("test_datas_gliding",exist_ok=True)
         jt.save(model.state_dict(), "test_datas_gliding/model.pk")
         imagess = []
         targetss = []

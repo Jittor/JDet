@@ -3,20 +3,21 @@ import jittor.nn as nn
 
 from jdet.utils.registry import HEADS, LOSSES, build_from_cfg
 from jdet.utils.general import multi_apply
-from jdet.ops.bbox_transforms import bbox2delta, mask2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3, delta2dbbox_v2, choose_best_Rroi_batch
+from jdet.ops.bbox_transforms import bbox2delta, mask2poly, obb2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3, delta2dbbox_v2, choose_best_Rroi_batch
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import rotated_box_to_poly
 
 def bbox_target_rbbox(pos_bboxes_list,
                 neg_bboxes_list,
                 pos_assigned_gt_inds_list,
-                gt_masks_list,
+                gt_masks_obbs_list,
                 pos_gt_labels_list,
                 cfg,
                 reg_classes=1,
                 target_means=[.0, .0, .0, .0, .0],
                 target_stds=[1.0, 1.0, 1.0, 1.0, 1.0],
                 concat=True,
+                use_obb=False,
                 with_module=True,
                 hbb_trans='hbb2obb_v2'):
     labels, label_weights, bbox_targets, bbox_weights = multi_apply(
@@ -24,13 +25,14 @@ def bbox_target_rbbox(pos_bboxes_list,
         pos_bboxes_list,
         neg_bboxes_list,
         pos_assigned_gt_inds_list,
-        gt_masks_list,
+        gt_masks_obbs_list,
         pos_gt_labels_list,
         cfg=cfg,
         reg_classes=reg_classes,
         target_means=target_means,
         target_stds=target_stds,
         with_module=with_module,
+        use_obb=use_obb,
         hbb_trans=hbb_trans)
 
     if concat:
@@ -44,13 +46,14 @@ def bbox_target_rbbox(pos_bboxes_list,
 def bbox_target_rbbox_single(pos_bboxes,
                        neg_bboxes,
                        pos_assigned_gt_inds,
-                       gt_masks,
+                       gt_masks_obbs,
                        pos_gt_labels,
                        cfg,
                        reg_classes=1,
                        target_means=[.0, .0, .0, .0, .0],
                        target_stds=[1.0, 1.0, 1.0, 1.0, 1.0],
                        with_module=True,
+                       use_obb=False,
                        hbb_trans='hbb2obb_v2'):
     num_pos = pos_bboxes.size(0)
     num_neg = neg_bboxes.size(0)
@@ -59,8 +62,11 @@ def bbox_target_rbbox_single(pos_bboxes,
     label_weights = jt.zeros(num_samples)
     bbox_targets = jt.zeros((num_samples, 5))
     bbox_weights = jt.zeros((num_samples, 5))
-    pos_gt_masks = gt_masks[pos_assigned_gt_inds]
-    pos_gt_polys = mask2poly(pos_gt_masks)
+    if use_obb:
+        pos_gt_polys = obb2poly(gt_masks_obbs[pos_assigned_gt_inds])
+    else:
+        pos_gt_masks = gt_masks_obbs[pos_assigned_gt_inds]
+        pos_gt_polys = mask2poly(pos_gt_masks)
     pos_gt_bp_polys = get_best_begin_point(pos_gt_polys)
     pos_gt_obbs = jt.array(polygonToRotRectangle_batch(pos_gt_bp_polys, with_module))
 
@@ -238,7 +244,7 @@ class BBoxHeadRbbox(nn.Module):
         bbox_pred = self.fc_reg(x) if self.with_reg else None
         return cls_score, bbox_pred
 
-    def get_target(self, sampling_results, gt_masks, gt_labels, rcnn_train_cfg):
+    def get_target(self, sampling_results, gt_masks_obbs, gt_labels, rcnn_train_cfg, use_obb=False):
         pos_proposals = [res.pos_bboxes for res in sampling_results]
         neg_proposals = [res.neg_bboxes for res in sampling_results]
         pos_assigned_gt_inds = [res.pos_assigned_gt_inds  for res in sampling_results]
@@ -248,13 +254,14 @@ class BBoxHeadRbbox(nn.Module):
             pos_proposals,
             neg_proposals,
             pos_assigned_gt_inds,
-            gt_masks,
+            gt_masks_obbs,
             pos_gt_labels,
             rcnn_train_cfg,
             reg_classes,
             target_means=self.target_means,
             target_stds=self.target_stds,
             with_module=self.with_module,
+            use_obb=use_obb,
             hbb_trans=self.hbb_trans)
         return cls_reg_targets
 
@@ -296,9 +303,6 @@ class BBoxHeadRbbox(nn.Module):
             print('strange size')
             import pdb
             pdb.set_trace()
-        hook.record('obbs', obbs)
-        hook.record('bbox_pred', bbox_pred)
-        hook.record('scores', scores)
         if bbox_pred is not None:
             dbboxes = delta2dbbox_v3(obbs, bbox_pred, self.target_means,
                                     self.target_stds, img_shape)
@@ -310,14 +314,10 @@ class BBoxHeadRbbox(nn.Module):
             dbboxes[:, 1::5] /= scale_factor
             dbboxes[:, 2::5] /= scale_factor
             dbboxes[:, 3::5] /= scale_factor
-        hook.record('dbboxes', dbboxes)
-        hook.record('scores', scores)
         det_bboxes, det_labels = multiclass_nms_rotated(dbboxes, scores,
                                                 cfg.score_thr, cfg.nms,
                                                 cfg.max_per_img)
         det_bboxes = jt.contrib.concat([rotated_box_to_poly(det_bboxes), det_bboxes[:,-1:]], -1)
-        hook.record('det_bboxes', det_bboxes)
-        hook.record('det_labels', det_labels)
         return det_bboxes, det_labels
 
     def get_det_rbboxes(self,

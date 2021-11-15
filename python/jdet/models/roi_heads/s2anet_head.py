@@ -12,7 +12,7 @@ from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 from jdet.ops.dcn_v1 import DeformConv
 from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 from jdet.ops.nms_rotated import multiclass_nms_rotated
-from jdet.models.boxes.box_ops import delta2bbox_rotated
+from jdet.models.boxes.box_ops import delta2bbox_rotated, rotated_box_to_poly
 from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
 from jdet.models.boxes.anchor_generator import AnchorGeneratorRotatedS2ANet
 
@@ -281,7 +281,7 @@ class S2ANetHead(nn.Module):
             for i in range(num_levels):
                 anchor_stride = self.anchor_strides[i]
                 feat_h, feat_w = featmap_sizes[i]
-                w,h = img_meta['pad_shape']
+                w,h = img_meta['pad_shape'][:2]
                 valid_feat_h = min(int(np.ceil(h / anchor_stride)), feat_h)
                 valid_feat_w = min(int(np.ceil(w / anchor_stride)), feat_w)
                 flags = self.anchor_generators[i].valid_flags((feat_h, feat_w), (valid_feat_h, valid_feat_w))
@@ -311,7 +311,7 @@ class S2ANetHead(nn.Module):
                 for i in range(num_levels):
                     anchor_stride = self.anchor_strides[i]
                     feat_h, feat_w = featmap_sizes[i]
-                    w,h = img_meta['pad_shape']
+                    w,h = img_meta['pad_shape'][:2]
                     valid_feat_h = min(int(np.ceil(h / anchor_stride)), feat_h)
                     valid_feat_w = min(int(np.ceil(w / anchor_stride)), feat_w)
                     flags = self.anchor_generators[i].valid_flags((feat_h, feat_w), (valid_feat_h, valid_feat_w))
@@ -595,8 +595,10 @@ class S2ANetHead(nn.Module):
                                                         mlvl_scores,
                                                         cfg.score_thr, cfg.nms,
                                                         cfg.max_per_img)
-        # [x,y,w,h,a,score],
-        return det_bboxes, det_labels
+        boxes = det_bboxes[:, :5]
+        scores = det_bboxes[:, 5]
+        polys = rotated_box_to_poly(boxes)
+        return polys, scores, det_labels
 
     
     def parse_targets(self,targets,is_train=True):

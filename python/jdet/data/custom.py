@@ -8,8 +8,8 @@ import numpy as np
 from jdet.utils.registry import DATASETS
 from jdet.models.boxes.box_ops import rotated_box_to_bbox_np
 from .transforms import Compose
+from pycocotools.coco import COCO
 import copy
-
 
 @DATASETS.register_module()
 class CustomDataset(Dataset):
@@ -31,7 +31,7 @@ class CustomDataset(Dataset):
     ]
     '''
     CLASSES = None
-    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True):
+    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,filter_min_size=-1):
         super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
         if (dataset_dir is not None):
             assert(images_dir is None)
@@ -48,11 +48,12 @@ class CustomDataset(Dataset):
         
         self.img_infos = jt.load(self.annotations_file)
         if filter_empty_gt:
-            self.img_infos = self._filter_imgs()
+            self.img_infos = self._filter_imgs(filter_min_size)
         self.total_len = len(self.img_infos)
 
-    def _filter_imgs(self):
-        return [img_info for img_info in self.img_infos if len(img_info["ann"]["bboxes"])>0 ]
+    def _filter_imgs(self, min_size):
+        return [img_info for img_info in self.img_infos
+                if (len(img_info["ann"]["bboxes"])>0 and min(img_info['width'], img_info['height'])>=min_size) ]
 
     def _read_ann_info(self,idx):
         while True:
@@ -82,6 +83,7 @@ class CustomDataset(Dataset):
             classes=self.CLASSES,
             ori_img_size=(width,height),
             img_size=(width,height),
+            scale_factor=1.0,
             filename =  img_info["filename"],
             img_file = img_path)
         return image,ann

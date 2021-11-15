@@ -4,7 +4,7 @@ model = dict(
         type = "Resnet50_v1d",
         return_stages =  ["layer1","layer2","layer3","layer4"],
         pretrained = True,
-        norm_layer="FrozenBatchNorm"),
+        ),
     neck = dict(
         type= "FPN",
         in_channels= [256,512,1024,2048],
@@ -63,8 +63,6 @@ dataset = dict(
     train=dict(
         type="DOTADataset",
         dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
-        # annotations_file='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/trainval.pkl',
-        # images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/DOTA_mini/splits/trainval_600_150_mini/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -125,7 +123,7 @@ max_epoch = 26
 eval_interval = 10
 log_interval = 50
 checkpoint_interval = 1
-pretrained_weights="weights/pretrained.pk_jt.pk"
+pretrained_weights="test_datas_retinanet/yx_init_pretrained.pk_jt.pk"
 merge_nms_threshold_type = 1
 
 parameter_groups_generator = dict(

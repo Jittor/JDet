@@ -2,6 +2,7 @@ import jittor as jt
 from jittor import nn
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
+from jdet.ops.nms_poly import multiclass_poly_nms
 
 from jdet.ops.bbox_transforms import *
 
@@ -16,7 +17,7 @@ class GlidingHead(nn.Module):
                  pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
                  pooler_sampling_ratio = 0,
                  score_thresh=0.05,
-                 nms_thresh=0.3,
+                 nms_thresh=0.1,
                  detections_per_img=2000,
                  box_weights = (10., 10., 5., 5.),
                  assigner=dict(
@@ -173,8 +174,12 @@ class GlidingHead(nn.Module):
             bboxes =jt.zeros((0, bbox_dim+1), dtype=multi_bboxes.dtype)
             labels = jt.zeros((0, ), dtype="int64")
             return bboxes, labels
+        
+        if self.nms_thresh is None:
+            dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
+        else:
+            dets,labels = multiclass_poly_nms(bboxes,scores,labels,self.nms_thresh)
 
-        dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
         return dets, labels
         
     def forward_single(self, x, sampling_results, test=False):
@@ -433,7 +438,10 @@ class GlidingHead(nn.Module):
             result = []
             for i in range(len(targets)):
 
-                scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x, [proposal_list[i]], test=True)
+                x_ = []
+                for j in range(len(x)):
+                    x_.append(x[j][i:i+1])
+                scores, bbox_deltas, fixes, ratios, rois = self.forward_single(x_, [proposal_list[i]], test=True)
                 img_shape = targets[i]['img_size']
                 scale_factor = targets[i]['scale_factor']
                 
@@ -441,7 +449,7 @@ class GlidingHead(nn.Module):
 
                 poly = det_bboxes[:, :8]
                 scores = det_bboxes[:, 8]
-                labels = det_labels
+                labels = det_labels - 1
 
                 result.append((poly, scores, labels))
             

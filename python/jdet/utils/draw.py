@@ -13,6 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 from collections.abc import Iterable
+import os
 
 
 def draw_hbb(ax,
@@ -194,6 +195,8 @@ def colors_val(colors):
     and read lines from it. If the file is not existing, the function
     will split the str by '|'.
     '''
+    if isinstance(colors, np.ndarray):
+        return colors
     if isinstance(colors, str):
         if osp.isfile(colors):
             with open(colors, 'r') as f:
@@ -241,6 +244,20 @@ def get_img_from_fig(fig, width, height):
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     return img
 
+# input
+#     img: str|Var[h, w, 3], if img is str means it's a path of the img, or it's a np.ndarray img
+#     bboxes[n, m]: n is the num of boxes, m is 4/5/8 means hbox(x1,y1,x2,y2)/rbox(cx,cy,w,h,a)/poly(x1,y1,x2,y2,x3,y3,x4,y4)
+#     labels[n]: optional, values are int in [0, n_classes-1], n_classes is the num of classes
+#     scores[n]: optional
+#     class_names[n_classes]: optional, list of string, name of each class
+#     score_thr: filter out boxes with score less than score_thr
+#     colors
+#     thickness
+#     with_text
+#     font_size
+#     out_file: optional, string of output image path
+# output
+#     drawed_image
 def draw_bboxes(img,
                   bboxes,
                   labels=None,
@@ -256,6 +273,7 @@ def draw_bboxes(img,
     if isinstance(img, np.ndarray):
         img = np.ascontiguousarray(img)
     else:
+        assert(isinstance(img, str) and os.path.exists(img))
         img = cv2.imread(img)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     assert isinstance(img,np.ndarray), "image must be a numpy array!"
@@ -263,6 +281,18 @@ def draw_bboxes(img,
     assert labels is None or (labels.shape[0]==bboxes.shape[0] and labels.ndim==1)
     assert scores is None or (scores.shape[0]==bboxes.shape[0] and scores.ndim==1)
     assert bboxes.shape[1] in [4,5,8] and bboxes.ndim==2
+
+    if labels is None:
+        labels = np.zeros([bboxes.shape[0]], dtype=np.int32)
+    if bboxes.shape[0] == 0:
+        if out_file is not None:
+            cv2.imwrite(out_file, img)
+        return img
+    if not scores is None:
+        idx = np.argsort(scores)
+        scores = scores[idx]
+        labels = labels[idx]
+        bboxes = bboxes[idx]
 
     draw_funcs = {
         4 : draw_hbb,
@@ -274,44 +304,37 @@ def draw_bboxes(img,
     if scores is None:
         with_score = False
     else:
-        bboxes = np.concatenate([bboxes, scores[:, None]], axis=1)
         with_score = True
 
-    if labels is None:
-        bboxes = [bboxes]
-    else:
-        bboxes = [bboxes[labels == i] for i in range(labels.max()+1)]
+    n_classes = labels.max()+1
 
-    if colors == 'random':
-        colors = random_colors(len(bboxes))
+    if isinstance(colors, str) and colors == 'random':
+        colors = random_colors(n_classes)
     else:
         colors = colors_val(colors)
         if len(colors) == 1:
-            colors = colors * len(bboxes)
-        assert len(colors) >= len(bboxes)
+            colors = colors * n_classes
+        assert len(colors) >= n_classes
 
 
     height, width = img.shape[:2]
     ax, fig = plt_init(width, height)
     plt.imshow(img)
 
-    for i, cls_bboxes in enumerate(bboxes):
-        if with_score:
-            cls_bboxes = cls_bboxes[cls_bboxes[:, -1] > score_thr]
-            cls_bboxes, cls_scores = cls_bboxes[:, :-1], cls_bboxes[:, -1]
+    if with_score:
+        valid_idx = scores >= score_thr
+        bboxes = bboxes[valid_idx]
+        scores = scores[valid_idx]
+        labels = labels[valid_idx]
 
+    for i in range(bboxes.shape[0]):
         if not with_text:
-            texts = None
+            text = None
         else:
-            texts = []
-            for j in range(len(cls_bboxes)):
-                text = f'cls: {i}' if class_names is None else class_names[i]
-                if with_score:
-                    text += f'|{cls_scores[j]:.02f}'
-                texts.append(text)
-
-        draw_func(ax, cls_bboxes, texts, colors[i], thickness, font_size)
-
+            text = f'cls: {labels[i]}' if class_names is None else class_names[labels[i]]
+            if with_score:
+                text += f'|{scores[i]:.02f}'
+        draw_func(ax, bboxes[i:i+1], [text], colors[labels[i]], thickness, font_size)
     drawed_img = get_img_from_fig(fig, width, height)
     
 

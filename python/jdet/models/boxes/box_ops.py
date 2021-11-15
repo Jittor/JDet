@@ -526,6 +526,8 @@ def rotated_box_to_poly_np(rrects):
     to
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     """
+    if rrects.shape[0] == 0:
+        return np.zeros([0,8], dtype=np.float32)
     polys = []
     for rrect in rrects:
         x_ctr, y_ctr, width, height, angle = rrect[:5]
@@ -548,8 +550,23 @@ def rotated_box_to_poly(rrects):
     to
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     """
-    #TODO: implement jt version
-    return jt.array(rotated_box_to_poly_np(rrects.data))
+    n = rrects.shape[0]
+    if n == 0:
+        return jt.zeros([0,8])
+    x_ctr = rrects[:, 0] 
+    y_ctr = rrects[:, 1] 
+    width = rrects[:, 2] 
+    height = rrects[:, 3] 
+    angle = rrects[:, 4]
+    tl_x, tl_y, br_x, br_y = -width / 2, -height / 2, width / 2, height / 2
+    rect = jt.stack([tl_x, br_x, br_x, tl_x, tl_x, br_x, br_x, tl_x, tl_y, tl_y, br_y, br_y, tl_y, tl_y, br_y, br_y], 1).reshape([n, 2, 8])
+    c = jt.cos(angle)
+    s = jt.sin(angle)
+    R = jt.stack([c, c, c, c, s, s, s, s, -s, -s, -s, -s, c, c, c, c], 1).reshape([n, 2, 8])
+    offset = jt.stack([x_ctr, x_ctr, x_ctr, x_ctr, y_ctr, y_ctr, y_ctr, y_ctr], 1)
+    poly = ((R * rect).sum(1) + offset).reshape([n, 2, 4]).permute([0,2,1]).reshape([n, 8])
+    return poly
+
 
 def rotated_box_to_bbox_np(rotatex_boxes):
     if rotatex_boxes.shape[0]==0:
@@ -611,3 +628,35 @@ def boxes_x0y0x1y1_to_xywh(boxes):
     y1 = boxes[:, 3]
     others = boxes[:, 4:]
     return jt.concat([jt.stack([(x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0], dim=1), others], dim=1)
+
+from jdet.models.utils.gliding_transforms import regular_obb,regular_theta
+
+def mintheta_obb(obboxes):
+    pi = 3.141592
+    x, y, w, h, theta = obboxes.unbind(dim=-1)
+    theta1 = regular_theta(theta)
+    theta2 = regular_theta(theta + pi/2)
+    abs_theta1 = jt.abs(theta1)
+    abs_theta2 = jt.abs(theta2)
+
+    w_regular = jt.ternary(abs_theta1 < abs_theta2, w, h)
+    h_regular = jt.ternary(abs_theta1 < abs_theta2, h, w)
+    theta_regular = jt.ternary(abs_theta1 < abs_theta2, theta1, theta2)
+
+    obboxes = jt.stack([x, y, w_regular, h_regular, theta_regular], dim=-1)
+    return obboxes
+
+def distance2obb(points, distance, max_shape=None):
+    distance, theta = distance.split([4, 1], dim=1)
+
+    Cos, Sin = jt.cos(theta), jt.sin(theta)
+    Matrix = jt.concat([Cos, Sin, -Sin, Cos], dim=1).reshape(-1, 2, 2)
+
+    wh = distance[:, :2] + distance[:, 2:]
+    offset_t = (distance[:, 2:] - distance[:, :2]) / 2
+    offset_t = offset_t.unsqueeze(2)
+    offset = jt.nn.bmm(Matrix, offset_t).squeeze(2)
+    ctr = points + offset
+
+    obbs = jt.concat([ctr, wh, theta], dim=1)
+    return regular_obb(obbs)

@@ -102,16 +102,23 @@ model = dict(
     # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
     )
-);
+)
 # dataset settings
-dataset_type = 'DOTARCNNDataset'
-data_root = '/mnt/disk/zwy/dota1_1024/'
+dataset_type = 'DOTADataset'
 dataset = dict(
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        root=data_root + 'trainval1024/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        version='1',
+        filter_min_size=32,
         transforms=[
+            dict(
+                type = "RotatedRandomFlip",
+                prob = 0.5,
+                direction="horizontal",
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -119,15 +126,15 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
         ],
-        shuffle=True,
         batch_size=2,
         ),
     val=dict(
         type=dataset_type,
-        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        root=data_root + 'trainval1024/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        version='1',
+        filter_min_size=32,
         transforms=[
             dict(
                 type = "Pad",
@@ -136,13 +143,12 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
         ],
         ),
     test=dict(
-        type=dataset_type,
-        anno_file=data_root + 'test1024/DOTA_test1024.json',
-        root=data_root + 'test1024/images',
+        type="ImageDataset",        
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         transforms=[
             dict(
                 type = "Pad",
@@ -151,9 +157,8 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False),
+                to_bgr=True),
         ],
-        test_mode=True
     )
 )
 # optimizer
@@ -180,6 +185,6 @@ logger = dict(
 # yapf:enable
 # runtime settings
 max_epoch = 12
-eval_interval = 1
+eval_interval = 6
 checkpoint_interval = 1
 log_interval = 20

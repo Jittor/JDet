@@ -394,8 +394,11 @@ class RotatedRandomFlip(RandomFlip):
             flipped[..., 0::5] = w - flipped[..., 0::5] - 1
             flipped[..., 4::5] = norm_angle(np.pi - flipped[..., 4::5])
         elif self.direction == 'vertical':
-            assert False
+            flipped[..., 1::5] = h - flipped[..., 1::5] - 1
+            flipped[..., 4::5] = norm_angle( - flipped[..., 4::5])
         elif self.direction == 'diagonal':
+            assert False
+        else:
             assert False
         return flipped
 
@@ -449,7 +452,7 @@ class Pad:
 
     def __call__(self,image,target=None):
         if self.size is not None:
-            pad_w,pad_h = size
+            pad_w,pad_h = self.size
         else:
             pad_h = int(np.ceil(image.size[1] / self.size_divisor)) * self.size_divisor
             pad_w = int(np.ceil(image.size[0] / self.size_divisor)) * self.size_divisor

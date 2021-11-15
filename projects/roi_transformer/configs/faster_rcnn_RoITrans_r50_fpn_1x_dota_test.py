@@ -1,4 +1,3 @@
-pretrained_weights = "test_datas_roi_transformer/init_pretrained.pk_jt.pk"
 model = dict(
     type='RoITransformer',
     pretrained='modelzoo://resnet50',
@@ -140,18 +139,21 @@ model = dict(
 )
 
 # dataset settings
-dataset_type = 'DOTARCNNDataset'
-data_root = '/mnt/disk/zwy/dota1_1024/'
-img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+dataset_type = 'DOTADataset'
 dataset = dict(
     imgs_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        root=data_root + 'trainval1024/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        version='1',
+        filter_min_size=32,
         transforms=[
+            dict(
+                type = "RotatedRandomFlip",
+                prob = 0.5,
+                direction="horizontal",
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -165,8 +167,9 @@ dataset = dict(
         ),
     val=dict(
         type=dataset_type,
-        anno_file=data_root + 'trainval1024/DOTA_trainval1024.json',
-        root=data_root + 'trainval1024/images/',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        version='1',
+        filter_min_size=32,
         transforms=[
             dict(
                 type = "Pad",
@@ -179,10 +182,8 @@ dataset = dict(
         ],
         ),
     test=dict(
-        type=dataset_type,
-        dataset_type="DOTA",
-        anno_file=data_root + 'test1024/DOTA_test1024.json',
-        root=data_root + 'test1024/images/',
+        type="ImageDataset",        
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
         transforms=[
             dict(
                 type = "Pad",
@@ -193,7 +194,6 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=True),
         ],
-        test_mode=True,
     )
 )
 # optimizer

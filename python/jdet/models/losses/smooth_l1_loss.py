@@ -11,6 +11,8 @@ def smooth_l1_loss(pred,target,weight=None,beta=1.,avg_factor=None,reduction="me
         loss = diff 
 
     if weight is not None:
+        if weight.ndim==1:
+            weight = weight[:,None]
         loss *= weight
 
     if avg_factor is None:

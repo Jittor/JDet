@@ -9,7 +9,7 @@ import datetime
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.visualization import visualize_results
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
-from jdet.config import COCO_CLASSES
+from jdet.config import get_classes_by_name
 from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.data_merge import data_merge_result
 import os
@@ -128,7 +128,7 @@ class Runner:
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
     
-            if check_interval(self.iter,self.log_interval):
+            if check_interval(self.iter,self.log_interval) and self.iter>0:
                 batch_size = len(targets)*jt.world_size
                 ptime = time.time()-start_time
                 fps = batch_size*(batch_idx+1)/ptime
@@ -160,13 +160,14 @@ class Runner:
 
     @jt.no_grad()
     @jt.single_process_scope()
-    def run_on_images(self,img_files,save_dir=None):
+    def run_on_images(self,save_dir=None):
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
         self.model.eval()
-        dataset = build_from_cfg("ImageDataset",DATASETS,img_files=img_files)
-        for i,(images,targets) in tqdm(enumerate(dataset)):
+        for i,(images,targets) in tqdm(enumerate(self.test_dataset)):
             results = self.model(images,targets)
             if save_dir:
-                visualize_results(results,COCO_CLASSES,[t["img_file"] for t in targets],save_dir)
+                visualize_results(sync(results),get_classes_by_name(self.test_dataset.dataset_type),[t["img_file"] for t in targets],save_dir)
 
     @jt.no_grad()
     @jt.single_process_scope()
@@ -222,11 +223,6 @@ class Runner:
             if (self.cfg.dataset.test.type == "ImageDataset"):
                 dataset_type = self.test_dataset.dataset_type
                 data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
-            else:
-                if (self.cfg.dataset.test.type == "DOTARCNNDataset"):
-                    # print(f"TODO: dataset type DOTARCNNDataset not supported auto data merge.")
-                    dataset_type = self.test_dataset.dataset_type
-                    data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
 
     @jt.single_process_scope()
     def save(self):

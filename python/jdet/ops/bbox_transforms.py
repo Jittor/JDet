@@ -58,6 +58,26 @@ def mask2poly(binary_mask_list):
     polys = map(mask2poly_single, binary_mask_list)
     return list(polys)
 
+def obb2poly_single(gt_obb):
+    '''
+    Args:
+        gt_obb (np.array): [x, y, h, w, a]
+    Rets:
+        poly (np.array): shape is [4, 2]
+    '''
+    center = np.array([gt_obb[0], gt_obb[1]])
+    vx = np.array([(gt_obb[2] - 1)*math.cos(gt_obb[4])/2, (gt_obb[2] - 1)*math.sin(gt_obb[4])/2])
+    vy = np.array([(gt_obb[3] - 1)*math.sin(gt_obb[4])/2, -(gt_obb[3] - 1)*math.cos(gt_obb[4])/2])
+    p1 = center + vx + vy
+    p2 = center + vx - vy
+    p3 = center - vx - vy
+    p4 = center - vx + vy
+    return np.stack((p1, p2, p3, p4))
+
+def obb2poly(gt_obb_list):
+    polys = map(obb2poly_single, gt_obb_list)
+    return list(polys)
+
 def polygonToRotRectangle_batch(bbox, with_module=True):
     bbox = np.array(bbox,dtype=np.float32)
     bbox = np.reshape(bbox,newshape=(-1, 2, 4),order='F')
@@ -262,14 +282,9 @@ def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1,
     return bbox_targets
 
 def dbbox2result(dbboxes, labels, num_classes):
-    if dbboxes.shape[0] == 0:
-        return [
-            np.zeros((0, 9), dtype=np.float32) for i in range(num_classes - 1)
-        ]
-    else:
-        dbboxes = dbboxes.numpy()
-        labels = labels.numpy()
-        return [dbboxes[labels == i, :] for i in range(num_classes - 1)]
+    dbboxes = dbboxes.numpy()
+    labels = labels.numpy()
+    return dbboxes[:, :8], dbboxes[:, -1].flatten(), labels
 
 def delta2dbbox_v3(Rrois,
                 deltas,
