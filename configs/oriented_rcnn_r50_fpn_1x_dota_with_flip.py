@@ -108,8 +108,8 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
+        annotations_file='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0/trainval1024.pkl',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -117,7 +117,12 @@ dataset = dict(
                 max_size=1024
             ),
             dict(
+                type='RotatedRandomFlip',
+                direction="horizontal",
+                prob=0.5),
+            dict(
                 type='RotatedRandomFlip', 
+                direction="vertical",
                 prob=0.5),
             # dict(
             #     type="RandomRotateAug",
@@ -164,7 +169,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -199,6 +204,6 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 1
+eval_interval = 100
 checkpoint_interval = 1
 log_interval = 50

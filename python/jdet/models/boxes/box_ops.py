@@ -629,7 +629,7 @@ def boxes_x0y0x1y1_to_xywh(boxes):
     others = boxes[:, 4:]
     return jt.concat([jt.stack([(x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0], dim=1), others], dim=1)
 
-from jdet.models.utils.gliding_transforms import regular_obb,regular_theta
+from jdet.ops.bbox_transforms import regular_obb, regular_theta
 
 def mintheta_obb(obboxes):
     pi = 3.141592

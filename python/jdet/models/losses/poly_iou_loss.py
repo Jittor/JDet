@@ -5,7 +5,7 @@ from jdet.utils.registry import LOSSES
 
 
 from jdet.ops.convex_sort import convex_sort
-from jdet.models.utils.gliding_transforms import bbox2type, get_bbox_areas
+from jdet.ops.bbox_transforms import bbox2type, get_bbox_areas
 
 
 def shoelace(pts):
