@@ -32,9 +32,10 @@ class OrientedHead(nn.Module):
                      min_pos_iou=0.5,
                      ignore_iof_thr=-1,
                      match_low_quality=False,
-                     iou_calculator=dict(type='BboxOverlaps2D')),
+                     assigned_labels_filled=-1,
+                     iou_calculator=dict(type='BboxOverlaps2D_rotated_v1')),
                  sampler=dict(
-                     type='RandomSampler',
+                     type='RandomSamplerRotated',
                      num=512,
                      pos_fraction=0.25,
                      neg_pos_ub=-1,
@@ -45,13 +46,13 @@ class OrientedHead(nn.Module):
                      target_stds=[0.1, 0.1, 0.2, 0.2, 0.1]),
                  bbox_roi_extractor=dict(
                      type='OrientedSingleRoIExtractor',
-                     roi_layer=dict(type='ROIAlignRotated', out_size=7, sample_num=2),
+                     roi_layer=dict(type='ROIAlignRotated_v1', output_size=7, sampling_ratio=2),
                      out_channels=256,
                      extend_factor=(1.4, 1.2),
                      featmap_strides=[4, 8, 16, 32]),
                  loss_cls=dict(
                      type='CrossEntropyLoss',
-                    ),
+                     ),
                  loss_bbox=dict(
                      type='SmoothL1Loss', 
                      beta=1.0, 
@@ -59,15 +60,15 @@ class OrientedHead(nn.Module):
                      ),
                  with_bbox=True,
                  with_shared_head=False,
+                 with_avg_pool=False,
                  with_cls=True,
                  with_reg=True,
-                 with_avg_pool=False,
                  start_bbox_type='obb',
                  end_bbox_type='obb',
                  reg_dim=None,
-                 pos_weight=-1,
-                 reg_class_agnostic=False,
+                 reg_class_agnostic=True,
                  reg_decoded_bbox=False,
+                 pos_weight=-1,
                  
      ):
         super().__init__()
@@ -263,30 +264,7 @@ class OrientedHead(nn.Module):
             labels = jt.zeros((0, ), dtype="int64")
             return bboxes, labels
 
-        # hbboxes = obb2hbb(bboxes)
-        # max_coordinate = hbboxes.max() - hbboxes.min()
-        # offsets = labels.astype(bboxes.dtype) * (max_coordinate + 1)
-        # bboxes_for_nms = bboxes.clone()
-        # bboxes_for_nms[:, :2] = bboxes_for_nms[:, :2] + offsets[:, None]
-
-        # print("bbox before nms")
-        # print(bboxes.shape)
-        # print(bboxes)
-
-        # print("test change")
-        # print(bboxes)
-        # print(poly2obb(obb2poly(bboxes)))
-
         dets = jt.concat([obb2poly(bboxes), scores.unsqueeze(1)], dim=1)
-
-        # keep = py_cpu_nms_poly_fast(np.array(dets), 0.1)
-        # dets = dets[keep]
-
-        # print("bbox after nms")
-        # print(dets.shape)
-        # print(dets)
-        
-        # dets = jt.concat([bboxes, scores.unsqueeze(1)], dim=1)
         return dets, labels
         
     def forward_single(self, x, sampling_results, test=False):
@@ -295,14 +273,6 @@ class OrientedHead(nn.Module):
             rois = self.arb2roi(sampling_results, bbox_type=self.start_bbox_type)
         else:
             rois = self.arb2roi([res.bboxes for res in sampling_results], bbox_type=self.start_bbox_type)
-
-        ### Test begin
-        # xx = []
-        # for i in range(len(x)):
-        #     with open(f'/mnt/disk/czh/masknet/temp/bbox_feats_{i}.pkl', 'rb') as f:
-        #         xx.append(jt.array(pickle.load(f)))
-        # x = tuple(xx)
-        ### Test end
 
         x = self.bbox_roi_extractor(x[:self.bbox_roi_extractor.num_inputs], rois)
 
@@ -362,15 +332,6 @@ class OrientedHead(nn.Module):
             bg_class_ind = self.num_classes
             # 0~self.num_classes-1 are FG, self.num_classes is BG
             pos_inds = (labels >= 0) & (labels < bg_class_ind)
-                 
-            ### Test begin
-            # with open(f'/mnt/disk/czh/masknet/temp/pos_inds.pkl', 'rb') as f:
-            #     pos_inds = jt.array(pickle.load(f))
-            # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
-            #     bbox_pred = jt.array(pickle.load(f))
-            # with open(f'/mnt/disk/czh/masknet/temp/rois.pkl', 'rb') as f:
-            #     rois = jt.array(pickle.load(f))
-            ## Test end
 
             # do not perform bounding box regression for BG anymore.
             if pos_inds.any_():
@@ -390,9 +351,6 @@ class OrientedHead(nn.Module):
                     reduction_override=reduction_override)
             else:
                 losses['orcnn_bbox_loss'] = bbox_pred.sum() * 0
-
-        # print("loss situation 2")
-        # print(losses)
 
         return losses
 
@@ -478,11 +436,7 @@ class OrientedHead(nn.Module):
                 bboxes /= scale_factor.repeat(2)
             bboxes = bboxes.view(bboxes.size(0), -1)
 
-        # print(bboxes.shape)
-
         det_bboxes, det_labels = self.get_results(bboxes, scores, bbox_type=self.end_bbox_type)
-        
-        # print(det_bboxes.shape)
 
         det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
@@ -516,26 +470,6 @@ class OrientedHead(nn.Module):
                 gt_bboxes.append(target["hboxes"])
                 gt_bboxes_ignore.append(target["hboxes_ignore"])
                 gt_labels.append(target["labels"] - 1)
-            
-            # print(gt_obboxes)
-            # print(gt_obboxes_ignore)
-
-            ### Test Start
-            
-            # import pickle
-            # for i in range(2):
-            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_proposal_{i}.pkl', 'rb') as f:
-            #         proposal_list[i] = jt.array(pickle.load(f))
-            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_gt_obboxes_{i}.pkl', 'rb') as f:
-            #         gt_obboxes.append(jt.array(pickle.load(f)))
-            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_gt_bboxes_{i}.pkl', 'rb') as f:
-            #         gt_bboxes.append(jt.array(pickle.load(f)))
-            #     with open(f'/mnt/disk/czh/masknet/temp/ohead_gt_labels_{i}.pkl', 'rb') as f:
-            #         gt_labels.append(jt.array(pickle.load(f)))
-            # gt_bboxes_ignore = None
-            # gt_obboxes_ignore = None
-
-            ### Test End
 
             # assign gts and sample proposals
             if self.with_bbox:
@@ -566,29 +500,6 @@ class OrientedHead(nn.Module):
                         else:
                             sampling_result.pos_gt_bboxes = gt_obboxes[i][sampling_result.pos_assigned_gt_inds, :]
 
-                    ### Test begin
-
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_is_gt_{i}.pkl', 'rb') as f:
-                    #     sampling_result.pos_is_gt = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_num_gts_{i}.pkl', 'rb') as f:
-                    #     sampling_result.num_gts = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_gt_bboxes_{i}.pkl', 'rb') as f:
-                    #     sampling_result.pos_gt_bboxes = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_gt_labels_{i}.pkl', 'rb') as f:
-                    #     sampling_result.pos_gt_labels = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_assigned_gt_inds_{i}.pkl', 'rb') as f:
-                    #     sampling_result.pos_assigned_gt_inds = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_bboxes_{i}.pkl', 'rb') as f:
-                    #     sampling_result.pos_bboxes = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_neg_bboxes_{i}.pkl', 'rb') as f:
-                    #     sampling_result.neg_bboxes = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_pos_inds_{i}.pkl', 'rb') as f:
-                    #     sampling_result.pos_inds = jt.array(pickle.load(f))
-                    # with open(f'/mnt/disk/czh/masknet/temp/ohead_sr_neg_inds_{i}.pkl', 'rb') as f:
-                    #     sampling_result.neg_inds = jt.array(pickle.load(f))
-
-                    ### Test end
-
                     sampling_results.append(sampling_result)
                     
 
@@ -599,6 +510,7 @@ class OrientedHead(nn.Module):
             loss = self.loss(scores, bbox_deltas, rois, *bbox_targets)
 
             return loss
+
         else:
             
             result = []
@@ -607,17 +519,6 @@ class OrientedHead(nn.Module):
                 scores, bbox_deltas, rois = self.forward_single(x, [proposal_list[i]], test=True)
                 img_shape = targets[i]['img_size']
                 scale_factor = targets[i]['scale_factor']
-
-                ### Test begin
-                
-                # with open(f'/mnt/disk/czh/masknet/temp/cls_score.pkl', 'rb') as f:
-                #     scores = jt.array(pickle.load(f))
-                # with open(f'/mnt/disk/czh/masknet/temp/bbox_pred.pkl', 'rb') as f:
-                #     bbox_deltas = jt.array(pickle.load(f))
-                # with open(f'/mnt/disk/czh/masknet/temp/rois.pkl', 'rb') as f:
-                #     rois = jt.array(pickle.load(f))
-                
-                ### Test end
                 
                 det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, img_shape, scale_factor, rescale=True)
 
@@ -625,175 +526,6 @@ class OrientedHead(nn.Module):
                 scores = det_bboxes[:, 8]
                 labels = det_labels
 
-                # visualization
-                # img_vis = cv2.imread(targets[i]["img_file"])
-                # filename = targets[i]["img_file"].split('/')[-1]
-                # for j in range(poly.shape[0]):
-                #     box = poly[j]
-                #     draw_poly(img_vis, box.reshape(-1, 2).numpy().astype(int), color=(255,0,0))
-                # cv2.imwrite(f'/mnt/disk/czh/orcnn/visualization/test_{filename}', img_vis)
-
-                # result.append((det_bboxes, det_labels))
                 result.append((poly, scores, labels))
             
             return result
-
-def draw_rbox(img,box,text,color):
-    box = [int(x) for x in box]
-    img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=color, thickness=1)
-    img = cv2.putText(img=img, text=text, org=(box[0],box[1]-5), fontFace=0, fontScale=0.5, color=color, thickness=1)
-    return img 
-
-def draw_box(img,box,text,color):
-    box = [int(x) for x in box]
-    img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=color, thickness=1)
-    img = cv2.putText(img=img, text=text, org=(box[0],box[1]-5), fontFace=0, fontScale=0.5, color=color, thickness=1)
-    return img 
-
-def visual_gts(targets,save_dir="./"):
-    for t in targets:
-        bbox = t["hboxes"].numpy()
-        labels = t["labels"].numpy()
-        classes = DOTA1_CLASSES
-        ori_img_size = t["ori_img_size"]
-        img_size = t["img_size"]
-        bbox[:,0::2] *= float(ori_img_size[0]/img_size[0])
-        bbox[:,1::2] *= float(ori_img_size[1]/img_size[1])
-        img_f = t["img_file"]
-        img = cv2.imread(img_f)
-        for box,l in zip(bbox,labels):
-            text = classes[l-1]
-            img = draw_box(img,box,text,(255,0,0))
-        cv2.imwrite(os.path.join(save_dir,"targtes.jpg"),img)
-
-def draw_poly(img,point,color=(255,0,0),thickness=2):
-    cv2.line(img, tuple(point[0]), tuple(point[1]), color, thickness)
-    cv2.line(img, tuple(point[1]), tuple(point[2]), color, thickness)
-    cv2.line(img, tuple(point[2]), tuple(point[3]), color, thickness)
-    cv2.line(img, tuple(point[3]), tuple(point[0]), color, thickness)
-
-
-def draw_proposal(img_file,proposals):
-    img = cv2.imread(img_file)
-    for box in proposals:
-        box = [int(x) for x in box]
-        img = cv2.rectangle(img=img, pt1=tuple(box[0:2]), pt2=tuple(box[2:]), color=(255,0,0), thickness=1)
-    cv2.imwrite("proposal.jpg",img)
-
-def draw_rboxes(img_file,boxes,scores,labels,classnames):
-    img = cv2.imread(img_file)
-    for box,score,label in zip(boxes,scores,labels):
-        # box = rotated_box_to_poly_single(box)
-        box = box.reshape(-1,2).astype(int)
-        classname = classnames[label-1]
-        text = f"{classname}:{score:.2}"
-        draw_poly(img,box,color=(255,0,0),thickness=2)
-
-        img = cv2.putText(img=img, text=text, org=(box[0][0],box[0][1]-5), fontFace=0, fontScale=0.5, color=(255,0,0), thickness=1)
-
-    cv2.imwrite("test.jpg",img)
-
-def handle_ratio_prediction(hboxes,rboxes,ratios,scores,labels):
-
-    if rboxes.numel()==0:
-        return rboxes, scores, labels
-
-    h_idx = jt.where(ratios > 0.8)[0]
-    h = hboxes[h_idx]
-    hboxes_vtx = jt.concat([h[:, 0:1], h[:, 1:2], h[:, 2:3], h[:, 1:2], h[:, 2:3], h[:, 3:4], h[:, 0:1], h[:, 3:4]],dim=1)
-    rboxes[h_idx] = hboxes_vtx
-    # keep = nms_poly(rboxes,scores, 0.1 )
-
-    # rboxes = rboxes[keep]
-    # scores = scores[keep]
-    # labels = labels[keep]
-
-    return rboxes, scores, labels
-
-
-def polygons2ratios(rbox):
-    def polygon_area( corners ):
-        n = len( corners ) # of corners
-        area = 0.0
-        for i in range( n ):
-            j = ( i + 1 ) % n
-            area += corners[i][0] * corners[j][1]
-            area -= corners[j][0] * corners[i][1]
-        area = abs( area ) / 2.0
-        return area
-    
-    max_x_ = rbox[:,  ::2].max( 1 )
-    min_x_ = rbox[:,  ::2].min( 1 )
-    max_y_ = rbox[:, 1::2].max( 1 )
-    min_y_ = rbox[:, 1::2].min( 1 )
-
-    rbox = rbox.view( (-1, 4, 2) )
-
-    polygon_areas = list( map( polygon_area, rbox ) )
-    polygon_areas = jt.concat( polygon_areas )
-
-    hbox_areas = ( max_y_ - min_y_ + 1 ) * ( max_x_ - min_x_ + 1 )
-    ratio_gt = polygon_areas / hbox_areas
-
-    ratio_gt = ratio_gt.view( (-1, 1) )
-    return ratio_gt
-
-def polygons2fix(rbox):
-    max_x_idx,max_x_  = rbox[:,  ::2].argmax( 1 )
-    min_x_idx,min_x_  = rbox[:,  ::2].argmin( 1 )
-    max_y_idx,max_y_  = rbox[:, 1::2].argmax( 1 )
-    min_y_idx,min_y_  = rbox[:, 1::2].argmin( 1 )
-
-    x_center = ( max_x_ + min_x_ ) / 2.
-    y_center = ( max_y_ + min_y_ ) / 2.
-
-    box = jt.stack( [min_x_, min_y_, max_x_, max_y_ ], dim=0 ).permute( 1, 0 )
-
-    rbox = rbox.view( (-1, 4, 2) )
-
-    rbox_ordered = jt.zeros_like( rbox )
-    rbox_ordered[:, 0] = rbox[range(len(rbox)), min_y_idx]
-    rbox_ordered[:, 1] = rbox[range(len(rbox)), max_x_idx]
-    rbox_ordered[:, 2] = rbox[range(len(rbox)), max_y_idx]
-    rbox_ordered[:, 3] = rbox[range(len(rbox)), min_x_idx]
-
-    top   = rbox_ordered[:, 0, 0]
-    right = rbox_ordered[:, 1, 1]
-    down  = rbox_ordered[:, 2, 0]
-    left  = rbox_ordered[:, 3, 1]
-
-    """
-    top = jt.min( jt.max( top, box[:, 0] ), box[:, 2] )
-    right = jt.min( jt.max( right, box[:, 1] ), box[:, 3] )
-    down = jt.min( jt.max( down, box[:, 0] ), box[:, 2] )
-    left = jt.min( jt.max( left, box[:, 1] ), box[:, 3] )
-    """
-
-    top_gt = (top - box[:, 0]) / (box[:, 2] - box[:, 0])
-    right_gt = (right - box[:, 1]) / (box[:, 3] - box[:, 1])
-    down_gt = (box[:, 2] - down) / (box[:, 2] - box[:, 0])
-    left_gt = (box[:, 3] - left) / (box[:, 3] - box[:, 1])
-
-    hori_box_mask = ((rbox_ordered[:,0,1] - rbox_ordered[:,1,1]) == 0) + ((rbox_ordered[:,1,0] - rbox_ordered[:,2,0]) == 0)
-
-    fix_gt = jt.stack( [top_gt, right_gt, down_gt, left_gt] ).permute( 1, 0 )
-    fix_gt = fix_gt.view( (-1, 4) )
-    fix_gt[hori_box_mask, :] = 1
-    return fix_gt
-
-def fix2polygons(box, alphas):
-    pred_top = (box[:, 2::4] - box[:, 0::4]) * alphas[:, 0::4] + box[:, 0::4]
-    pred_right = (box[:, 3::4] - box[:, 1::4]) * alphas[:, 1::4] + box[:, 1::4]
-    pred_down = (box[:, 0::4] - box[:, 2::4]) * alphas[:, 2::4] + box[:, 2::4]
-    pred_left = (box[:, 1::4] - box[:, 3::4]) * alphas[:, 3::4] + box[:, 3::4]
-
-    pred_rbox = jt.zeros( (box.shape[0], box.shape[1] * 2) )
-    pred_rbox[:, 0::8] = pred_top
-    pred_rbox[:, 1::8] = box[:, 1::4]
-    pred_rbox[:, 2::8] = box[:, 2::4]
-    pred_rbox[:, 3::8] = pred_right
-    pred_rbox[:, 4::8] = pred_down
-    pred_rbox[:, 5::8] = box[:, 3::4]
-    pred_rbox[:, 6::8] = box[:, 0::4]
-    pred_rbox[:, 7::8] = pred_left
-    return pred_rbox

@@ -132,17 +132,13 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
         prepare_gliding(result_pkl, save_path, classes)
     elif "faster_rcnn" in result_pkl:
         prepare_fasterrcnn(result_pkl, save_path, classes)
-    elif "orcnn" in result_pkl:
+    elif "oriented_rcnn" in result_pkl:
         prepare_orcnn(result_pkl, save_path, classes)
     else:
         prepare(result_pkl, save_path, classes)
 
     check_dir(final_path)
     mergebypoly(save_path,final_path)
-    # if "orcnn" in result_pkl:
-    #     mergebyobb(save_path, final_path)
-    # else:
-    #     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
     assert dataset_type in ["FAIR", "DOTA", "DOTA1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, and DOTA1_5 are supported"

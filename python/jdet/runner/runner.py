@@ -119,12 +119,6 @@ class Runner:
 
         self.model.train()
 
-        # from jittor_utils import auto_diff
-        # hook = auto_diff.Hook("gliding")
-        # hook.hook_module(self.model)
-        # hook.hook_optimizer(self.optimizer)
-        # print("Hook...")
-
         start_time = time.time()
 
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
@@ -197,12 +191,6 @@ class Runner:
     @jt.no_grad()
     @jt.single_process_scope()
     def test(self):
-
-        # from jittor_utils import auto_diff
-        # hook = auto_diff.Hook("gliding")
-        # hook.hook_module(self.model)
-        # hook.hook_optimizer(self.optimizer)
-        # print("Hook...")
 
         if self.test_dataset is None:
             self.logger.print_log("Please set Test dataset")

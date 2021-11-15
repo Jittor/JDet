@@ -17,10 +17,10 @@ class OrientedRPNHead(nn.Module):
     def __init__(self,
                  in_channels,
                  num_classes=1,
-                 min_bbox_size = 0,
-                 nms_thresh = 0.8,
-                 nms_pre = 2000,
-                 nms_post = 2000,
+                 min_bbox_size=0,
+                 nms_thresh=0.8,
+                 nms_pre=2000,
+                 nms_post=2000,
                  feat_channels=256,
                  bbox_type='obb',
                  reg_dim=6,
@@ -28,31 +28,31 @@ class OrientedRPNHead(nn.Module):
                  reg_decoded_bbox=False,
                  pos_weight=-1,
                  anchor_generator=dict(
-                     type='AnchorGenerator',
-                     scales=[4, 8, 16, 32],
+                 type='AnchorGenerator',
+                     scales=[8],
                      ratios=[0.5, 1.0, 2.0],
-                     strides=[8, 16, 32, 64,128]),
+                     strides=[4, 8, 16, 32, 64]),
                  bbox_coder=dict(
-                     type='OrientedDeltaXYWHBBoxCoder',
-                     target_means=(.0, .0, .0, .0),
-                     target_stds=(1.0, 1.0, 1.0, 1.0)),
-                 loss_cls=dict(
-                     type='CrossEntropyLoss',
-                     loss_weight=1.0),
-                 loss_bbox=dict(
-                     type='L1Loss', loss_weight=1.0),
+                     type='MidpointOffsetCoder',
+                     target_means=[.0, .0, .0, .0, .0, .0],
+                     target_stds=[1.0, 1.0, 1.0, 1.0, 0.5, 0.5]),
+                 loss_cls=dict(type='CrossEntropyLossForRcnn', use_sigmoid=True, loss_weight=1.0),
+                 loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
                  assigner=dict(
-                    type='MaxIoUAssigner',
-                    pos_iou_thr=0.8,
-                    neg_iou_thr=0.3,
-                    min_pos_iou=0.3,
-                    ignore_iof_thr=-1),
+                     type='MaxIoUAssigner',
+                     pos_iou_thr=0.7,
+                     neg_iou_thr=0.3,
+                     min_pos_iou=0.3,
+                     ignore_iof_thr=-1,
+                     match_low_quality=True,
+                     assigned_labels_filled=-1,
+                     ),
                  sampler=dict(
-                    type='RandomSampler',
-                    num=256,
-                    pos_fraction=0.5,
-                    neg_pos_ub=-1,
-                    add_gt_as_proposals=False),
+                     type='RandomSampler',
+                     num=256,
+                     pos_fraction=0.5,
+                     neg_pos_ub=-1,
+                     add_gt_as_proposals=False)
                 ):
         super(OrientedRPNHead, self).__init__()
 
@@ -210,10 +210,6 @@ class OrientedRPNHead(nn.Module):
                 scores = scores[valid_mask]
                 ids = ids[valid_mask]
         
-        # print("proposals before nms: ")
-        # print(proposals.shape)
-        # print(proposals)
-
         hproposals = obb2hbb(proposals)
         max_coordinate = hproposals.max() - hproposals.min()
         offsets = ids.astype(hproposals.dtype) * (max_coordinate + 1)
@@ -224,19 +220,7 @@ class OrientedRPNHead(nn.Module):
         
         dets = jt.concat([proposals, scores.unsqueeze(1)], dim=1)
         dets = dets[keep, :]
-        
-        ### Test begin
 
-        # import pickle
-        # with open(f'/mnt/disk/czh/masknet/temp/proposal.pkl', 'rb') as f:
-        #     dets = jt.array(pickle.load(f))
-
-        ### Test end
-
-        # print("proposals after nms: ")
-        # print(dets.shape)
-        # print(dets)
-        
         dets = dets[:self.nms_post]
 
         return dets
@@ -304,14 +288,6 @@ class OrientedRPNHead(nn.Module):
             gt_bboxes_ignore[:, -1] *= -1
 
         gt_labels = None
-
-        # ## Test Begin
-        # flag = gt_bboxes[0, 0] > 900
-        # import pickle
-        # with open(f'/mnt/disk/czh/masknet/temp/rpn_gt_bboxes_{flag}.pkl', 'rb') as f:
-        #     gt_bboxes = jt.array(pickle.load(f))
-        # gt_bboxes_ignore = None
-        ### Test End
         
         flat_anchors = jt.concat(anchors_list)
         valid_flags = jt.concat(valid_flag_list)
@@ -320,11 +296,6 @@ class OrientedRPNHead(nn.Module):
         if not inside_flags.any_():
             return (None, ) * 6
         anchors = flat_anchors[inside_flags, :]
-
-        # ### Test Begin
-        # with open(f'/mnt/disk/czh/masknet/temp/anchors_{flag}.pkl', 'rb') as f:
-        #     anchors = jt.array(pickle.load(f))
-        ### Test End
                 
         # assign gt and sample anchors
         anchor_bbox_type = get_bbox_type(anchors)
@@ -335,22 +306,6 @@ class OrientedRPNHead(nn.Module):
 
         assign_result = self.assigner.assign(anchors, target_bboxes, target_bboxes_ignore, None if self.sampling else gt_labels)
         sampling_result = self.sampler.sample(assign_result, anchors, target_bboxes)
-
-
-        ### Test Begin
-        
-        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_gt_bboxes_{flag}.pkl', 'rb') as f:
-        #     sampling_result.pos_gt_bboxes = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_assigned_gt_inds_{flag}.pkl', 'rb') as f:
-        #     sampling_result.pos_assigned_gt_inds = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_bboxes_{flag}.pkl', 'rb') as f:
-        #     sampling_result.pos_bboxes = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/sr_pos_inds_{flag}.pkl', 'rb') as f:
-        #     sampling_result.pos_inds = jt.array(pickle.load(f))
-        # with open(f'/mnt/disk/czh/masknet/temp/sr_neg_inds_{flag}.pkl', 'rb') as f:
-        #     sampling_result.neg_inds = jt.array(pickle.load(f))
-
-        ### Test End
 
 
         if anchor_bbox_type != gt_bbox_type:
@@ -521,10 +476,6 @@ class OrientedRPNHead(nn.Module):
             bbox_targets_list,
             bbox_weights_list,
             num_total_samples=num_total_samples)
-
-        # print("losses situation")
-        # print(f"losses cls: {losses_cls}")
-        # print(f"losses_bbox: {losses_bbox}")
 
         return dict(loss_rpn_cls=losses_cls, loss_rpn_bbox=losses_bbox)
 
