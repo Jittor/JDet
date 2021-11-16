@@ -7,16 +7,19 @@
 import os
 import re
 import sys
-
 import numpy as np
+import jittor as jt
 
 from . import dota_utils as util
 from jdet.ops.nms_poly import iou_poly
+from jdet.ops.nms_rotated import nms_rotated_cpu, nms_rotated_cuda
+
 import pdb
 import math
 from multiprocessing import Pool
 from functools import partial
 from jdet.config import get_cfg
+from jdet.ops.bbox_transforms import poly2obb
 
 ## the thresh for nms when merge image
 nms_threshold_0 = 0.1
@@ -126,6 +129,20 @@ def py_cpu_nms_poly_fast(dets, thresh):
         # order = np.concatenate((order_obb, order_hbb), axis=0).astype(np.int)
     return keep
 
+def py_cpu_nms_obb(dets, thresh):
+    
+    scores = jt.array(dets[:, -1])
+    dets = poly2obb(jt.array(dets[:, 0:-1]))
+
+    if dets.numel()==0:
+        return jt.array([])
+
+    # assert dets.numel()>0 and dets.ndim==2
+    # assert dets.dtype==scores.dtype
+    order_t, _ = scores.argsort(0, descending=True)
+    keep = nms_rotated_cpu(dets, order_t, thresh, box_length=5)
+        
+    return jt.where(keep)[0].numpy()
 
 def py_cpu_nms(dets, thresh):
     """Pure Python NMS baseline."""
@@ -283,6 +300,21 @@ def mergebypoly(srcpath, dstpath):
     mergebase_parallel(srcpath,
                        dstpath,
                        py_cpu_nms_poly_fast)
+
+def mergebyobb(srcpath, dstpath):
+    """
+    srcpath: result files before merge and nms
+    dstpath: result files after merge and nms
+    """
+    # srcpath = r'/home/dingjian/evaluation_task1/result/faster-rcnn-59/comp4_test_results'
+    # dstpath = r'/home/dingjian/evaluation_task1/result/faster-rcnn-59/testtime'
+
+    mergebase(srcpath,
+              dstpath,
+              py_cpu_nms_obb)
+    # mergebase_parallel(srcpath,
+    #                    dstpath,
+    #                    py_cpu_nms_obb)
 
 
 if __name__ == '__main__':

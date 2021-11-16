@@ -1,7 +1,7 @@
 from http.client import UnimplementedFileMode
 from jittor import nn
 from jdet.utils.registry import BOXES, MODELS, build_from_cfg, BACKBONES, HEADS, NECKS, SHARED_HEADS, ROI_EXTRACTORS
-from jdet.ops.bbox_transfomrs import bbox2roi, dbbox2result
+from jdet.ops.bbox_transforms import bbox2roi, dbbox2result
 import jittor as jt
 from jdet.utils.general import parse_losses
 

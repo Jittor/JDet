@@ -2,7 +2,7 @@
 model = dict(
     type='GlidingVertex',
     backbone=dict(
-        type='Resnet50',
+        type='Resnet101',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
@@ -117,7 +117,8 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -149,7 +150,8 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        annotations_file='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",

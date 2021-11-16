@@ -3,7 +3,7 @@ import jittor as jt
 from jdet.config.constant import get_classes_by_name
 from jdet.utils.general import check_dir
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
-from jdet.data.devkits.result_merge import mergebypoly
+from jdet.data.devkits.result_merge import mergebypoly, mergebyobb
 import os
 import shutil
 from tqdm import tqdm

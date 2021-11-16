@@ -3,7 +3,7 @@ import jittor.nn as nn
 
 from jdet.utils.registry import HEADS, LOSSES, build_from_cfg
 from jdet.utils.general import multi_apply
-from jdet.ops.bbox_transfomrs import bbox2delta, mask2poly, obb2poly, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3, delta2dbbox_v2, choose_best_Rroi_batch
+from jdet.ops.bbox_transforms import bbox2delta, mask2poly, obb2poly_v0, get_best_begin_point, polygonToRotRectangle_batch, hbb2obb_v2, dbbox2delta_v3, best_match_dbbox2delta, delta2dbbox_v3, delta2dbbox_v2, choose_best_Rroi_batch
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import rotated_box_to_poly
 
@@ -63,7 +63,7 @@ def bbox_target_rbbox_single(pos_bboxes,
     bbox_targets = jt.zeros((num_samples, 5))
     bbox_weights = jt.zeros((num_samples, 5))
     if use_obb:
-        pos_gt_polys = obb2poly(gt_masks_obbs[pos_assigned_gt_inds])
+        pos_gt_polys = obb2poly_v0(gt_masks_obbs[pos_assigned_gt_inds])
     else:
         pos_gt_masks = gt_masks_obbs[pos_assigned_gt_inds]
         pos_gt_polys = mask2poly(pos_gt_masks)

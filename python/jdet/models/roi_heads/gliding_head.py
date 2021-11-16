@@ -4,7 +4,7 @@ from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
 from jdet.ops.nms_poly import multiclass_poly_nms
 
-from jdet.models.utils.gliding_transforms import *
+from jdet.ops.bbox_transforms import *
 
 @HEADS.register_module()
 class GlidingHead(nn.Module):
@@ -63,6 +63,15 @@ class GlidingHead(nn.Module):
                      beta=1.0 / 3.0, 
                      loss_weight=16.0
                      ),
+                 with_bbox=True,
+                 with_shared_head=False,
+                 start_bbox_type='hbb',
+                 end_bbox_type='poly',
+                 with_avg_pool=False,
+                 pos_weight=-1,
+                 reg_class_agnostic=False,
+                 ratio_thr=0.8,
+                 max_per_img=2000,
      ):
         super().__init__()
         self.representation_dim = representation_dim
@@ -76,16 +85,15 @@ class GlidingHead(nn.Module):
         self.nms_thresh = nms_thresh
         self.detections_per_img = detections_per_img
         
-        # TODO: Add these attr to config
-        self.with_bbox = True
-        self.with_shared_head = False
-        self.start_bbox_type = 'hbb'
-        self.end_bbox_type = 'poly'
-        self.with_avg_pool = False
-        self.pos_weight = -1
-        self.reg_class_agnostic = False
-        self.ratio_thr = 0.8
-        self.max_per_img = 2000
+        self.with_bbox = with_bbox
+        self.with_shared_head = with_shared_head
+        self.start_bbox_type = start_bbox_type
+        self.end_bbox_type = end_bbox_type
+        self.with_avg_pool = with_avg_pool
+        self.pos_weight = pos_weight
+        self.reg_class_agnostic = reg_class_agnostic
+        self.ratio_thr = ratio_thr
+        self.max_per_img = max_per_img
 
         self.assigner = build_from_cfg(assigner, BOXES)
         self.sampler = build_from_cfg(sampler, BOXES)
@@ -126,25 +134,10 @@ class GlidingHead(nn.Module):
             nn.init.gauss_(l.weight,std=0.001)
             nn.init.constant_(l.bias, 0)
 
-    def get_bbox_dim(self, bbox_type, with_score=False):
-        
-        if bbox_type == 'hbb':
-            dim = 4
-        elif bbox_type == 'obb':
-            dim = 5
-        elif bbox_type == 'poly':
-            dim = 8
-        else:
-            raise ValueError(f"don't know {bbox_type} bbox dim")
-
-        if with_score:
-            dim += 1
-        return dim
-
     def arb2roi(self, bbox_list, bbox_type='hbb'):
 
         assert bbox_type in ['hbb', 'obb', 'poly']
-        bbox_dim = self.get_bbox_dim(bbox_type)
+        bbox_dim = get_bbox_dim(bbox_type)
 
         rois_list = []
         for img_id, bboxes in enumerate(bbox_list):
@@ -159,7 +152,7 @@ class GlidingHead(nn.Module):
     
     def get_results(self, multi_bboxes, multi_scores, score_factors=None, bbox_type='hbb'):
         
-        bbox_dim = self.get_bbox_dim(bbox_type)
+        bbox_dim = get_bbox_dim(bbox_type)
         num_classes = multi_scores.size(1) - 1
 
         # exclude background category
@@ -381,7 +374,7 @@ class GlidingHead(nn.Module):
         polys = polys.view(polys.size(0), -1)
 
         det_bboxes, det_labels = self.get_results(polys, scores, bbox_type='poly')
-        det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
+        # det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
         return det_bboxes, det_labels
 

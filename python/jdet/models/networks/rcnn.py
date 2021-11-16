@@ -30,18 +30,19 @@ class RCNN(nn.Module):
             results: detections
             losses (dict): losses
         '''
+
         features = self.backbone(images)
         
         if self.neck:
             features = self.neck(features)
-            
+
         proposals_list, rpn_losses = self.rpn(features,targets)
 
         output = self.bbox_head(features, proposals_list, targets)
 
         if self.is_training():
             output.update(rpn_losses)
-
+            
         return output
 
     def train(self):

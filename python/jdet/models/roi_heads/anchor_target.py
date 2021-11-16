@@ -2,7 +2,7 @@ import jittor as jt
 
 from ..boxes.sampler import PseudoSampler
 from jdet.utils.general import multi_apply
-from jdet.ops.bbox_transfomrs import bbox2delta
+from jdet.ops.bbox_transforms import bbox2delta
 from jdet.utils.registry import BOXES, build_from_cfg
 
 #TODO: use functions in 'anchor_generator' to delete this file

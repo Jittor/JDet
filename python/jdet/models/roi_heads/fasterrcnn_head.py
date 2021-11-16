@@ -6,7 +6,7 @@ from jittor import nn, init
 
 from .anchor_generator import AnchorGenerator
 from .anchor_target import anchor_target
-from jdet.ops.bbox_transfomrs import delta2bbox
+from jdet.ops.bbox_transforms import delta2bbox
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import LOSSES, HEADS, build_from_cfg
 

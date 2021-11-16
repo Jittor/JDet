@@ -92,7 +92,7 @@ class MaxIoUAssigner:
             raise ValueError('No gt or bboxes')
 
         overlaps = self.iou_calculator(gt_bboxes, bboxes)
-
+        
         if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
                 gt_bboxes_ignore.numel() > 0):
             if self.ignore_wrt_candidates:
@@ -164,7 +164,7 @@ class MaxIoUAssigner:
                 assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
-            
+
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
 
 @BOXES.register_module()
