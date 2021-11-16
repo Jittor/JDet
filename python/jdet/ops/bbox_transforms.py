@@ -74,7 +74,7 @@ def obb2poly_single(gt_obb):
     p4 = center - vx + vy
     return np.stack((p1, p2, p3, p4))
 
-def obb2poly(gt_obb_list):
+def obb2poly_v0(gt_obb_list):
     polys = map(obb2poly_single, gt_obb_list)
     return list(polys)
 
