@@ -101,15 +101,15 @@ def main():
             # "s1_rbbox_loss_bbox": s1_rbbox_loss_bbox
             "losses" : loss_list
         }            
-        pk.dump(data, open("test_datas_roitrans/test_data.pk", "wb"))
+        pk.dump(data, open("test_datas_roi_transformer/test_data.pk", "wb"))
         # print(s0_rbbox_loss_cls)
         # print(s0_rbbox_loss_bbox)
         # print(s1_rbbox_loss_cls)
         # print(s1_rbbox_loss_bbox)
         print(loss_list)
     else:
-        model.load("test_datas_roitrans/init_pretrained.pk_jt.pk")
-        data = pk.load(open("test_datas_roitrans/test_data.pk", "rb"))
+        model.load("test_datas_roi_transformer/init_pretrained.pk_jt.pk")
+        data = pk.load(open("test_datas_roi_transformer/test_data.pk", "rb"))
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         # targetss = jdet.utils.general.to_jt_var(data["targetss"])

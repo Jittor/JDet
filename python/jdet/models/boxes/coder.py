@@ -1,6 +1,6 @@
+from jdet.ops.bbox_transforms import *
 from .box_ops import delta2bbox,bbox2delta,delta2bbox_rotated,bbox2delta_rotated
 from jdet.utils.registry import BOXES
-from jdet.ops.bbox_transforms import *
 
 import jittor as jt
 import math

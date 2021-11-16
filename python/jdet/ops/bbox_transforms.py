@@ -130,6 +130,7 @@ def cal_line_length(point1, point2):
     return math.sqrt( math.pow(point1[0] - point2[0], 2) + math.pow(point1[1] - point2[1], 2))
 
 def get_best_begin_point_single(coordinate):
+    coordinate = coordinate.reshape([4,2])
     x1 = coordinate[0][0]
     y1 = coordinate[0][1]
     x2 = coordinate[1][0]
