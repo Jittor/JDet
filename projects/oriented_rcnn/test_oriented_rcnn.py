@@ -16,8 +16,8 @@ def main():
     args = parser.parse_args()
 
     jt.flags.use_cuda=1
-    jt.set_global_seed(666)
-    init_cfg("configs/orcnn_test.py")
+    jt.set_global_seed(233)
+    init_cfg("configs/oriented_rcnn_test.py")
     cfg = get_cfg()
 
     model = build_from_cfg(cfg.model,MODELS)
@@ -26,8 +26,8 @@ def main():
     model.train()
     
     if (args.set_data):
-        os.makedirs("test_datas_orcnn",exist_ok=True)
-        jt.save(model.state_dict(), "test_datas_orcnn/model.pk")
+        os.makedirs("test_datas_oriented_rcnn",exist_ok=True)
+        jt.save(model.state_dict(), "test_datas_oriented_rcnn/model.pk")
         imagess = []
         targetss = []
         correct_loss = []
@@ -47,15 +47,15 @@ def main():
             "targetss": targetss,
             "correct_loss": correct_loss,
         }
-        if (not os.path.exists("test_datas_orcnn")):
-            os.makedirs("test_datas_orcnn")
-        pk.dump(data, open("test_datas_orcnn/test_orcnn.pk", "wb"))
+        if (not os.path.exists("test_datas_oriented_rcnn")):
+            os.makedirs("test_datas_oriented_rcnn")
+        pk.dump(data, open("test_datas_oriented_rcnn/test_oriented_rcnn.pk", "wb"))
         print(correct_loss)
 
     else:
 
-        model.load_parameters(jt.load("test_datas_orcnn/model.pk"))
-        data = pk.load(open("test_datas_orcnn/test_orcnn.pk", "rb"))
+        model.load_parameters(jt.load("test_datas_oriented_rcnn/model.pk"))
+        data = pk.load(open("test_datas_oriented_rcnn/test_oriented_rcnn.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         correct_loss = data["correct_loss"]

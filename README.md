@@ -103,6 +103,7 @@ python run_net.py --config-file=configs/base.py --task=test
 | S2ANet-R101-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r101_fpn_1x_dota_bs2.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r101_fpn_1x_dota_without_torch_pretrained%2Fckpt_12.pkl&dl=1) |
 | Gliding-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 72.93  | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/ebeefa1edaf84a4d8a2a/?dl=1) |
 | Gliding-R50-FPN |DOTA1.0|1024/200|Flip+ra90+bc|-|  SGD   |   1x    | 74.93   | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip_rotate_balance_cate.py) | [model](https://cloud.tsinghua.edu.cn/f/395ecd3ddaf44bb58ac9/?dl=1) |
+| OrientedRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 75.62  | [arxiv](https://openaccess.thecvf.com/content/ICCV2021/papers/Xie_Oriented_R-CNN_for_Object_Detection_ICCV_2021_paper.pdf)| [config](configs/oriented_rcnn_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/a50517f7b8e840949d3f/?dl=1) |
 | RetinaNet-R50-FPN |DOTA1.0|600/150|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) [pretrained](https://cloud.tsinghua.edu.cn/f/6b5db5fdd5304a5abf19/) |
 | FasterRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 69.631   | [arxiv](https://arxiv.org/abs/1506.01497)| [config](configs/faster_rcnn_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/29197095057348d0a392/?dl=1) |
 | RoITransformer-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 73.842   | [arxiv](https://arxiv.org/abs/1812.00155)| [config](configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/55fe6380928f4a6582f8/?dl=1) |
@@ -127,7 +128,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: SSD
 - :heavy_check_mark: ROI Transformer
 - :heavy_check_mark: fcos
-- :clock3: Oriented R-CNN
+- :heavy_check_mark: Oriented R-CNN
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det
@@ -182,9 +183,10 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
 5. [RotationDetection](https://github.com/yangxue0827/RotationDetection)
 6. [s2anet](https://github.com/csuhan/s2anet)
 7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
-8. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
-9. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
-10. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
-11. [OBBDetection](https://github.com/jbwang1997/OBBDetection)
+8. [oriented_rcnn](https://github.com/jbwang1997/OBBDetection/tree/master/configs/obb/oriented_rcnn)
+9. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
+10. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
+11. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
+12. [OBBDetection](https://github.com/jbwang1997/OBBDetection)
 
 

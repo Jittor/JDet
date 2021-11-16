@@ -202,6 +202,6 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 1
+eval_interval = 100
 checkpoint_interval = 1
 log_interval = 50

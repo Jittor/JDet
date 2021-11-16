@@ -1,6 +1,7 @@
 import os
-tasks = ["roi_transformer", "faster_rcnn", "retinanet", "s2anet", "ssd", "gliding","fcos"]
-zip_path = "https://cloud.tsinghua.edu.cn/f/6e59245651f24026b06b/?dl=1"
+tasks = ["roi_transformer", "faster_rcnn", "retinanet", "s2anet", "ssd", "gliding", 
+"oriented_rcnn", "fcos"]
+zip_path = "https://cloud.tsinghua.edu.cn/f/e29bc9e04cda45bb8e66/?dl=1"
 
 if (not os.path.exists("test_datas.zip")):
     os.system(f"wget {zip_path}")
