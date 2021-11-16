@@ -490,11 +490,9 @@ def dbbox2roi(dbbox_list):
     drois = jt.contrib.concat(drois_list, 0)
     return drois
     
-pi = 3.141592
-
-def regular_theta(theta, mode='180', start=-pi/2):
+def regular_theta(theta, mode='180', start=-np.pi/2):
     assert mode in ['360', '180']
-    cycle = 2 * pi if mode == '360' else pi
+    cycle = 2 * np.pi if mode == '360' else np.pi
 
     theta = theta - start
     theta = theta % cycle
@@ -505,10 +503,10 @@ def regular_obb(obboxes):
     
     w_regular = w * (w > h) + h * (1 - (w > h))
     h_regular = h * (w > h) + w * (1 - (w > h))
-    theta_regular = theta * (w > h) + (theta + pi / 2) * (1 - (w > h))
+    theta_regular = theta * (w > h) + (theta + np.pi / 2) * (1 - (w > h))
     # w_regular = jt.where(w > h, w, h)
     # h_regular = jt.where(w > h, h, w)
-    # theta_regular = jt.where(w > h, theta, theta+pi/2)
+    # theta_regular = jt.where(w > h, theta, theta + np.pi/2)
     theta_regular = regular_theta(theta_regular)
     return jt.stack([x, y, w_regular, h_regular, theta_regular], dim=-1)
 
@@ -557,7 +555,7 @@ def poly2obb(polys):
         else:
             w, h = h, w
             angle = -90 - angle
-        theta = angle / 180 * pi
+        theta = angle / 180 * np.pi
         obboxes.append([x, y, w, h, theta])
 
     if not obboxes:
@@ -639,7 +637,7 @@ def hbb2obb(hbboxes):
     theta = jt.zeros_like(x)
 
     obboxes1 = jt.stack([x, y, w, h, theta], dim=-1)
-    obboxes2 = jt.stack([x, y, h, w, theta-pi/2], dim=-1)
+    obboxes2 = jt.stack([x, y, h, w, theta-np.pi/2], dim=-1)
     flag = (w >= h)[..., None]
     obboxes = flag * obboxes1 + (1 - flag) * obboxes2
     

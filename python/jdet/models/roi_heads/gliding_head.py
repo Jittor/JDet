@@ -374,7 +374,7 @@ class GlidingHead(nn.Module):
         polys = polys.view(polys.size(0), -1)
 
         det_bboxes, det_labels = self.get_results(polys, scores, bbox_type='poly')
-        det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
+        # det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
         return det_bboxes, det_labels
 

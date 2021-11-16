@@ -115,13 +115,18 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(
-                type='RotatedRandomFlip', 
-                prob=0.5),
-            dict(
-                type="RandomRotateAug",
-                random_rotate_on=True,
-            ),
+            # dict(
+            #     type='RotatedRandomFlip',
+            #     direction="horizontal",
+            #     prob=0.5),
+            # dict(
+            #     type='RotatedRandomFlip', 
+            #     direction="vertical",
+            #     prob=0.5),
+            # dict(
+            #     type="RandomRotateAug",
+            #     random_rotate_on=True,
+            # ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -136,7 +141,7 @@ dataset = dict(
         num_workers=4,
         shuffle=True,
         filter_empty_gt=False,
-        balance_category=True
+        balance_category=False
     ),
     val=dict(
         type="DOTADataset",

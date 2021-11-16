@@ -438,7 +438,7 @@ class OrientedHead(nn.Module):
 
         det_bboxes, det_labels = self.get_results(bboxes, scores, bbox_type=self.end_bbox_type)
 
-        det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
+        # det_labels = det_labels + 1 # output label range should be adjusted back to [1, self.class_NUm]
 
         return det_bboxes, det_labels
 

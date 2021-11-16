@@ -125,7 +125,7 @@ class MaxIoUAssigner:
         num_gts, num_bboxes = overlaps.size(0), overlaps.size(1)
 
         # 1. assign -1 by default
-        assigned_gt_inds = jt.full((num_bboxes,), -1).long()
+        assigned_gt_inds = jt.full((num_bboxes,), -1).int()
 
         # for each anchor, which gt best overlaps with it
         # for each anchor, the max iou of all gts
@@ -164,14 +164,6 @@ class MaxIoUAssigner:
                 assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
-
-        # print("assign_result")
-        # print(num_gts)
-        # print(assigned_gt_inds.shape)
-        # print(assigned_gt_inds)
-        # print(max_overlaps.shape)
-        # print(max_overlaps)
-        # print(assigned_labels)
 
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
 

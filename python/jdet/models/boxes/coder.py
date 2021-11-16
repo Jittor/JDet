@@ -452,7 +452,7 @@ class OrientedDeltaXYWHTCoder:
         gx, gy, gw, gh, gtheta = gt.unbind(dim=-1)
 
         dtheta1 = regular_theta(gtheta - ptheta)
-        dtheta2 = regular_theta(gtheta - ptheta + pi/2)
+        dtheta2 = regular_theta(gtheta - ptheta + np.pi/2)
         abs_dtheta1 = jt.abs(dtheta1)
         abs_dtheta2 = jt.abs(dtheta2)
 
