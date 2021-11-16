@@ -127,7 +127,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: SSD
 - :heavy_check_mark: ROI Transformer
 - :heavy_check_mark: fcos
-- :clock3: Oriented R-CNN
+- :heavy_check_mark: Oriented R-CNN
 - :clock3: ReDet
 - :clock3: YOLOv5
 - :clock3: R3Det
