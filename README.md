@@ -136,6 +136,9 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_plus_sign: DCL
 - :heavy_plus_sign: GWD
 - :heavy_plus_sign: KLD
+- :heavy_plus_sign: Double Head OBB
+- :heavy_plus_sign: OrientedReppoints
+- :heavy_plus_sign: Guided Anchoring
 - :heavy_plus_sign: ...
 
 
