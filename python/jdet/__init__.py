@@ -7,5 +7,5 @@ from . import utils
 from . import optims
 
 # version must use ' instead of "
-__version__ = '0.1.0.0'
+__version__ = '0.2.0.0'
 
