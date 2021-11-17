@@ -107,7 +107,7 @@ python run_net.py --config-file=configs/base.py --task=test
 | FasterRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 69.631   | [arxiv](https://arxiv.org/abs/1506.01497)| [config](configs/faster_rcnn_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/29197095057348d0a392/?dl=1) |
 | RoITransformer-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 73.842   | [arxiv](https://arxiv.org/abs/1812.00155)| [config](configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/55fe6380928f4a6582f8/?dl=1) |
 | FCOS-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 70.40   | [iccv19](https://openaccess.thecvf.com/content_ICCV_2019/papers/Tian_FCOS_Fully_Convolutional_One-Stage_Object_Detection_ICCV_2019_paper.pdf)| [config](configs/fcos_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Ffcos_r50%2Fckpt_12.pkl&dl=1) |
-| OrientedRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 75.62  | [arxiv](https://openaccess.thecvf.com/content/ICCV2021/papers/Xie_Oriented_R-CNN_for_Object_Detection_ICCV_2021_paper.pdf)| [config](configs/oriented_rcnn_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/a50517f7b8e840949d3f/?dl=1) |
+| OrientedRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 75.62  | [iccv21](https://openaccess.thecvf.com/content/ICCV2021/papers/Xie_Oriented_R-CNN_for_Object_Detection_ICCV_2021_paper.pdf)| [config](configs/oriented_rcnn_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/a50517f7b8e840949d3f/?dl=1) |
 
 
 **Notice**:
