@@ -118,6 +118,7 @@ python run_net.py --config-file=configs/base.py --task=test
 4. ra90: rotate aug with angle 90,180,270
 5. 1x : 12 epochs
 6. bc: balance category
+7. mAP: mean Average Precision on DOTA1.0 test set
 
 ### Plan
 <b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
