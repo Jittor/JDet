@@ -110,7 +110,7 @@ class BaseSampler(metaclass=ABCMeta):
 
         return SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes,
                               assign_result, gt_flags)
-
+@BOXES.register_module()
 class PseudoSampler(BaseSampler):
 
     def __init__(self, **kwargs):

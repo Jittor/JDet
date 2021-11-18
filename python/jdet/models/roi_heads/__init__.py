@@ -7,4 +7,5 @@ from . import gliding_rpn_head
 from . import gliding_head
 from . import ssd_head
 from . import fasterrcnn_head
+from . import rretina_head
 __all__ = []
