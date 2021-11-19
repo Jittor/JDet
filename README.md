@@ -1,6 +1,6 @@
 # JDet
 ## Introduction
-JDet is a object detection benchmark based on [Jittor](https://github.com/Jittor/jittor), and mainly focus on aerial image object detection (oriented object detection). 
+JDet is an object detection benchmark based on [Jittor](https://github.com/Jittor/jittor), and mainly focus on aerial image object detection (oriented object detection). 
 
 <!-- **Features**
 - Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
