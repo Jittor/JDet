@@ -1,7 +1,7 @@
 import numpy as np
 import shapely.geometry as shgeo
 
-from jdet.ops.bbox_transforms import *
+from jdet.ops.bbox_transforms_numpy import *
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     assert mode in ['iou', 'iof']

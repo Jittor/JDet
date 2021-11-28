@@ -4,6 +4,8 @@ import cv2
 import math
 import copy             #TODO: remove copy(?)
 
+pi = np.pi
+
 def dbbox2delta_v3(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
     proposals = proposals.float()
     gt = gt.float()
@@ -38,7 +40,7 @@ def hbb2obb_v2(boxes):
     ex_ctr_x = boxes[..., 0] + 0.5 * (ex_heights - 1.0)
     ex_ctr_y = boxes[..., 1] + 0.5 * (ex_widths - 1.0)
     c_bboxes = jt.contrib.concat((ex_ctr_x.unsqueeze(1), ex_ctr_y.unsqueeze(1), ex_widths.unsqueeze(1), ex_heights.unsqueeze(1)), 1)
-    initial_angles = -jt.ones((num_boxes, 1)) * np.pi / 2
+    initial_angles = -jt.ones((num_boxes, 1)) * pi / 2
     dbboxes = jt.contrib.concat((c_bboxes, initial_angles), 1)
 
     return dbboxes
@@ -120,7 +122,7 @@ def polygonToRotRectangle_batch(bbox, with_module=True):
     h = h[:, np.newaxis]
     # TODO: check it
     if with_module:
-        angle = angle[:, np.newaxis] % ( 2 * np.pi)
+        angle = angle[:, np.newaxis] % ( 2 * pi)
     else:
         angle = angle[:, np.newaxis]
     dboxes = np.concatenate((center[:, 0].astype(np.float), center[:, 1].astype(np.float), w, h, angle), axis=1)
@@ -218,10 +220,10 @@ def dbbox2delta_v2(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1])
     targets_dw = jt.log(gt_widths / roi_widths)
     targets_dh = jt.log(gt_heights / roi_heights)
     targets_dangle = (gt_angle - roi_angle)
-    dist = targets_dangle % (2 * np.pi)
-    dist = jt.minimum(dist, np.pi * 2 - dist)
+    dist = targets_dangle % (2 * pi)
+    dist = jt.minimum(dist, pi * 2 - dist)
     try:
-        assert np.all(dist.numpy() <= (np.pi/2. + 0.001) )
+        assert np.all(dist.numpy() <= (pi/2. + 0.001) )
     except:
         import pdb
         pdb.set_trace()
@@ -229,7 +231,7 @@ def dbbox2delta_v2(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1])
     inds = jt.sin(targets_dangle) < 0
     dist[inds] = -dist[inds]
     # TODO: change the norm value
-    dist = dist / (np.pi / 2.)
+    dist = dist / (pi / 2.)
     deltas = jt.stack((targets_dx, targets_dy, targets_dw, targets_dh, dist), -1)
 
 
@@ -244,19 +246,19 @@ def choose_best_match_batch(Rrois, gt_rois):
 
     gt_xs, gt_ys, gt_ws, gt_hs, gt_angles = gt_rois[:, 0].copy(), gt_rois[:, 1].copy(), gt_rois[:, 2].copy(), gt_rois[:, 3].copy(), gt_rois[:, 4].copy()
 
-    gt_angle_extent = jt.contrib.concat((gt_angles[:, np.newaxis], (gt_angles + np.pi/2.)[:, np.newaxis],
-                                      (gt_angles + np.pi)[:, np.newaxis], (gt_angles + np.pi * 3/2.)[:, np.newaxis]), 1)
-    dist = (Rroi_angles - gt_angle_extent) % (2 * np.pi)
-    dist = jt.minimum(dist, np.pi * 2 - dist)
+    gt_angle_extent = jt.contrib.concat((gt_angles[:, np.newaxis], (gt_angles + pi/2.)[:, np.newaxis],
+                                      (gt_angles + pi)[:, np.newaxis], (gt_angles + pi * 3/2.)[:, np.newaxis]), 1)
+    dist = (Rroi_angles - gt_angle_extent) % (2 * pi)
+    dist = jt.minimum(dist, pi * 2 - dist)
     min_index = jt.argmin(dist, 1)[0]
 
     gt_rois_extent0 = copy.deepcopy(gt_rois)
     gt_rois_extent1 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
-                                 gt_hs.unsqueeze(1), gt_ws.unsqueeze(1), gt_angles.unsqueeze(1) + np.pi/2.), 1)
+                                 gt_hs.unsqueeze(1), gt_ws.unsqueeze(1), gt_angles.unsqueeze(1) + pi/2.), 1)
     gt_rois_extent2 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
-                                 gt_ws.unsqueeze(1), gt_hs.unsqueeze(1), gt_angles.unsqueeze(1) + np.pi), 1)
+                                 gt_ws.unsqueeze(1), gt_hs.unsqueeze(1), gt_angles.unsqueeze(1) + pi), 1)
     gt_rois_extent3 = jt.contrib.concat((gt_xs.unsqueeze(1), gt_ys.unsqueeze(1), \
-                                 gt_hs.unsqueeze(1), gt_ws.unsqueeze(1), gt_angles.unsqueeze(1) + np.pi * 3/2.), 1)
+                                 gt_hs.unsqueeze(1), gt_ws.unsqueeze(1), gt_angles.unsqueeze(1) + pi * 3/2.), 1)
     gt_rois_extent = jt.contrib.concat((gt_rois_extent0.unsqueeze(1),
                                      gt_rois_extent1.unsqueeze(1),
                                      gt_rois_extent2.unsqueeze(1),
@@ -266,14 +268,14 @@ def choose_best_match_batch(Rrois, gt_rois):
     for curiter, index in enumerate(min_index):
         gt_rois_new[curiter, :] = gt_rois_extent[curiter, index.item(), :]
 
-    gt_rois_new[:, 4] = gt_rois_new[:, 4] % (2 * np.pi)
+    gt_rois_new[:, 4] = gt_rois_new[:, 4] % (2 * pi)
 
     return gt_rois_new
 
 def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
     gt_boxes_new = choose_best_match_batch(Rrois, gt)
     try:
-        assert np.all(Rrois.numpy()[:, 4] <= (np.pi + 0.001))
+        assert np.all(Rrois.numpy()[:, 4] <= (pi + 0.001))
     except:
         import pdb
         pdb.set_trace()
@@ -320,9 +322,9 @@ def delta2dbbox_v3(Rrois,
     gh = Rroi_h * dh.exp()
 
     # TODO: check the hard code
-    # gangle = (2 * np.pi) * dangle + Rroi_angle
+    # gangle = (2 * pi) * dangle + Rroi_angle
     gangle = dangle + Rroi_angle
-    # gangle = gangle % ( 2 * np.pi)
+    # gangle = gangle % ( 2 * pi)
 
     if max_shape is not None:
         pass
@@ -361,7 +363,7 @@ def delta2dbbox_v2(Rrois,
     gw = Rroi_w * dw.exp()
     gh = Rroi_h * dh.exp()
 
-    gangle = (np.pi / 2.) * dangle + Rroi_angle
+    gangle = (pi / 2.) * dangle + Rroi_angle
 
     if max_shape is not None:
         pass
@@ -466,9 +468,9 @@ def choose_best_Rroi_batch(Rroi):
 
     Rroi[indexes, 2] = h[indexes]
     Rroi[indexes, 3] = w[indexes]
-    Rroi[indexes, 4] = Rroi[indexes, 4] + np.pi / 2.
+    Rroi[indexes, 4] = Rroi[indexes, 4] + pi / 2.
     # TODO: check the module
-    Rroi[:, 4] = Rroi[:, 4] % np.pi
+    Rroi[:, 4] = Rroi[:, 4] % pi
 
     return Rroi
 
@@ -490,9 +492,9 @@ def dbbox2roi(dbbox_list):
     drois = jt.contrib.concat(drois_list, 0)
     return drois
     
-def regular_theta(theta, mode='180', start=-np.pi/2):
+def regular_theta(theta, mode='180', start=-pi/2):
     assert mode in ['360', '180']
-    cycle = 2 * np.pi if mode == '360' else np.pi
+    cycle = 2 * pi if mode == '360' else pi
 
     theta = theta - start
     theta = theta % cycle
@@ -503,10 +505,10 @@ def regular_obb(obboxes):
     
     w_regular = w * (w > h) + h * (1 - (w > h))
     h_regular = h * (w > h) + w * (1 - (w > h))
-    theta_regular = theta * (w > h) + (theta + np.pi / 2) * (1 - (w > h))
+    theta_regular = theta * (w > h) + (theta + pi / 2) * (1 - (w > h))
     # w_regular = jt.where(w > h, w, h)
     # h_regular = jt.where(w > h, h, w)
-    # theta_regular = jt.where(w > h, theta, theta + np.pi/2)
+    # theta_regular = jt.where(w > h, theta, theta + pi/2)
     theta_regular = regular_theta(theta_regular)
     return jt.stack([x, y, w_regular, h_regular, theta_regular], dim=-1)
 
@@ -555,7 +557,7 @@ def poly2obb(polys):
         else:
             w, h = h, w
             angle = -90 - angle
-        theta = angle / 180 * np.pi
+        theta = angle / 180 * pi
         obboxes.append([x, y, w, h, theta])
 
     if not obboxes:
@@ -637,7 +639,7 @@ def hbb2obb(hbboxes):
     theta = jt.zeros_like(x)
 
     obboxes1 = jt.stack([x, y, w, h, theta], dim=-1)
-    obboxes2 = jt.stack([x, y, h, w, theta-np.pi/2], dim=-1)
+    obboxes2 = jt.stack([x, y, h, w, theta-pi/2], dim=-1)
     flag = (w >= h)[..., None]
     obboxes = flag * obboxes1 + (1 - flag) * obboxes2
     

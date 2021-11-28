@@ -116,11 +116,19 @@ dataset = dict(
                 max_size=1024
             ),
             dict(
+                type='RotatedRandomFlip',
+                direction="horizontal",
+                prob=0.5),
+            dict(
                 type='RotatedRandomFlip', 
+                direction="vertical",
                 prob=0.5),
             dict(
                 type="RandomRotateAug",
                 random_rotate_on=True,
+                rotate_90=False,
+                angles=(0, 90),
+                vert_rate=0.5,
             ),
             dict(
                 type = "Pad",
