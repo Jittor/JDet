@@ -120,7 +120,7 @@ python run_net.py --config-file=configs/base.py --task=test
 6. bc: balance category
 7. mAP: mean Average Precision on DOTA1.0 test set
 
-### Plan of models
+### Plan of Models
 <b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
 
 - :heavy_check_mark: S2ANet
