@@ -120,7 +120,7 @@ python run_net.py --config-file=configs/base.py --task=test
 6. bc: balance category
 7. mAP: mean Average Precision on DOTA1.0 test set
 
-### Plan
+### Plan of models
 <b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
 
 - :heavy_check_mark: S2ANet
@@ -144,6 +144,27 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_plus_sign: Guided Anchoring
 - :heavy_plus_sign: ...
 
+### Plan of Datasets
+<b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
+
+- :heavy_check_mark: DOTA1.0
+- :heavy_check_mark: DOTA1.5
+- :heavy_check_mark: DOTA2.0
+- :heavy_check_mark: SSDD
+- :heavy_check_mark: SSDD+
+- :heavy_check_mark: FAIR
+- :heavy_check_mark: COCO
+- :heavy_plus_sign: LS-SSDD
+- :heavy_plus_sign: DIOR-R
+- :heavy_plus_sign: HRSC2016
+- :heavy_plus_sign: ICDAR2015
+- :heavy_plus_sign: ICDAR2017 MLT
+- :heavy_plus_sign: UCAS-AOD
+- :heavy_plus_sign: FDDB
+- :heavy_plus_sign: OHD-SJTU
+- :heavy_plus_sign: MSRA-TD500
+- :heavy_plus_sign: Total-Text
+- :heavy_plus_sign: ...
 
 ## Contact Us
 
