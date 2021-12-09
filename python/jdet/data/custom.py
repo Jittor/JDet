@@ -103,7 +103,7 @@ class CustomDataset(Dataset):
         batch_imgs = np.zeros((N,3,max_height,max_width),dtype=np.float32)
         for i,image in enumerate(imgs):
             batch_imgs[i,:,:image.shape[-2],:image.shape[-1]] = image
-        
+
         return batch_imgs,anns 
 
     def __getitem__(self, idx):
@@ -113,6 +113,9 @@ class CustomDataset(Dataset):
 
         if self.transforms is not None:
             image, anno = self.transforms(image, anno)
+
+        if anno is None:
+            return self.__getitem__(np.random.choice(np.arange(self.total_len)))
 
         return image, anno 
 

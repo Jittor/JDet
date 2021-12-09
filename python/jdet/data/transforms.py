@@ -42,6 +42,7 @@ class RandomRotateAug:
                  rotate_mode='range',
                  vert_rate=0.5,
                  vert_cls=None,
+                 label_standard="rboxes",
                  keep_iof_thr=0.7):
 
         self.random_rotate_on = random_rotate_on
@@ -52,6 +53,7 @@ class RandomRotateAug:
         self.vert_rate = vert_rate
         self.vert_cls = vert_cls
         self.keep_iof_thr = keep_iof_thr
+        self.label_standard = label_standard
 
     def get_matrix_and_size(self, target):
         angle = target["rotate_angle"]
@@ -74,6 +76,7 @@ class RandomRotateAug:
 
         w, h = size
         for key in["bboxes", "hboxes", "rboxes", "polys", "hboxes_ignore", "polys_ignore", "rboxes_ignore"]:
+            
             if key not in target:
                 continue
             bboxes = target[key]
@@ -98,32 +101,31 @@ class RandomRotateAug:
             if "rboxes" in key:
                 new_bboxes = poly_to_rotated_box_np(new_bboxes)
 
-            target[key]=new_bboxes
+            target[key] = new_bboxes
 
     def _rotate_boxes_rand(self, target, matrix, w, h, img_bound):
-
-        # for key in ["hboxes_ignore", "polys_ignore", "rboxes_ignore", "bboxes", "hboxes", "rboxes", "polys",]:
-        for key in ["hboxes"]:
-
+        
+        for key in ["bboxes", "hboxes", "rboxes", "polys",]:
             if key not in target:
                 continue
 
             bboxes = target[key]
             if bboxes.ndim < 2:
                 continue
+            warped_bboxes = warp(target[key], matrix, keep_type=True)
+            if self.keep_shape:
+                iofs = bbox_overlaps(warped_bboxes, img_bound, mode='iof')
+                if_inwindow = iofs[:, 0] > self.keep_iof_thr
+                new_bboxes = warped_bboxes[if_inwindow]
             
-            if "bboxes" in key or "hboxes" in key or "rboxes" in key:
-                warped_bboxes = warp(target[key], matrix, keep_type=True)
-                if self.keep_shape:
-                    iofs = bbox_overlaps(warped_bboxes, img_bound, mode='iof')
-                    if_inwindow = iofs[:, 0] > self.keep_iof_thr
-                    new_bboxes = warped_bboxes[if_inwindow]
+            if key == self.label_standard:
+                label_if_inwindow = if_inwindow.copy()
 
-            target[key] = new_bboxes 
+            target[key] = new_bboxes
 
         if "labels" in target.keys():
-            target['labels'] = target['labels'][if_inwindow]
-        
+            target['labels'] = target['labels'][label_if_inwindow]
+
     def __call__( self, image, target=None ):
 
         if self.random_rotate_on:
@@ -153,6 +155,8 @@ class RandomRotateAug:
                     target["rotate_angle"] = 90 * indx
 
             else:
+
+                target["rboxes"][:, 4] *= -1
                 if self.rotate_mode == 'value':
                     angles = list(self.angles)
                     angles = angles + [0] if 0 not in angles else angles
@@ -170,7 +174,8 @@ class RandomRotateAug:
 
                     img_bound = np.array([[0, 0, w, 0, w, h, 0, h]])
                     self._rotate_boxes_rand(target, matrix, w, h, img_bound)
-                    image = image.rotate(angle, expand=False)
+                    image = image.rotate(angle)
+                target["rboxes"][:, 4] *= -1
 
         return image, target
 
@@ -583,3 +588,17 @@ class Normalize:
         target["to_bgr"] = self.to_bgr
         return image, target
 
+@TRANSFORMS.register_module()
+class FliterEmpty:
+    
+    def __init__(self, fliter_list):
+        self.fliter_list = fliter_list
+
+    def __call__(self, image, target=None):
+        
+        for k in self.fliter_list:
+            if k == "rboxes" or k == "hboxes" or k == "polys" or k == "bboxes":
+                if target[k].size == 0:
+                    return image, None
+
+        return image, target
