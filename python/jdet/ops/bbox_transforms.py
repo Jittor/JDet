@@ -220,11 +220,6 @@ def dbbox2delta_v2(proposals, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1])
     targets_dangle = (gt_angle - roi_angle)
     dist = targets_dangle % (2 * np.pi)
     dist = jt.minimum(dist, np.pi * 2 - dist)
-    try:
-        assert np.all(dist.numpy() <= (np.pi/2. + 0.001) )
-    except:
-        import pdb
-        pdb.set_trace()
 
     inds = jt.sin(targets_dangle) < 0
     dist[inds] = -dist[inds]
@@ -272,18 +267,13 @@ def choose_best_match_batch(Rrois, gt_rois):
 
 def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
     gt_boxes_new = choose_best_match_batch(Rrois, gt)
-    try:
-        assert np.all(Rrois.numpy()[:, 4] <= (np.pi + 0.001))
-    except:
-        import pdb
-        pdb.set_trace()
     bbox_targets = dbbox2delta_v2(Rrois, gt_boxes_new, means, stds)
 
     return bbox_targets
 
 def dbbox2result(dbboxes, labels, num_classes):
-    dbboxes = dbboxes.numpy()
-    labels = labels.numpy()
+    dbboxes = dbboxes
+    labels = labels
     return dbboxes[:, :8], dbboxes[:, -1].flatten(), labels
 
 def delta2dbbox_v3(Rrois,
@@ -471,6 +461,22 @@ def choose_best_Rroi_batch(Rroi):
     Rroi[:, 4] = Rroi[:, 4] % np.pi
 
     return Rroi
+
+def choose_best_obb_batch(ori_gt_obbs):
+    """
+    make the angle of obb close to -90
+    :param gt_obb: (x_ctr, y_ctr, w, h, angle)
+            shape: (n, 5)
+    """
+    gt_obbs = copy.deepcopy(ori_gt_obbs)
+    w, h = ori_gt_obbs[:, 2], ori_gt_obbs[:, 3]
+    gt_obbs[:, 4] = (gt_obbs[:, 4] - np.pi * 1. / 4.) % np.pi
+    indexes = gt_obbs[:, 4] >= np.pi / 2
+    gt_obbs[indexes, 2] = h[indexes]
+    gt_obbs[indexes, 3] = w[indexes]
+    gt_obbs[indexes, 4] = gt_obbs[indexes, 4] - np.pi / 2.
+    gt_obbs[:, 4] = gt_obbs[:, 4] - np.pi * 3. / 4.
+    return gt_obbs
 
 def dbbox2roi(dbbox_list):
     """
