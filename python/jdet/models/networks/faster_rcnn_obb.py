@@ -50,8 +50,6 @@ class FasterRCNNOBB(nn.Module):
                 img_shape = target['img_size'],
                 pad_shape = target['pad_shape'],
                 img_file = target['img_file'],
-                mean = target['mean'].numpy(),
-                std = target['std'].numpy(),
                 to_bgr = target['to_bgr'],
                 scale_factor = target['scale_factor']
             )
@@ -59,7 +57,7 @@ class FasterRCNNOBB(nn.Module):
             gt_bboxes.append(target['hboxes'])
             gt_labels.append(target['labels'])
             gt_bboxes_ignore.append(target['hboxes_ignore'])
-            gt_obbs.append(target['rboxes'].numpy())
+            gt_obbs.append(target['rboxes'])
 
         losses = dict()
         features = self.backbone(images)
@@ -98,7 +96,7 @@ class FasterRCNNOBB(nn.Module):
         cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
         rbbox_targets = self.bbox_head.get_target(
-            sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn, use_obb=True)
+            sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn)
         loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
                                         *rbbox_targets)
         losses.update(loss_bbox)
