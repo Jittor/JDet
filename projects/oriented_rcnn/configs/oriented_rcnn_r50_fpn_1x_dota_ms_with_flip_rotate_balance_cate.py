@@ -126,6 +126,9 @@ dataset = dict(
             dict(
                 type="RandomRotateAug",
                 random_rotate_on=True,
+                rotate_90=False,
+                angles=(0, 90),
+                vert_rate=0.5,
             ),
             dict(
                 type = "Pad",
@@ -134,7 +137,10 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False,)
+                to_bgr=False,),
+            dict(
+                type = "FliterEmpty",
+                fliter_list = ["rboxes"],),
             
         ],
         batch_size=2,

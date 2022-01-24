@@ -108,7 +108,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -126,6 +126,9 @@ dataset = dict(
             # dict(
             #     type="RandomRotateAug",
             #     random_rotate_on=True,
+            #     rotate_90=False,
+            #     angles=(0, 90),
+            #     vert_rate=0.5
             # ),
             dict(
                 type = "Pad",
@@ -135,7 +138,6 @@ dataset = dict(
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False,)
-            
         ],
         batch_size=2,
         num_workers=4,
@@ -167,7 +169,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images/',
+        images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/test_1024_200_1.0/images/',
         transforms=[
             dict(
                 type="RotatedResize",

@@ -2,7 +2,7 @@
 model = dict(
     type='OrientedRCNN',
     backbone=dict(
-        type='Resnet101',
+        type='Resnet50',
         frozen_stages=1,
         return_stages=["layer1","layer2","layer3","layer4"],
         pretrained= True),
@@ -108,7 +108,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/trainval_1024_500_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -123,13 +123,13 @@ dataset = dict(
                 type='RotatedRandomFlip', 
                 direction="vertical",
                 prob=0.5),
-            # dict(
-            #     type="RandomRotateAug",
-            #     random_rotate_on=True,
-            #     rotate_90=False,
-            #     angles=(0, 90),
-            #     vert_rate=0.5
-            # ),
+            dict(
+                type="RandomRotateAug",
+                random_rotate_on=True,
+                rotate_90=False,
+                angles=(0, 90),
+                vert_rate=0.5,
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -137,18 +137,21 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=False,)
+                to_bgr=False,),
+            dict(
+                type = "FliterEmpty",
+                fliter_list = ["rboxes"],),
             
         ],
         batch_size=2,
         num_workers=4,
         shuffle=True,
         filter_empty_gt=False,
-        balance_category=False
+        balance_category=True
     ),
     val=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_500_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -170,7 +173,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images/',
+        images_dir='/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/test_1024_500_0.5-1.0-1.5/images',
         transforms=[
             dict(
                 type="RotatedResize",

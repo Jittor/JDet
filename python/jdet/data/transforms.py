@@ -1,4 +1,5 @@
 import random
+
 import jittor as jt 
 import cv2
 import numpy as np
@@ -7,6 +8,9 @@ from PIL import Image
 from jdet.utils.registry import build_from_cfg,TRANSFORMS
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box_np,norm_angle
 from jdet.models.boxes.iou_calculator import bbox_overlaps_np
+from jdet.ops.bbox_move import warp
+from jdet.ops.bbox_transforms_numpy import bbox2type
+from jdet.ops.bbox_geometry import bbox_overlaps
 from numpy import random as nprandom
 
 @TRANSFORMS.register_module()
@@ -30,16 +34,53 @@ class Compose:
 
 @TRANSFORMS.register_module()
 class RandomRotateAug:
-    def __init__(self, random_rotate_on=False):
+    def __init__(self, 
+                 random_rotate_on=False, 
+                 rotate_90=True,
+                 keep_shape=True,
+                 angles=(0, 90),
+                 rotate_mode='range',
+                 vert_rate=0.5,
+                 vert_cls=None,
+                 label_standard="rboxes",
+                 keep_iof_thr=0.7):
+
         self.random_rotate_on = random_rotate_on
-    
-    def _rotate_boxes_90(self,target,size):
-        w,h = size
-        for key in["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
+        self.rotate_90 = rotate_90
+        self.keep_shape = keep_shape
+        self.angles = angles
+        self.rotate_mode = rotate_mode
+        self.vert_rate = vert_rate
+        self.vert_cls = vert_cls
+        self.keep_iof_thr = keep_iof_thr
+        self.label_standard = label_standard
+
+    def get_matrix_and_size(self, target):
+        angle = target["rotate_angle"]
+        height, width = target["img_size"][:2]
+        if self.keep_shape:
+            center = ((width - 1) * 0.5, (height - 1) * 0.5)
+            matrix = cv2.getRotationMatrix2D(center, angle, 1)
+        else:
+            matrix = cv2.getRotationMatrix2D((0, 0), angle, 1)
+            img_bbox = np.array([[0, 0, width, 0, width, height, 0, width]])
+            img_bbox = bbox2type(warp(img_bbox, matrix), 'hbb')
+
+            width = int(img_bbox[0, 2] - img_bbox[0, 0] + 1)
+            height = int(img_bbox[0, 3] - img_bbox[0, 1] + 1)
+            matrix[0, 2] = -img_bbox[0, 0]
+            matrix[1, 2] = -img_bbox[0, 1]
+        return matrix, width, height
+
+    def _rotate_boxes_90(self, target,size):
+
+        w, h = size
+        for key in["bboxes", "hboxes", "rboxes", "polys", "hboxes_ignore", "polys_ignore", "rboxes_ignore"]:
+            
             if key not in target:
                 continue
             bboxes = target[key]
-            if bboxes.ndim<2:
+            if bboxes.ndim < 2:
                 continue
             if "bboxes" in key or "hboxes" in key:
                 new_boxes = np.zeros_like(bboxes)
@@ -60,19 +101,81 @@ class RandomRotateAug:
             if "rboxes" in key:
                 new_bboxes = poly_to_rotated_box_np(new_bboxes)
 
-            target[key]=new_bboxes
+            target[key] = new_bboxes
+
+    def _rotate_boxes_rand(self, target, matrix, w, h, img_bound):
+        
+        for key in ["bboxes", "hboxes", "rboxes", "polys",]:
+            if key not in target:
+                continue
+
+            bboxes = target[key]
+            if bboxes.ndim < 2:
+                continue
+            warped_bboxes = warp(target[key], matrix, keep_type=True)
+            if self.keep_shape:
+                iofs = bbox_overlaps(warped_bboxes, img_bound, mode='iof')
+                if_inwindow = iofs[:, 0] > self.keep_iof_thr
+                new_bboxes = warped_bboxes[if_inwindow]
+            
+            if key == self.label_standard:
+                label_if_inwindow = if_inwindow.copy()
+
+            target[key] = new_bboxes
+
+        if "labels" in target.keys():
+            target['labels'] = target['labels'][label_if_inwindow]
 
     def __call__( self, image, target=None ):
-        # (0, 90, 180, or 270)
+
         if self.random_rotate_on:
-            indx = int(random.random() * 100) // 25
-            # anticlockwise
-            for _ in range(indx):
+
+            vert = False
+            if self.vert_cls is not None:
+                if "cls" not in target:
+                    raise ValueError('need class order when vert_cls is not None')
+                vert_lbls = [target["cls"].index(c) for c in self.vert_cls]
+                if "labels" in target:
+                    labels = target["labels"]
+                    for i in vert_lbls:
+                        if (labels == i).any():
+                            vert = True
+        
+            vert = True if np.random.rand() < self.vert_rate else vert
+            
+            if self.rotate_90 or vert == True:
+                # (0, 90, 180, or 270)              
+                indx = int(random.random() * 100) // 25
+                # anticlockwise
+                for _ in range(indx):
+                    if target is not None:
+                        self._rotate_boxes_90(target , image.size)
+                    image = image.rotate(90, expand=True)
                 if target is not None:
-                    self._rotate_boxes_90(target,image.size)
-                image = image.rotate(90,expand=True)
-            if target is not None:
-                target["rotate_angle"]=90*indx
+                    target["rotate_angle"] = 90 * indx
+
+            else:
+
+                target["rboxes"][:, 4] *= -1
+                if self.rotate_mode == 'value':
+                    angles = list(self.angles)
+                    angles = angles + [0] if 0 not in angles else angles
+                    np.random.shuffle(angles)
+                    angle = angles[0]
+                else:
+                    angle_min, angle_max = min(self.angles), max(self.angles)
+                    angle = (angle_max - angle_min) * np.random.rand() + angle_min
+
+                if target is not None:
+                    target["rotate_angle"] = angle
+                
+                if angle != 0:
+                    matrix, w, h = self.get_matrix_and_size(target)
+
+                    img_bound = np.array([[0, 0, w, 0, w, h, 0, h]])
+                    self._rotate_boxes_rand(target, matrix, w, h, img_bound)
+                    image = image.rotate(angle)
+                target["rboxes"][:, 4] *= -1
 
         return image, target
 
@@ -485,3 +588,17 @@ class Normalize:
         target["to_bgr"] = self.to_bgr
         return image, target
 
+@TRANSFORMS.register_module()
+class FliterEmpty:
+    
+    def __init__(self, fliter_list):
+        self.fliter_list = fliter_list
+
+    def __call__(self, image, target=None):
+        
+        for k in self.fliter_list:
+            if k == "rboxes" or k == "hboxes" or k == "polys" or k == "bboxes":
+                if target[k].size == 0:
+                    return image, None
+
+        return image, target
