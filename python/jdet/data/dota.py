@@ -22,10 +22,11 @@ def s2anet_post(result):
 @DATASETS.register_module()
 class DOTADataset(CustomDataset):
 
-    def __init__(self,*arg,balance_category=False,version='1',**kwargs):
+    def __init__(self,*arg,balance_category=False,version='1',use_07_metric=False,**kwargs):
         assert version in ['1', '1_5', '2']
         self.CLASSES = get_classes_by_name('DOTA'+version)
         super().__init__(*arg,**kwargs)
+        self.use_07_metric=use_07_metric
         if balance_category:
             self.img_infos = self._balance_categories()
             self.total_len = len(self.img_infos)
@@ -132,7 +133,7 @@ class DOTADataset(CustomDataset):
                 diffculty = diffculty.astype(bool)
                 g = np.concatenate([g,dg])
                 classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
-            rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly)
+            rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly,use_07_metric=self.use_07_metric)
             aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
         map = sum(list(aps.values()))/len(aps)
         aps["eval/0_meanAP"]=map
