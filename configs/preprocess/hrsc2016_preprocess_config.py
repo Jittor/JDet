@@ -2,7 +2,7 @@ from numpy import source
 
 
 type='HRSC2016'
-source_dataset_path='/mnt/disk/flowey/dataset/HRSC2016'
+source_dataset_path='/home/flowey/dataset/HRSC2016'
 
 tasks=[
     dict(
