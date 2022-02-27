@@ -1,3 +1,4 @@
+from multiprocessing.spawn import prepare
 import shutil
 import jittor as jt 
 from jdet.config.constant import get_classes_by_name
@@ -54,6 +55,13 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
+    if dataset_type in ["HRSC2016"]:
+        save_path = os.path.join(work_dir, f"test/submit_{epoch}")
+        if (os.path.exists(save_path)):
+            shutil.rmtree(save_path)
+        classes = get_classes_by_name(dataset_type)
+        prepare_data(result_pkl, save_path, classes)
+        return
     assert dataset_type in ["FAIR", "DOTA", "DOTA1_5", "DOTA2"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, DOTA1_5 and DOTA2 are supported"
     print("Merge results...")
     save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")

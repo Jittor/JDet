@@ -80,7 +80,7 @@ model = dict(
                 debug=False))
         )
     )
-base_data_root = '/mnt/disk/flowey/dataset/HRSC2016'
+base_data_root = '/home/flowey/dataset/HRSC2016'
 dataset = dict(
     train=dict(
         type="HRSC2016Dataset",
@@ -111,7 +111,8 @@ dataset = dict(
     val=dict(
         type="HRSC2016Dataset",
         images_dir = base_data_root + '/Test/AllImages',
-        annotations_file = base_data_root + '/Train/labels.pkl',
+        annotations_file = base_data_root + '/Test/labels.pkl',
+        use_07_metric=False,
         transforms=[
             dict(
                 type="RotatedResize",
@@ -132,9 +133,9 @@ dataset = dict(
         shuffle=False
     ),
     test=dict(
-        type="HRSC2016Dataset",
+        type="ImageDataset",
+        dataset_type="HRSC2016",
         images_dir = base_data_root + '/Test/AllImages',
-        annotations_file = base_data_root + '/Train/labels.pkl',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -151,7 +152,7 @@ dataset = dict(
                 to_bgr=False,),
         ],
         num_workers=4,
-        batch_size=1,
+        batch_size=2,
     )
 )
 
@@ -176,7 +177,7 @@ logger = dict(
     type="RunLogger")
 
 # when we the trained model from cshuan, image is rgb
-max_epoch = 12
+max_epoch = 36
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
