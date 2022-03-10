@@ -7,4 +7,5 @@ from .single_stage import SingleStageDetector
 from .faster_rcnn_obb import FasterRCNNOBB
 from .roi_transformer import RoITransformer
 from .fcos import FCOS
+from .san import SAN
 __all__ = []
