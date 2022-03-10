@@ -182,14 +182,13 @@ class SAN(nn.Module):
 
 
 def san(sa_type, layers, kernels, num_classes):
-    model = SAN(sa_type, layers, kernels, num_classes, block=Bottleneck, loss=SANMixUpLoss(), loss_prepare=True)
+    model = SAN(sa_type, layers, kernels, num_classes, block=Bottleneck, loss=dict(type='SAMSmoothLoss'), loss_prepare=True)
     return model
 
 
 if __name__ == '__main__':
     jt.flags.use_cuda=1
     net = san(sa_type=0, layers=(3, 4, 6, 8, 3), kernels=[3, 7, 7, 7, 7], num_classes=1000)
-    # print(net)
     targets = [dict(img_label=1),dict(img_label=2),dict(img_label=3),dict(img_label=4)]
     y = net(jt.randn(4, 3, 224, 224), targets)
     print(y)
