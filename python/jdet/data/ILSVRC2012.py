@@ -3,12 +3,33 @@ import numpy as np
 import os
 
 from jdet.utils.registry import DATASETS
+from jdet.utils.general import check_dir, to_jt_var
 from .transforms import Compose
+from tqdm import tqdm
 
 import jittor as jt 
 import os
 from jittor.dataset import Dataset 
 import jdet
+
+def cal_topk_accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k
+
+    Parameters:
+        output: jt.Var [N, K]
+        target: jt.Var [K]
+    """
+    with jt.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = jt.equal(pred, target.view(1, -1).expand_as(pred))
+        res = []
+        for k in topk:
+            correct_k = correct[:k].view(-1).float().sum(0, keepdims=True)
+            res.append(correct_k.sum().item() * (100.0 / batch_size))
+        return res
 
 @DATASETS.register_module()
 class ILSVRCDataset(Dataset):
@@ -87,3 +108,37 @@ class ILSVRCDataset(Dataset):
         if self.transforms:
             img,targets = self.transforms(img,targets)
         return img,targets 
+
+    def evaluate(self,results,work_dir,epoch,logger=None, save=True):
+        print("Calculating mAP......")
+        if save:
+            save_path = os.path.join(work_dir,f"detections/val_{epoch}")
+            check_dir(save_path)
+            jt.save(results,save_path+"/val.pkl")
+        sum_top1, sum_top5, count = 0, 0, 0
+        num_classes = len(self.classes)
+        sum_intersection, sum_output, sum_target = jt.zeros((num_classes)), jt.zeros((num_classes)), jt.zeros((num_classes))
+        for img_idx,(result,target) in tqdm(enumerate(results)):
+            target = jt.array([target['img_label']])
+            result = to_jt_var(result).unsqueeze(0)
+            top1, top5 = cal_topk_accuracy(result, target, topk=(1,5))
+
+            output, confidence = jt.argmax(result, dim=1, keepdims=False)
+            intersection = output[output == target]
+            sum_intersection = jt.scatter(sum_intersection, 0, intersection, jt.array([1]), reduce='add')
+            sum_output = jt.scatter(sum_output, 0, output, jt.array([1]), reduce='add')
+            sum_target = jt.scatter(sum_target, 0, target, jt.array([1]), reduce='add')
+
+            sum_top1 = sum_top1 + top1
+            sum_top5 = sum_top5 + top5
+            count = count + 1
+        iou_classes = sum_intersection / (sum_output + sum_target - sum_intersection + 1e-10)
+        accuracy_class = sum_intersection / (sum_target + 1e-10)
+        aps = dict(
+            mIoU = jt.mean(iou_classes, 0).item(),
+            mAcc = jt.mean(accuracy_class, 0).item(),
+            allAcc = sum_intersection.sum() / (sum_target.sum() + 1e-10),
+            mtop1 = sum_top1 / count,
+            mtop5 = sum_top5 / count,
+        )
+        return aps

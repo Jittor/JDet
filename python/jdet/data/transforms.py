@@ -9,6 +9,7 @@ from jdet.utils.registry import build_from_cfg,TRANSFORMS
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box_np,norm_angle
 from jdet.models.boxes.iou_calculator import bbox_overlaps_np
 from numpy import random as nprandom
+from jittor.transform import CenterCrop
 
 @TRANSFORMS.register_module()
 class Compose:
@@ -150,6 +151,20 @@ class Resize:
             target["scale_factor"] = scale_factor
             target["pad_shape"] = image.size
             target["keep_ratio"] = self.keep_ratio
+        return image, target
+
+# Warning: DO NOT USE THIS
+@TRANSFORMS.register_module()
+class CenterCropJt:
+    def __init__(self, size):
+        if not isinstance(size, (list, tuple)):
+            size = (size,)
+        self.transformer = CenterCrop(size)
+    
+    def __call__(self, image, target=None):
+        image = self.transformer(image)
+        if target is not None:
+            target["img_size"] = image.size
         return image, target
 
 @TRANSFORMS.register_module()

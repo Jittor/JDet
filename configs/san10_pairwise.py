@@ -33,24 +33,27 @@ dataset = dict(
                 type = "Normalize",         ## unknown normalize
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True),
+                to_bgr=False),
         ],
         batch_size=2,
         ),
     val=dict(
         type=dataset_type,
-        batch_size=128,
-        images_dir='/home/flowey/dataset/ILSVRC2012/train/',
+        batch_size=100,
+        images_dir='/home/flowey/dataset/ILSVRC2012/val/',
         transforms=[
             dict(type = "Resize",
-                 min_size = 224,
-                 max_size = 224,
+                 min_size = 256,
+                 max_size = None,
+            ),
+            dict(type = "CenterCropJt",
+                 size = 224,
             ),
             dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True),
+                to_bgr=False),
         ],
         ),
     test=dict(
@@ -65,7 +68,7 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True),
+                to_bgr=False),
         ],
     )
 )
