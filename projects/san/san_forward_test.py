@@ -24,11 +24,11 @@ def main():
     jt.set_global_seed(0)
     np.random.seed(0)
     random.seed(0)
-    init_cfg("/home/flowey/remote2/JDet/configs/san10_pairwise.py")
+    init_cfg("configs/san10_pairwise.py")
     cfg = get_cfg()
 
     model = build_from_cfg(cfg.model,MODELS)
-    numpy_save_dir = '/home/flowey/remote2/JDet/projects/san/test_datas_san/models_numpy.pkl'
+    numpy_save_dir = 'test_datas_san/models_numpy.pkl'
     numpy_dict = pk.load(open(numpy_save_dir, 'rb'))
     jittor_dict = dict()
     for k, v in numpy_dict.items():
@@ -36,7 +36,7 @@ def main():
     model.load_state_dict(jittor_dict)
     optimizer = build_from_cfg(cfg.optimizer,OPTIMS,params=model.parameters())
 
-    model.train()
+    model.eval()
     if (args.set_data):
 
         imagess = []
@@ -83,8 +83,8 @@ def main():
             all_loss, losses = parse_losses(losses)
             jt.sync_all(True)
             l = all_loss.item()
-            print(l)
-            optimizer.step(all_loss)
+            # print(l)
+            # optimizer.step(all_loss)
             c_l = correct_loss[batch_idx]
             err_rate = float(abs(c_l - l)/np.minimum(c_l, l))
             print(f"correct loss is {float(c_l):.4f}, runtime loss is {float(l):.4f}, err rate is {err_rate*100:.2f}%")
