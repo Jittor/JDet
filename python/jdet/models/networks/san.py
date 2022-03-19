@@ -161,7 +161,7 @@ class SAN(nn.Module):
         return nn.Sequential(*layers)
 
     def execute(self, x, targets=None):
-        targets = jt.array([t['img_label'] for t in targets])
+        targets = jt.array([t['img_label'] for t in targets], dtype = jt.int32)
         if self.is_training() and self.loss_prepare:
             x = self.loss.prepare(x, targets)
 

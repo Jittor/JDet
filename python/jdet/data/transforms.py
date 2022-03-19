@@ -80,12 +80,13 @@ class RandomRotateAug:
 
 @TRANSFORMS.register_module()
 class Resize:
-    def __init__(self, min_size, max_size, keep_ratio=True):
+    def __init__(self, min_size, max_size, keep_ratio=True, clip_min_size=True):
         if not isinstance(min_size, (list, tuple)):
             min_size = (min_size,)
         self.min_size = min_size
         self.max_size = max_size
         self.keep_ratio = keep_ratio
+        self.clip_min_size = clip_min_size
 
     # modified from torchvision to add support for max size
     def get_size(self, image_size):
@@ -95,10 +96,11 @@ class Resize:
 
         if self.keep_ratio:
             # NOTE Mingtao
-            if w <= h:
-              size = np.clip( size, int(w / 1.5), int(w * 1.5) )
-            else:
-              size = np.clip( size, int(h / 1.5), int(h * 1.5) )
+            if self.clip_min_size:
+                if w <= h:
+                    size = np.clip( size, int(w / 1.5), int(w * 1.5) )
+                else:
+                    size = np.clip( size, int(h / 1.5), int(h * 1.5) )
 
             if max_size is not None:
                 min_original_size = float(min((w, h)))

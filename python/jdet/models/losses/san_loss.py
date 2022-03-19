@@ -3,6 +3,11 @@ import numpy as np
 from jittor import nn
 from jdet.utils.registry import LOSSES
 
+def log_softmax(x, dim):
+    v_max = jt.expand(jt.max(x, dim, keepdims=True), x.shape)
+    log_bias = jt.expand(jt.sum(jt.exp(x - v_max), dim, keepdims=True), x.shape)
+    return x - v_max - jt.log(log_bias)
+
 def mixup_data(x, y, alpha=0.2):
     '''Returns mixed inputs, pairs of targets, and lambda'''
     if alpha > 0:
@@ -18,20 +23,20 @@ def mixup_data(x, y, alpha=0.2):
 def mixup_loss(output, target_a, target_b, lam=1.0, eps=0.0):
     w = jt.zeros_like(output).scatter_(1, target_a.unsqueeze(1), jt.array(1))
     w = w * (1 - eps) + (1 - w) * eps / (output.shape[1] - 1)
-    log_prob = nn.log_softmax(output, dim=1)
+    log_prob = log_softmax(output, dim=1)
     loss_a = (-w * log_prob).sum(dim=1).mean()
 
     w = jt.zeros_like(output).scatter_(1, target_b.unsqueeze(1), jt.array(1))
     w = w * (1 - eps) + (1 - w) * eps / (output.shape[1] - 1)
-    log_prob = nn.log_softmax(output, dim=1)
+    log_prob = log_softmax(output, dim=1)
     loss_b = (-w * log_prob).sum(dim=1).mean()
     return lam * loss_a + (1 - lam) * loss_b
 
 
 def smooth_loss(output, target, eps=0.1):
-    w = jt.zeros_like(output).scatter_(1, target.unsqueeze(1), jt.array(1))
+    w = jt.zeros_like(output).scatter_(1, target.unsqueeze(1), jt.array(1, dtype=output.dtype))
     w = w * (1 - eps) + (1 - w) * eps / (output.shape[1] - 1)
-    log_prob = nn.log_softmax(output, dim=1)
+    log_prob = log_softmax(output, dim=1)
     loss = (-w * log_prob).sum(dim=1).mean()
     return loss
 

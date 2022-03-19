@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import jittor as jt 
 import os
-from jittor.dataset import Dataset 
+from jittor.dataset import Dataset, ImageFolder
 import jdet
 
 def cal_topk_accuracy(output, target, topk=(1,)):
@@ -62,15 +62,23 @@ class ILSVRCDataset(Dataset):
  
     def _load_images(self, images_dir):
         images, labels = [], []
-        for label in os.listdir(images_dir):
-            label_dir = os.path.join(images_dir, label)
-            if os.path.isdir(label_dir):
-                if label not in self.class_to_idx.keys():
-                    raise ValueError("unknow class {}".format(label))
-                for name in os.listdir(label_dir):
-                    if (jdet.utils.general.is_img(name)):
-                        images.append(os.path.join(images_dir, label, name))
-                        labels.append(self.class_to_idx[label])
+        for i, class_name in enumerate(self.classes):
+            class_dir = os.path.join(images_dir, class_name)
+            for dname, _, fnames in sorted(os.walk(class_dir, followlinks=True)):
+                for fname in sorted(fnames):
+                    if (jdet.utils.general.is_img(fname)):
+                        images.append(os.path.join(class_dir, fname))
+                        labels.append(self.class_to_idx[class_name])
+
+        # for label in os.listdir(images_dir):
+        #     label_dir = os.path.join(images_dir, label)
+        #     if os.path.isdir(label_dir):
+        #         if label not in self.class_to_idx.keys():
+        #             raise ValueError("unknow class {}".format(label))
+        #         for name in os.listdir(label_dir):
+        #             if (jdet.utils.general.is_img(name)):
+        #                 images.append(os.path.join(images_dir, label, name))
+        #                 labels.append(self.class_to_idx[label])
         return images, labels
     
     def collate_batch(self,batch):
