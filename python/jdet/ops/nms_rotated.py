@@ -512,6 +512,14 @@ def nms_rotated_cuda(dets,order_t,iou_threshold,box_length=6) :
         cuda_src=f"const float iou_threshold = {iou_threshold};"+ML_NMS_ROTATED_CUDA_SRC)
     return keep 
 
+def obb2hbb(obboxes):
+    center, w, h, theta = jt.split(obboxes, [2, 1, 1, 1], dim=1)
+    Cos, Sin = jt.cos(theta), jt.sin(theta)
+    x_bias = jt.abs(w/2 * Cos) + jt.abs(h/2 * Sin)
+    y_bias = jt.abs(w/2 * Sin) + jt.abs(h/2 * Cos)
+    bias = jt.concat([x_bias, y_bias], dim=1)
+    return jt.concat([center-bias, center+bias], dim=1)
+
 def ml_nms_rotated(dets,scores,labels,iou_threshold):
     assert dets.numel()>0 and dets.ndim==2
     assert dets.dtype==scores.dtype

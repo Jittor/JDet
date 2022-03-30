@@ -818,3 +818,22 @@ if __name__ == '__main__':
     print(anchor_bases)
     print(ssd_anchor_generator.grid_anchors([(2, 2)]))
     print('ssd_anchor_generator')
+
+@BOXES.register_module()
+class Theta0AnchorGenerator(AnchorGenerator):
+
+    def single_level_grid_anchors(self,
+                                  base_anchors,
+                                  featmap_size,
+                                  stride=(16, 16)):
+        anchors = super(Theta0AnchorGenerator, self).single_level_grid_anchors(
+            base_anchors, featmap_size, stride=stride)
+
+        num_anchors = anchors.size(0)
+        xy = (anchors[:, 2:] + anchors[:, :2]) / 2
+        wh = anchors[:, 2:] - anchors[:, :2]
+        theta = jt.zeros((num_anchors, 1), dtype=float)
+
+        anchors = jt.concat([xy, wh, theta], dim=1)
+        return anchors
+

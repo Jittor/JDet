@@ -140,6 +140,113 @@ class DeltaXYWHABBoxCoder:
 
         return decoded_bboxes
 
+
+@BOXES.register_module()
+class DeltaXYWHTBBoxCoder:
+    """Delta XYWHT BBox coder, for Retinanet.
+    """
+
+    def __init__(self,
+                 target_means=(0., 0., 0., 0., 0.),
+                 target_stds=(1., 1., 1., 1., 1.),
+                 clip_border=True):
+        self.means = target_means
+        self.stds = target_stds
+        self.clip_border = clip_border
+
+    def encode(self, bboxes, gt_bboxes):
+        """Get box regression transformation deltas that can be used to
+        transform the ``bboxes`` into the ``gt_bboxes``.
+
+        Args:
+            bboxes (jt.Var): Source boxes, e.g., object proposals.
+            gt_bboxes (jt.Var): Target of the transformation, e.g.,
+                ground-truth boxes.
+
+        Returns:
+            jt.Var: Box transformation deltas
+        """
+
+        assert bboxes.size(0) == gt_bboxes.size(0)
+        assert bboxes.size(-1) == gt_bboxes.size(-1) == 5
+        encoded_bboxes = bbox2delta_rotated(bboxes, gt_bboxes, self.means, self.stds)
+        return encoded_bboxes
+
+    def decode(self,
+               bboxes,
+               pred_bboxes,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000):
+        """Apply transformation `pred_bboxes` to `boxes`.
+
+        Args:
+            boxes (jt.Var): Basic boxes.
+            pred_bboxes (jt.Var): Encoded boxes with shape
+            max_shape (tuple[int], optional): Maximum shape of boxes.
+                Defaults to None.
+            wh_ratio_clip (float, optional): The allowed ratio between
+                width and height.
+
+        Returns:
+            jt.Var: Decoded boxes.
+        """
+        assert pred_bboxes.size(0) == bboxes.size(0)
+        decoded_bboxes = self.delta2bbox_rotated_new(bboxes, pred_bboxes, self.means, self.stds,
+                                            max_shape, wh_ratio_clip, self.clip_border)
+
+        return decoded_bboxes
+
+    def delta2bbox_rotated_new(self, rois, deltas, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1., 1., 1.), max_shape=None,
+                       wh_ratio_clip=16 / 1000, clip_border=True):
+        """
+        Following OBBDetection
+        """
+        means = jt.array(means).repeat(1, deltas.size(1) // 5)
+        stds = jt.array(stds).repeat(1, deltas.size(1) // 5)
+        denorm_deltas = deltas * stds + means
+
+        dx = denorm_deltas[:, 0::5]
+        dy = denorm_deltas[:, 1::5]
+        dw = denorm_deltas[:, 2::5]
+        dh = denorm_deltas[:, 3::5]
+        dangle = denorm_deltas[:, 4::5]
+
+        max_ratio = np.abs(np.log(wh_ratio_clip))
+        dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+        dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+        roi_x = (rois[:, 0]).unsqueeze(1).expand_as(dx)
+        roi_y = (rois[:, 1]).unsqueeze(1).expand_as(dy)
+        roi_w = (rois[:, 2]).unsqueeze(1).expand_as(dw)
+        roi_h = (rois[:, 3]).unsqueeze(1).expand_as(dh)
+        roi_angle = (rois[:, 4]).unsqueeze(1).expand_as(dangle)
+        gx = dx * roi_w * jt.cos(-roi_angle) \
+            - dy * roi_h * jt.sin(-roi_angle) + roi_x
+        gy = dx * roi_w * jt.sin(-roi_angle) \
+            + dy * roi_h * jt.cos(-roi_angle) + roi_y
+        gw = roi_w * dw.exp()
+        gh = roi_h * dh.exp()
+
+        # ga = np.pi * dangle + roi_angle
+
+        ga = dangle + roi_angle
+        # ga = self.norm_angle(ga)
+
+        bboxes = jt.stack([gx, gy, gw, gh, ga], dim=-1).view_as(deltas)
+        bboxes = self.regular_obb(bboxes)
+        return bboxes
+
+    def regular_obb(self, obboxes):
+        x, y, w, h, theta = obboxes.unbind(dim=-1)
+        w_regular, h_regular, theta_regular = w.copy(), h.copy(), theta.copy()
+        regular_index = jt.where(w <= h)
+        for index in regular_index:
+            w_regular[index] = h[index]
+            h_regular[index] = w[index]
+            theta_regular[index] += np.pi / 2
+        theta_regular = regular_theta(theta_regular)
+        return jt.stack([x, y, w_regular, h_regular, theta_regular], dim=-1)
+
+
 @BOXES.register_module()
 class GVFixCoder:
     def __init__(self):

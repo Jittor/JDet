@@ -67,3 +67,11 @@ class RetinaNet(nn.Module):
             return losses 
         else:
             return results
+
+    def train(self):
+        super().train()
+        self.backbone.train()
+
+    def eval(self):
+        super().eval()
+        self.backbone.eval()

@@ -20,21 +20,21 @@ model = dict(
         in_channels = 256,
         stacked_convs = 4,
         feat_channels= 256,
+        anchor_generator = dict(
+            type= "Theta0AnchorGenerator",
+            strides= [8, 16, 32, 64, 128],
+            ratios= [0.5, 1, 2.0],
+            octave_base_scale=4,
+            scales_per_octave=3),
         # anchor_generator = dict(
-        #     type= "Theta0AnchorGenerator",
+        #     type= "AnchorGeneratorRotated",
         #     strides= [8, 16, 32, 64, 128],
         #     ratios= [1, 0.5, 2.0],
-        #     octave_base_scale=4,
-        #     scales_per_octave=3),
-        anchor_generator = dict(
-            type= "AnchorGeneratorRotated",
-            strides= [8, 16, 32, 64, 128],
-            ratios= [1, 0.5, 2.0],
-            scales= [4, 4.756828460010884, 5.656854249492381],
-            mode="R"
-        ),
+        #     scales= [4, 4.756828460010884, 5.656854249492381],
+        #     mode="R"
+        # ),
         bbox_coder=dict(
-            type="DeltaXYWHABBoxCoder",
+            type="DeltaXYWHTBBoxCoder",
             target_means=[.0, .0, .0, .0, .0],
             target_stds=[1.0, 1.0, 1.0, 1.0, 1.0]
         ),
@@ -118,7 +118,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir = "/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/trainval_1024_200_1.0/images/",
+      images_dir = "/mnt/disk/cxjyxx_me/JAD/datasets/processed_DOTA/test_1024_200_1.0/images/",
       transforms= [
         dict(
           type= "RotatedResize",
@@ -152,12 +152,11 @@ scheduler = dict(
 logger = dict(
     type= "RunLogger")
 
-work_dir ="./work_dirs/retinanet1"
+work_dir ="./work_dirs/retinanet_test"
 
 max_epoch = 12
 eval_interval = 1
 log_interval = 50
 checkpoint_interval = 1
-# pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"
 # merge_nms_threshold_type = 1
 

@@ -102,7 +102,7 @@ class RetinaHead1(nn.Module):
         self._init_layers()
 
     def _init_layers(self):
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
@@ -432,12 +432,12 @@ class RetinaHead1(nn.Module):
             concat_anchor_list.append(jt.concat(anchor_list[i]))
         all_anchor_list = images_to_levels(concat_anchor_list,
                                            num_level_anchors)
-        batch_size = len(bbox_preds)
+        num_levels = len(bbox_preds)
         losses = dict(
             roi_cls_loss=0,
             roi_loc_loss=0
-        ) 
-        for i in range(batch_size):
+        )
+        for i in range(num_levels):
             loss_cls, loss_bbox = self.loss_single(
                 cls_scores[i],
                 bbox_preds[i],
@@ -450,8 +450,8 @@ class RetinaHead1(nn.Module):
             )
             losses['roi_cls_loss'] += loss_cls
             losses['roi_loc_loss'] += loss_bbox
-        losses['roi_cls_loss'] /= batch_size
-        losses['roi_loc_loss'] /= batch_size
+        losses['roi_cls_loss'] /= num_levels
+        losses['roi_loc_loss'] /= num_levels
         return losses
 
     # @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
@@ -489,7 +489,6 @@ class RetinaHead1(nn.Module):
         featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
         mlvl_anchors = self.anchor_generator.grid_anchors(
             featmap_sizes)
-
         result_list = []
         for img_id in range(len(img_metas)):
             cls_score_list = [
@@ -530,17 +529,17 @@ class RetinaHead1(nn.Module):
                 scores = cls_score.sigmoid()
             else:
                 scores = cls_score.softmax(-1)
-            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, self.reg_dim)
             nms_pre = cfg.get('nms_pre', -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:
                 # Get maximum scores for foreground classes.
                 if self.use_sigmoid_cls:
-                    max_scores, _ = scores.max(dim=1)
+                    max_scores = scores.max(dim=1)
                 else:
                     # remind that we set FG labels to [0, num_class-1]
                     # since mmdet v2.0
                     # BG cat_id: num_class
-                    max_scores, _ = scores[:, :-1].max(dim=1)
+                    max_scores = scores[:, :-1].max(dim=1)
                 _, topk_inds = max_scores.topk(nms_pre)
                 anchors = anchors[topk_inds, :]
                 bbox_pred = bbox_pred[topk_inds, :]
@@ -557,8 +556,8 @@ class RetinaHead1(nn.Module):
             # Add a dummy background class to the backend when using sigmoid
             # remind that we set FG labels to [0, num_class-1] since mmdet v2.0
             # BG cat_id: num_class
-            padding = jt.zeros(mlvl_scores.shape[0], dtype=float)
-            mlvl_scores = jt.concat([mlvl_scores, padding], dim=1)
+            padding = jt.zeros((mlvl_scores.shape[0], 1), dtype=float)
+            mlvl_scores = jt.concat([padding, mlvl_scores], dim=1) # 0-col is background
         det_bboxes, det_labels = multiclass_nms_rotated(mlvl_bboxes, mlvl_scores,
                                                 cfg.score_thr, cfg.nms,
                                                 cfg.max_per_img)
@@ -569,10 +568,13 @@ class RetinaHead1(nn.Module):
         reg_feat = x
         for conv_cls in self.cls_convs:
             cls_feat = conv_cls(cls_feat)
+            cls_feat = self.relu(cls_feat)
         for conv_reg in self.reg_convs:
             reg_feat = conv_reg(reg_feat)
-        cls_score = self.retina_cls(x)
-        bbox_pred = self.retina_reg(x)
+            reg_feat= self.relu(reg_feat)
+
+        cls_score = self.retina_cls(cls_feat)
+        bbox_pred = self.retina_reg(reg_feat)
         return cls_score, bbox_pred
     
     def execute(self, x, targets):
@@ -585,8 +587,9 @@ class RetinaHead1(nn.Module):
             meta["img_shape"] = tgt["img_size"]
             meta["scale_factor"] = tgt["scale_factor"]
             meta["pad_shape"] = tgt["pad_shape"]
-            gt_bboxes.append(tgt["rboxes"])
-            gt_labels.append(tgt["labels"])
+            if self.is_training():
+                gt_bboxes.append(tgt["rboxes"])
+                gt_labels.append(tgt["labels"])
             img_metas.append(meta)
 
         cls_scores, bbox_preds = multi_apply(self.execute_single, x)
@@ -594,8 +597,15 @@ class RetinaHead1(nn.Module):
         results = []
         if self.is_training():
             losses = self.losses(cls_scores, bbox_preds, 
-                        gt_bboxes, gt_labels, img_metas)
+                        gt_bboxes, gt_labels, img_metas)             
         else:
             results = self.get_bboxes(cls_scores, bbox_preds, img_metas)
+            # results = self.trans_labels_to_jdet(results)
         return results, losses
+
+    def trans_labels_to_jdet(self, x):
+        a = jt.array([5, 13, 14, 2, 0, 6, 10, 8, 3, 4, 1, 7, 11, 9, 12])
+        for i in range(len(x)):
+            x[i][1][:] = a[x[i][1][:]]
+        return x
         
