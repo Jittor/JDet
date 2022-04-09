@@ -158,9 +158,9 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: SSDD+
 - :heavy_check_mark: FAIR
 - :heavy_check_mark: COCO
+- :heavy_check_mark: HRSC2016
 - :heavy_plus_sign: LS-SSDD
 - :heavy_plus_sign: DIOR-R
-- :heavy_plus_sign: HRSC2016
 - :heavy_plus_sign: ICDAR2015
 - :heavy_plus_sign: ICDAR2017 MLT
 - :heavy_plus_sign: UCAS-AOD
