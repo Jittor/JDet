@@ -8,13 +8,14 @@ import pickle
 import datetime
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.visualization import visualize_results
-from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
+from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS,EMA
 from jdet.config import get_classes_by_name
-from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
+from jdet.utils.general import build_file, current_time, sync,check_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.data_merge import data_merge_result
 import os
 import shutil
 from tqdm import tqdm
+from jittor_utils import auto_diff
 import copy
 
 class Runner:
@@ -43,6 +44,10 @@ class Runner:
         self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
         self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
         self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
+
+        self.ema = build_from_cfg(cfg.ema, EMA, model=self.model)
+        if self.ema:
+            self.ema.updates = 0 * len(self.train_dataset) // max(round(64 / cfg.batch_size), 1) #start_epoch * nb // accumulate
         
         self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
@@ -83,11 +88,10 @@ class Runner:
             self.train()
             if check_interval(self.epoch,self.eval_interval) and False:
                 # TODO: need remove this
-                self.model.eval()
-                self.val()
+                self.val(model=self.ema.ema if self.ema else self.model)
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
-        self.test()
+        self.val(model=self.ema.ema if self.ema else self.model)
 
     def test_time(self):
         warmup = 10
@@ -126,17 +130,20 @@ class Runner:
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
+            if self.ema:
+                self.ema.update(self.model)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
-    
             if check_interval(self.iter,self.log_interval) and self.iter>0:
-                batch_size = len(targets)*jt.world_size
+                batch_size = len(images)*jt.world_size
                 ptime = time.time()-start_time
                 fps = batch_size*(batch_idx+1)/ptime
                 eta_time = (self.total_iter-self.iter)*ptime/(batch_idx+1)
                 eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     name = self.cfg.name,
-                    lr = self.optimizer.cur_lr(),
+                    lr_0 = self.optimizer.param_groups[0]['lr'],
+                    lr_1 = self.optimizer.param_groups[1]['lr'],
+                    lr_2 = self.optimizer.param_groups[2]['lr'],
                     iter = self.iter,
                     epoch = self.epoch,
                     batch_idx = batch_idx,
@@ -147,14 +154,15 @@ class Runner:
                 )
                 data.update(losses)
                 data = sync(data)
-                # is_main use jt.rank==0, so it's scope must have no jt.Vars
+                # is_main use jt.rank==0, so its scope must have no jt.Vars
                 if jt.rank==0:
                     self.logger.log(data)
             
             self.iter+=1
             if self.finish:
                 break
-
+        if self.ema:
+            self.ema.update_attr(self.model, include=['yaml', 'nc', 'hyp', 'gr', 'names', 'stride', 'class_weights']) 
         self.epoch +=1
 
 
@@ -171,36 +179,35 @@ class Runner:
 
     @jt.no_grad()
     @jt.single_process_scope()
-    def val(self):
+    def val(self, model=None):
         if self.val_dataset is None:
             self.logger.print_log("Please set Val dataset")
         else:
             self.logger.print_log("Validating....")
             # TODO: need move eval into this function
-            # self.model.eval()
-            if self.model.is_training():
-                self.model.eval()
+            model.eval()
+            #if model.is_training():
+            #    model.eval()
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
-                result = self.model(images,targets)
+                result = model(images,targets)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
             self.logger.log(eval_results,iter=self.iter)
 
     @jt.no_grad()
     @jt.single_process_scope()
-    def test(self):
+    def test(self, model=None):
 
         if self.test_dataset is None:
             self.logger.print_log("Please set Test dataset")
         else:
             self.logger.print_log("Testing...")
-            self.model.eval()
+            model.eval()
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
-                result = self.model(images,targets)
+                result = model(images,targets)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
                 for mode in self.flip_test:
                     images_flip = images.copy()
@@ -212,7 +219,7 @@ class Runner:
                         images_flip = images_flip[:, :, ::-1, ::-1]
                     else:
                         assert(False)
-                    result = self.model(images_flip,targets)
+                    result = model(images_flip,targets)
                     targets_ = copy.deepcopy(targets)
                     for i in range(len(targets_)):
                         targets_[i]["flip_mode"] = mode
@@ -240,9 +247,9 @@ class Runner:
             "scheduler": self.scheduler.parameters(),
             "optimizer": self.optimizer.parameters()
         }
-
         save_file = build_file(self.work_dir,prefix=f"checkpoints/ckpt_{self.epoch}.pkl")
         jt.save(save_data,save_file)
+        print("saved")
     
     def load(self, load_path, model_only=False):
         resume_data = jt.load(load_path)
@@ -265,4 +272,4 @@ class Runner:
         self.logger.print_log(f"Loading model parameters from {load_path}")
 
     def resume(self):
-        self.load(self.resume_path)
+        self.load(self.resume_path, model_only=True)
