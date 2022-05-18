@@ -144,7 +144,7 @@ dataset = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/flowey/dataset/processed_DOTA/trainval_1024_200_1.0/',
         version='1',
         filter_min_size=32,
         transforms=[
@@ -163,10 +163,11 @@ dataset = dict(
                 to_bgr=True),
         ],
         batch_size=2,
+        shuffle=True,
         ),
     val=dict(
         type=dataset_type,
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/flowey/dataset/processed_DOTA/trainval_1024_200_1.0/',
         version='1',
         filter_min_size=32,
         transforms=[
@@ -182,7 +183,7 @@ dataset = dict(
         ),
     test=dict(
         type="ImageDataset",        
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',
+        images_dir='/home/flowey/dataset/processed_DOTA/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type = "Pad",
