@@ -192,7 +192,7 @@ def anchor_inside_flags(flat_anchors, valid_flags, img_shape,
             (flat_anchors[:, 3] < img_h + allowed_border)
     else:
         inside_flags = valid_flags
-    return inside_flags
+    return inside_flags.bool()
 
 
 def unmap(data, count, inds, fill=0):

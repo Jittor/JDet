@@ -1,4 +1,5 @@
 import random
+from tokenize import Number
 import jittor as jt 
 import cv2
 import numpy as np
@@ -8,6 +9,7 @@ from jdet.utils.registry import build_from_cfg,TRANSFORMS
 from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box_np,norm_angle
 from jdet.models.boxes.iou_calculator import bbox_overlaps_np
 from numpy import random as nprandom
+from jittor.transform import CenterCrop
 
 @TRANSFORMS.register_module()
 class Compose:
@@ -78,12 +80,13 @@ class RandomRotateAug:
 
 @TRANSFORMS.register_module()
 class Resize:
-    def __init__(self, min_size, max_size, keep_ratio=True):
+    def __init__(self, min_size, max_size, keep_ratio=True, clip_min_size=True):
         if not isinstance(min_size, (list, tuple)):
             min_size = (min_size,)
         self.min_size = min_size
         self.max_size = max_size
         self.keep_ratio = keep_ratio
+        self.clip_min_size = clip_min_size
 
     # modified from torchvision to add support for max size
     def get_size(self, image_size):
@@ -93,10 +96,11 @@ class Resize:
 
         if self.keep_ratio:
             # NOTE Mingtao
-            if w <= h:
-              size = np.clip( size, int(w / 1.5), int(w * 1.5) )
-            else:
-              size = np.clip( size, int(h / 1.5), int(h * 1.5) )
+            if self.clip_min_size:
+                if w <= h:
+                    size = np.clip( size, int(w / 1.5), int(w * 1.5) )
+                else:
+                    size = np.clip( size, int(h / 1.5), int(h * 1.5) )
 
             if max_size is not None:
                 min_original_size = float(min((w, h)))
@@ -149,6 +153,20 @@ class Resize:
             target["scale_factor"] = scale_factor
             target["pad_shape"] = image.size
             target["keep_ratio"] = self.keep_ratio
+        return image, target
+
+# Warning: DO NOT USE THIS
+@TRANSFORMS.register_module()
+class CenterCropJt:
+    def __init__(self, size):
+        if not isinstance(size, (list, tuple)):
+            size = (size,)
+        self.transformer = CenterCrop(size)
+    
+    def __call__(self, image, target=None):
+        image = self.transformer(image)
+        if target is not None:
+            target["img_size"] = image.size
         return image, target
 
 @TRANSFORMS.register_module()

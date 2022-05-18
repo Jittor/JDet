@@ -55,6 +55,8 @@ FAIR Dataset: [fair.md](docs/fair.md)
 
 SSDD/SSDD+: [ssdd.md](docs/ssdd.md)
 
+HRSC2016: [hrsc2016.md](docs/hrsc2016.md)
+
 You can also build your own dataset by convert your datas to DOTA format.
 ### Config
 JDet defines the used model, dataset and training/testing method by `config-file`, please check the [config.md](docs/config.md) to learn how it works.

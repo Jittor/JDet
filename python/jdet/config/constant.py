@@ -200,6 +200,8 @@ FAIR_CLASSES_ = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919',
 
 SSDD_CLASSES = ['ship']
 
+HRSC2016_CLASSES = ['ship']
+
 def get_classes_by_name(name):
     res = {
         'VOC':      VOC_CLASSES,
@@ -213,6 +215,7 @@ def get_classes_by_name(name):
         'FAIR':     FAIR_CLASSES_,
         'SSDD':     SSDD_CLASSES,
         'SSDD+':    SSDD_CLASSES,
+        'HRSC2016': HRSC2016_CLASSES,
     }
     assert(name in res)
     return res[name]

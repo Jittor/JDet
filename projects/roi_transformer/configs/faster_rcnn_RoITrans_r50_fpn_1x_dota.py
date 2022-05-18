@@ -163,6 +163,7 @@ dataset = dict(
                 to_bgr=True),
         ],
         batch_size=2,
+        shuffle=True,
         ),
     val=dict(
         type=dataset_type,
