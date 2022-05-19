@@ -3,7 +3,6 @@ import jittor as jt
 from jdet.config import init_cfg, get_cfg
 from jdet.utils.general import parse_losses
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS, EMA
-import models
 import numpy as np
 import argparse
 import os

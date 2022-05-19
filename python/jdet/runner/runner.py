@@ -8,7 +8,7 @@ import pickle
 import datetime
 from jdet.config import get_cfg,save_cfg
 from jdet.utils.visualization import visualize_results
-from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS,EMA
+from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import get_classes_by_name
 from jdet.utils.general import build_file, current_time, sync,check_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.data_merge import data_merge_result
@@ -44,10 +44,6 @@ class Runner:
         self.train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi)
         self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
         self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
-
-        self.ema = build_from_cfg(cfg.ema, EMA, model=self.model)
-        if self.ema:
-            self.ema.updates = 0 * len(self.train_dataset) // max(round(64 / cfg.batch_size), 1) #start_epoch * nb // accumulate
         
         self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
@@ -86,12 +82,12 @@ class Runner:
         
         while not self.finish:
             self.train()
-            if check_interval(self.epoch,self.eval_interval) and False:
+            if check_interval(self.epoch,self.eval_interval) and True:
                 # TODO: need remove this
-                self.val(model=self.ema.ema if self.ema else self.model)
+                self.val()
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
-        self.val(model=self.ema.ema if self.ema else self.model)
+        self.val()
 
     def test_time(self):
         warmup = 10
@@ -130,8 +126,6 @@ class Runner:
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
-            if self.ema:
-                self.ema.update(self.model)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
             if check_interval(self.iter,self.log_interval) and self.iter>0:
                 batch_size = len(images)*jt.world_size
@@ -141,9 +135,7 @@ class Runner:
                 eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     name = self.cfg.name,
-                    lr_0 = self.optimizer.param_groups[0]['lr'],
-                    lr_1 = self.optimizer.param_groups[1]['lr'],
-                    lr_2 = self.optimizer.param_groups[2]['lr'],
+                    lr = self.optimizer.cur_lr(),
                     iter = self.iter,
                     epoch = self.epoch,
                     batch_idx = batch_idx,
@@ -161,8 +153,6 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
-        if self.ema:
-            self.ema.update_attr(self.model, include=['yaml', 'nc', 'hyp', 'gr', 'names', 'stride', 'class_weights']) 
         self.epoch +=1
 
 
@@ -179,18 +169,18 @@ class Runner:
 
     @jt.no_grad()
     @jt.single_process_scope()
-    def val(self, model=None):
+    def val(self):
         if self.val_dataset is None:
             self.logger.print_log("Please set Val dataset")
         else:
             self.logger.print_log("Validating....")
             # TODO: need move eval into this function
-            model.eval()
+            self.model.eval()
             #if model.is_training():
             #    model.eval()
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
-                result = model(images,targets)
+                result = self.model(images,targets)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
@@ -198,16 +188,16 @@ class Runner:
 
     @jt.no_grad()
     @jt.single_process_scope()
-    def test(self, model=None):
+    def test(self):
 
         if self.test_dataset is None:
             self.logger.print_log("Please set Test dataset")
         else:
             self.logger.print_log("Testing...")
-            model.eval()
+            self.model.eval()
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.test_dataset),total=len(self.test_dataset)):
-                result = model(images,targets)
+                result = self.model(images,targets)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
                 for mode in self.flip_test:
                     images_flip = images.copy()
@@ -219,7 +209,7 @@ class Runner:
                         images_flip = images_flip[:, :, ::-1, ::-1]
                     else:
                         assert(False)
-                    result = model(images_flip,targets)
+                    result = self.model(images_flip,targets)
                     targets_ = copy.deepcopy(targets)
                     for i in range(len(targets_)):
                         targets_[i]["flip_mode"] = mode
@@ -272,4 +262,4 @@ class Runner:
         self.logger.print_log(f"Loading model parameters from {load_path}")
 
     def resume(self):
-        self.load(self.resume_path, model_only=True)
+        self.load(self.resume_path)

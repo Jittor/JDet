@@ -9,16 +9,15 @@ imgsz=640
 imgsz_test=640
 nc=80
 dataset_type = 'YoloDataset'
-data_path='/mnt/disk/wang/JDet/projects/yolo/data/coco.yaml'
-hyp='/mnt/disk/wang/JDet/projects/yolo/data/hyp.scratch.yaml'
+hyp='/mnt/disk/wang/JDet/projects/yolo1/data/hyp.scratch.yaml'
 
 model = dict(
-    type ='YOLOv5M',
+    type ='YOLOv5S',
     ch = 3, 
     nc = nc,
     pretrained=False,
     imgsz=imgsz,
-    hyp=hyp
+    ema=True
 )
 ema = dict(
     type = 'ModelEMA'
@@ -35,7 +34,7 @@ optimizer=dict(
     nesterov=True
 )
 scheduler=dict(
-    type='CosineAnnealingLR',
+    type='CosineAnnealingLRGroup',
     max_steps=max_epoch,
     min_lr_ratio=0.2, # hyp[lrf]
     warmup_init_lr_pg=[0., 0., 0.1], #[pg0, pg1, pg2]

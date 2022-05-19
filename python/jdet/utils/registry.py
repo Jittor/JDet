@@ -58,7 +58,6 @@ NECKS = Registry()
 SCHEDULERS = Registry()
 BOXES = Registry()
 HOOKS = Registry()
-EMA = Registry()
 
 ROI_EXTRACTORS = Registry()
 SHARED_HEADS = Registry()

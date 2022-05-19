@@ -22,7 +22,7 @@ from jittor.dataset import Dataset
 from tqdm import tqdm
 from jdet.models.boxes.box_ops import bbox_iou 
 from jdet.utils.general import colorstr, check_img_size
-from jdet.utils.registry import DATASETS
+from jdet.utils.registry import build_from_cfg,TRANSFORMS, DATASETS
 # Parameters
 help_url = 'https://github.com/ultralytics/yolov3/wiki/Train-Custom-Data'
 img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng']  # acceptable image suffixes
@@ -37,21 +37,44 @@ for orientation in ExifTags.TAGS.keys():
 
 
 @DATASETS.register_module()
-def YoloDataset(path, task='val', single_cls=False, imgsz=640, batch_size=1, nc=80, stride=32, hyp=None, cache=False, pad=0.0, augment=False, rect=False, drop_last=False,
-                      rank=-1, world_size=1, num_workers=8, image_weights=False, quad=False, conf_thres=0.001, iou_thres=0.6, save_hybrid=False, save_conf=True, save_json=False, save_txt=False, verbose=False, is_coco=False):
+def YoloDataset(path, task='val', 
+                single_cls=False, 
+                imgsz=640, 
+                batch_size=1, 
+                nc=80, 
+                stride=32, 
+                cache=False, 
+                pad=0.0, 
+                augment=False, 
+                rect=False, 
+                drop_last=False,
+                rank=-1, 
+                world_size=1, 
+                num_workers=8,  
+                quad=False, 
+                conf_thres=0.001, 
+                iou_thres=0.6, 
+                save_conf=True, 
+                save_json=False, 
+                save_txt=False, 
+                verbose=False, 
+                is_coco=False,
+                mixup_prob=0.0,
+                mosaic_prob=1.0,
+                random_perspective=None, 
+                augment_hsv=None, 
+                flipud=None, 
+                fliplr=None,
+                ):
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     
     nc = 1 if single_cls else nc  # number of classes
     img_size = check_img_size(imgsz, stride)
     nw = min([os.cpu_count() // world_size, batch_size if batch_size > 1 else 0, num_workers])  # number of workers
-   
-    with open(hyp) as f:
-        hyp = yaml.load(f, Loader=yaml.SafeLoader)
 
     if task == 'train':
         dataset = LoadImagesAndLabels(path, img_size=img_size, task=task, 
                                       augment=augment,  # augment images
-                                      hyp=hyp,  # augmentation hyperparameters
                                       rect=rect,  # rectangular training
                                       cache_images=cache,
                                       single_cls=single_cls,
@@ -60,15 +83,19 @@ def YoloDataset(path, task='val', single_cls=False, imgsz=640, batch_size=1, nc=
                                       batch_size=batch_size,
                                       drop_last=drop_last,
                                       num_workers=nw,
-                                      image_weights=image_weights,
                                       conf_thres=conf_thres, 
                                       iou_thres=iou_thres,
                                       prefix=colorstr('train: '),
+                                      mosaic_prob=mosaic_prob,
+                                      mixup_prob=mixup_prob,
+                                      random_perspective=random_perspective, 
+                                      augment_hsv=augment_hsv, 
+                                      flipud=flipud, 
+                                      fliplr=fliplr,
                                       num_classes=nc)
     elif task == 'val':
         dataset = LoadImagesAndLabels(path, img_size=img_size, task=task, 
                                       augment=False,  # augment images
-                                      hyp=hyp,  # augmentation hyperparameters
                                       rect=True,  # rectangular training
                                       cache_images=cache,
                                       single_cls=single_cls,
@@ -77,10 +104,8 @@ def YoloDataset(path, task='val', single_cls=False, imgsz=640, batch_size=1, nc=
                                       batch_size=batch_size,
                                       drop_last=drop_last,
                                       num_workers=nw,
-                                      image_weights=False,
                                       conf_thres=conf_thres, 
                                       iou_thres=iou_thres,
-                                      save_hybrid=save_hybrid,
                                       is_coco=is_coco,
                                       save_conf=save_conf,
                                       save_json=save_json,
@@ -91,7 +116,6 @@ def YoloDataset(path, task='val', single_cls=False, imgsz=640, batch_size=1, nc=
     elif task == 'test':
         dataset = LoadImagesAndLabels(path, img_size=img_size, task=task, 
                                       augment=False,  # augment images
-                                      hyp=hyp,  # augmentation hyperparameters
                                       rect=True,  # rectangular training
                                       cache_images=cache,
                                       single_cls=single_cls,
@@ -100,10 +124,8 @@ def YoloDataset(path, task='val', single_cls=False, imgsz=640, batch_size=1, nc=
                                       batch_size=batch_size,
                                       drop_last=drop_last,
                                       num_workers=nw,
-                                      image_weights=False,
                                       conf_thres=conf_thres, 
                                       iou_thres=iou_thres,
-                                      save_hybrid=save_hybrid,
                                       is_coco=is_coco,
                                       save_conf=save_conf,
                                       save_json=save_json,
@@ -123,21 +145,53 @@ def img2label_paths(img_paths):
 
 
 class LoadImagesAndLabels(Dataset):  # for training/testing
-    def __init__(self, path, task='train', img_size=640, batch_size=16, shuffle=False,num_workers=0,augment=False, hyp=None, rect=False, image_weights=False, drop_last=False,
-                 cache_images=False, single_cls=False, stride=32, pad=0.0, prefix='', conf_thres=0.001, iou_thres=0.6, save_hybrid=False, save_conf=True, is_coco=False, save_json=False, save_txt=False, num_classes=80, verbose=False):
+    def __init__(self, path, task='train', 
+                img_size=640, 
+                batch_size=16, 
+                shuffle=False,
+                num_workers=0,
+                augment=False, 
+                rect=False, 
+                drop_last=False,
+                cache_images=False, 
+                single_cls=False, 
+                stride=32, 
+                pad=0.0, 
+                prefix='', 
+                conf_thres=0.001, 
+                iou_thres=0.6, 
+                save_conf=True, 
+                is_coco=False, 
+                save_json=False, 
+                save_txt=False, 
+                num_classes=80, 
+                verbose=False,
+                mosaic_prob=1.0, # image mosaic (probability)
+                mixup_prob=0.0, # image mixup (probability)
+                random_perspective=None, 
+                augment_hsv=None, 
+                flipud=None, 
+                fliplr=None,
+                ):
         super(LoadImagesAndLabels,self).__init__(batch_size=batch_size,shuffle=shuffle,num_workers=num_workers, drop_last=drop_last)
         self.img_size = img_size
         self.augment = augment
         self.task=task
-        self.hyp = hyp
-        self.image_weights = image_weights
-        self.rect = False if image_weights else rect
-        self.mosaic = self.augment and not self.rect  # load 4 images at a time into a mosaic (only during training)
-        self.mosaic_border = [-img_size // 2, -img_size // 2]
+        self.rect = rect
+        self.mosaic = self.augment and not self.rect # load 4 images at a time into a mosaic (only during training)
+        
+        if self.augment:
+            self.mosaic_prob = mosaic_prob
+            self.mixup_prob = mixup_prob
+            self.mosaic_border = [-img_size // 2, -img_size // 2]
+            self.random_perspective = build_from_cfg(random_perspective, TRANSFORMS)
+            self.augment_hsv = build_from_cfg(augment_hsv, TRANSFORMS)
+            self.flipud = build_from_cfg(flipud, TRANSFORMS)
+            self.fliplr = build_from_cfg(fliplr, TRANSFORMS)
+
         self.stride = stride
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
-        self.save_hybrid = save_hybrid
         self.save_json = save_json
         self.save_txt = save_txt
         self.save_conf = save_conf
@@ -283,16 +337,15 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         return x
 
     def __getitem__(self, index):
-        index = self.indices[index]  # linear, shuffled, or image_weights
+        index = self.indices[index]  # linear or shuffled
 
-        hyp = self.hyp
-        mosaic = self.mosaic and random.random() < hyp['mosaic']
+        mosaic = self.mosaic and random.random() < self.mosaic_prob
         if mosaic:
             # Load mosaic
             img, labels = load_mosaic(self, index)
 
             # MixUp https://arxiv.org/pdf/1710.09412.pdf
-            if random.random() < hyp['mixup']:
+            if random.random() < self.mixup_prob:
                 img2, labels2 = load_mosaic(self, random.randint(0, self.n - 1))
                 r = np.random.beta(8.0, 8.0)  # mixup ratio, alpha=beta=8.0
                 img = (img * r + img2 * (1 - r)).astype(np.uint8)
@@ -320,15 +373,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if self.augment:
             # Augment imagespace
             if not mosaic:
-                img, labels = random_perspective(img, labels,
-                                                 degrees=hyp['degrees'],
-                                                 translate=hyp['translate'],
-                                                 scale=hyp['scale'],
-                                                 shear=hyp['shear'],
-                                                 perspective=hyp['perspective'])
+                img, labels = self.random_perspective(img, labels)
 
             # Augment colorspace
-            augment_hsv(img, hgain=hyp['hsv_h'], sgain=hyp['hsv_s'], vgain=hyp['hsv_v'])
+            self.augment_hsv(img)
 
             # Apply cutouts
             # if random.random() < 0.9:
@@ -341,22 +389,14 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             labels[:, [1, 3]] /= img.shape[1]  # normalized width 0-1
 
         if self.augment:
-            # flip up-down
-            if random.random() < hyp['flipud']:
-                img = np.flipud(img)
-                if nL:
-                    labels[:, 2] = 1 - labels[:, 2]
-
-            # flip left-right
-            if random.random() < hyp['fliplr']:
-                img = np.fliplr(img)
-                if nL:
-                    labels[:, 1] = 1 - labels[:, 1]
+            # flip up-down, left-right
+            img, labels = self.flipud(img, labels)
+            img, labels = self.fliplr(img, labels)
 
         labels_out = jt.zeros((nL, 6)) if self.task is 'train' else jt.zeros((nL + 2, 6))
         
         #store meta data in the first two labels 
-        if self.task is 'val':
+        if self.task is 'val' or self.task is 'test':
             labels_out[0, 1] = index 
             labels_out[0,2:4] = jt.array(img.shape[:-1])
             labels_out[0, 4:6] = jt.array([h0, w0])
@@ -364,7 +404,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             labels_out[1, 3:5] = jt.array(list(pad))
 
         if nL:
-            if self.task is 'val':
+            if self.task is 'val' or self.task is 'test':
                 labels_out[2:, 1:] = jt.array(labels)
             else:
                 labels_out[:, 1:] = jt.array(labels)
@@ -441,7 +481,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             shapes = [((int(meta[0, 4]), int(meta[0, 5])), ((meta[1, 1], meta[1, 2]), (meta[1, 3], meta[1, 4]))) for meta in metas]
 
             targets[:, 2:] *= jt.array([width, height, width, height])  # to pixels
-            lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if self.save_hybrid else []  # for autolabelling
+            lb = [] 
             output = non_max_suppression(jt.array(inf_out), conf_thres=self.conf_thres, iou_thres=0.65 if self.is_coco else 0.6, labels=lb)
             for si, pred in enumerate(output):
                 labels = targets[targets[:, 0] == si, 1:]
@@ -582,25 +622,6 @@ def load_image(self, index):
         return self.imgs[index], self.img_hw0[index], self.img_hw[index]  # img, hw_original, hw_resized
 
 
-def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):
-    r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
-    hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
-    dtype = img.dtype  # uint8
-
-    x = np.arange(0, 256, dtype=np.int16)
-    lut_hue = ((x * r[0]) % 180).astype(dtype)
-    lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
-    lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
-
-    img_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))).astype(dtype)
-    cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
-
-    # Histogram equalization
-    # if random.random() < 0.2:
-    #     for i in range(3):
-    #         img[:, :, i] = cv2.equalizeHist(img[:, :, i])
-
-
 def load_mosaic(self, index):
     # loads images in a 4-mosaic
 
@@ -648,13 +669,7 @@ def load_mosaic(self, index):
         # img4, labels4 = replicate(img4, labels4)  # replicate
 
     # Augment
-    img4, labels4 = random_perspective(img4, labels4,
-                                       degrees=self.hyp['degrees'],
-                                       translate=self.hyp['translate'],
-                                       scale=self.hyp['scale'],
-                                       shear=self.hyp['shear'],
-                                       perspective=self.hyp['perspective'],
-                                       border=self.mosaic_border)  # border to remove
+    img4, labels4 = self.random_perspective(img4, labels4, border=self.mosaic_border)  # border to remove
 
     return img4, labels4
 
@@ -722,13 +737,7 @@ def load_mosaic9(self, index):
         # img9, labels9 = replicate(img9, labels9)  # replicate
 
     # Augment
-    img9, labels9 = random_perspective(img9, labels9,
-                                       degrees=self.hyp['degrees'],
-                                       translate=self.hyp['translate'],
-                                       scale=self.hyp['scale'],
-                                       shear=self.hyp['shear'],
-                                       perspective=self.hyp['perspective'],
-                                       border=self.mosaic_border)  # border to remove
+    img9, labels9 = self.random_perspective(img9, labels9, border=self.mosaic_border)  # border to remove
 
     return img9, labels9
 
@@ -781,101 +790,6 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     return img, ratio, (dw, dh)
-
-
-def random_perspective(img, targets=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0, border=(0, 0)):
-    # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(.1, .1), scale=(.9, 1.1), shear=(-10, 10))
-    # targets = [cls, xyxy]
-
-    height = img.shape[0] + border[0] * 2  # shape(h,w,c)
-    width = img.shape[1] + border[1] * 2
-
-    # Center
-    C = np.eye(3)
-    C[0, 2] = -img.shape[1] / 2  # x translation (pixels)
-    C[1, 2] = -img.shape[0] / 2  # y translation (pixels)
-
-    # Perspective
-    P = np.eye(3)
-    P[2, 0] = random.uniform(-perspective, perspective)  # x perspective (about y)
-    P[2, 1] = random.uniform(-perspective, perspective)  # y perspective (about x)
-
-    # Rotation and Scale
-    R = np.eye(3)
-    a = random.uniform(-degrees, degrees)
-    # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
-    s = random.uniform(1 - scale, 1 + scale)
-    # s = 2 ** random.uniform(-scale, scale)
-    R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
-
-    # Shear
-    S = np.eye(3)
-    S[0, 1] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # x shear (deg)
-    S[1, 0] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # y shear (deg)
-
-    # Translation
-    T = np.eye(3)
-    T[0, 2] = random.uniform(0.5 - translate, 0.5 + translate) * width  # x translation (pixels)
-    T[1, 2] = random.uniform(0.5 - translate, 0.5 + translate) * height  # y translation (pixels)
-
-    # Combined rotation matrix
-    M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
-    if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
-        if perspective:
-            img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
-        else:  # affine
-            img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
-
-    # Visualize
-    # import matplotlib.pyplot as plt
-    # ax = plt.subplots(1, 2, figsize=(12, 6))[1].ravel()
-    # ax[0].imshow(img[:, :, ::-1])  # base
-    # ax[1].imshow(img2[:, :, ::-1])  # warped
-
-    # Transform label coordinates
-    n = len(targets)
-    if n:
-        # warp points
-        xy = np.ones((n * 4, 3))
-        xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
-        xy = xy @ M.T  # transform
-        if perspective:
-            xy = (xy[:, :2] / xy[:, 2:3]).reshape(n, 8)  # rescale
-        else:  # affine
-            xy = xy[:, :2].reshape(n, 8)
-
-        # create new boxes
-        x = xy[:, [0, 2, 4, 6]]
-        y = xy[:, [1, 3, 5, 7]]
-        xy = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
-
-        # # apply angle-based reduction of bounding boxes
-        # radians = a * math.pi / 180
-        # reduction = max(abs(math.sin(radians)), abs(math.cos(radians))) ** 0.5
-        # x = (xy[:, 2] + xy[:, 0]) / 2
-        # y = (xy[:, 3] + xy[:, 1]) / 2
-        # w = (xy[:, 2] - xy[:, 0]) * reduction
-        # h = (xy[:, 3] - xy[:, 1]) * reduction
-        # xy = np.concatenate((x - w / 2, y - h / 2, x + w / 2, y + h / 2)).reshape(4, n).T
-
-        # clip boxes
-        xy[:, [0, 2]] = xy[:, [0, 2]].clip(0, width)
-        xy[:, [1, 3]] = xy[:, [1, 3]].clip(0, height)
-
-        # filter candidates
-        i = box_candidates(box1=targets[:, 1:5].T * s, box2=xy.T)
-        targets = targets[i]
-        targets[:, 1:5] = xy[i]
-
-    return img, targets
-
-
-def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1, eps=1e-16):  # box1(4,n), box2(4,n)
-    # Compute candidate boxes: box1 before augment, box2 after augment, wh_thr (pixels), aspect_ratio_thr, area_ratio
-    w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
-    w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
-    ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
-    return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
 
 
 def cutout(image, labels):

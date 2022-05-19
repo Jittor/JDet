@@ -65,8 +65,6 @@ def unmap(data, count, inds, fill=0):
     return ret
     
 def parse_losses(losses):
-    if isinstance(losses, tuple):
-        return losses # assuming losses are already parsed in model
     _losses = dict()
     for loss_name, loss_value in losses.items():
         if isinstance(loss_value, jt.Var):

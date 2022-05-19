@@ -10,6 +10,72 @@ class WarmUpLR(object):
         optimizer (Optimizer): the optimizer to optimize the model
         warmup (string): Type of warmup used. It can be None(use no warmup),
             'constant', 'linear' or 'exp'
+        warmup_iters (int): The number of iterations or epochs that warmup
+            lasts
+        warmup_ratio (float): LR used at the beginning of warmup equals to
+            warmup_ratio * initial_lr
+    """
+    def __init__(self,optimizer,
+                      warmup_ratio=1.0 / 3,
+                      warmup_iters=500,
+                      warmup = None):
+        self.optimizer = optimizer
+        self.warmup_ratio = warmup_ratio
+        self.warmup_iters = warmup_iters
+        self.warmup = warmup
+        self.base_lr = optimizer.lr
+        self.base_lr_pg = [pg.get("lr", optimizer.lr) for pg in optimizer.param_groups]
+        self.step(0, 0)
+    
+    def get_warmup_lr(self,lr,cur_iters):
+        if self.warmup == 'constant':
+            k = self.warmup_ratio
+        elif self.warmup == 'linear':
+            k = 1-(1 - cur_iters / self.warmup_iters) * (1 -self.warmup_ratio)
+        elif self.warmup == 'exp':
+            k = self.warmup_ratio**(1 - cur_iters / self.warmup_iters)
+        return k*lr
+    
+    def get_lr(self,lr,steps):
+        return lr 
+    
+    def _update_lr(self,steps,get_lr_func):
+        self.optimizer.lr = get_lr_func(self.base_lr,steps)
+        for i, param_group in enumerate(self.optimizer.param_groups):
+            param_group["lr"] = get_lr_func(self.base_lr_pg[i],steps)
+
+    def step(self,iters,epochs,by_epoch=True):
+        if self.warmup is not None:
+            if iters>=self.warmup_iters:
+                if by_epoch:
+                    self._update_lr(epochs,self.get_lr)
+                else:
+                    self._update_lr(iters-self.warmup_iters,self.get_lr)
+            else:
+                self._update_lr(iters,self.get_warmup_lr)
+        else:
+            if by_epoch:
+                self._update_lr(epochs,self.get_lr)
+            else:
+                self._update_lr(iters,self.get_lr)
+
+    def parameters(self):
+        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
+    
+    def load_parameters(self,data):
+        if isinstance(data,dict):
+            for k,d in data.items():
+                if k in self.__dict__:
+                    self.__dict__[k]=d 
+
+
+@SCHEDULERS.register_module()
+class WarmUpLRGroup(object):
+    """Warm LR scheduler with warmup learning rates specified upto each parameter group
+    Args:
+        optimizer (Optimizer): the optimizer to optimize the model
+        warmup (string): Type of warmup used. It can be None(use no warmup),
+            'constant', 'linear' or 'exp'
         warmup_pg (list[string]): Type of warmup used for each parameter group
             of the optimizer. If it is None, mode specificed in warmup is used
             for all of the parameter group. 
@@ -66,12 +132,13 @@ class WarmUpLR(object):
         self.warmup_iters = warmup_iters
         self.step(0, 0)
 
-    
     def get_warmup_lr(self,lr,cur_iters, warmup=None, ratio=None, epochs=0):
         if warmup == 'constant':
             k = ratio
         elif warmup == 'linear':
-            k = 1-(1 - cur_iters / self.warmup_iters) * (1 -ratio)
+            #in the linear case, the ratio is adjusted based on current learning rate.
+            ratio *= lr / self.get_lr(lr, epochs)
+            k = 1-(1 - cur_iters / self.warmup_iters) * (1 - ratio)
         elif warmup == 'exp':
             k = ratio**(1 - cur_iters / self.warmup_iters)
         return k*lr
@@ -187,16 +254,24 @@ class CosineAnnealingLR(WarmUpLR):
         lr = target_lr + 0.5 * (base_lr - target_lr) * cos_out
         return lr
 
-    def get_warmup_lr(self,lr,cur_iters, warmup=None, ratio=None, epochs=0):
-        if warmup == 'constant':
-            k = ratio
-        elif warmup == 'linear':
-            #in the linear case, the ratio is adjusted based on current learning rate.
-            ratio *= lr / self.get_lr(lr, epochs)
-            k = 1-(1 - cur_iters / self.warmup_iters) * (1 - ratio)
-        elif warmup == 'exp':
-            k = ratio**(1 - cur_iters / self.warmup_iters)
-        return k*lr
+@SCHEDULERS.register_module()
+class CosineAnnealingLRGroup(WarmUpLRGroup):
+
+    def __init__(self, max_steps,min_lr=None, min_lr_ratio=None, **kwargs):
+        assert (min_lr is None) ^ (min_lr_ratio is None)
+        self.min_lr = min_lr
+        self.min_lr_ratio = min_lr_ratio
+        self.max_steps = max_steps
+        super(CosineAnnealingLRGroup, self).__init__(**kwargs)
+
+    def get_lr(self, base_lr,steps):
+        if self.min_lr_ratio is not None:
+            target_lr = base_lr * self.min_lr_ratio
+        else:
+            target_lr = self.min_lr
+        cos_out = math.cos(math.pi * (steps / self.max_steps)) + 1
+        lr = target_lr + 0.5 * (base_lr - target_lr) * cos_out
+        return lr
 
 @SCHEDULERS.register_module()
 class ExpLR(WarmUpLR):

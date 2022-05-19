@@ -1,69 +1,49 @@
+_base_ = ['yolo_model_base.py', 'yolo_dataset_base.py', 'yolo_optimizer_base.py', 'yolo_scheduler_base.py']
 batch_size = 16
 max_epoch = 300
 log_interval=1
-eval_interval=1
+eval_interval=300
 work_dir='/mnt/disk/wang/JDet/projects/yolo/coco128-v5s-300epoch-ema3'
 stride=32
 imgsz=640
 imgsz_test=640
-nc=80
 dataset_type = 'YoloDataset'
-data_path='/mnt/disk/wang/JDet/projects/yolo/data/coco128.yaml'
-hyp='/mnt/disk/wang/JDet/projects/yolo/data/hyp.scratch.yaml'
 
 model = dict(
-    type ='YOLOv5S',
-    ch = 3, 
-    nc = nc,
+    type='YOLOv5S',
     pretrained=False,
-    imgsz=imgsz,
-    hyp=hyp
-)
-ema = dict(
-    type = 'ModelEMA'
+    ema=True,
+    imgsz=imgsz
 )
 parameter_groups_generator = dict(
-    type='YoloParameterGroupsGenerator',
-    weight_decay=0.0005, #hyp[weight_decay]
     batch_size=batch_size
 )
-optimizer=dict(
-    type='SGD',
-    lr=0.01, # hyp[lr0]
-    momentum=0.937, #hyp[momentum]
-    nesterov=True
-)
 scheduler=dict(
-    type='CosineAnnealingLR',
-    max_steps=max_epoch,
-    min_lr_ratio=0.2, # hyp[lrf]
-    warmup_init_lr_pg=[0., 0., 0.1], #[pg0, pg1, pg2]
-    warmup_ratio = 0.,
-    warmup_initial_momentum = 0.8, #hyp[warmup_momentum]
-    warmup = 'linear',
-    warmup_iters= 1000 # 3 epochs 
+    max_steps=max_epoch
 )
 dataset = dict(
     val=dict(
-        type=dataset_type,
-        task='val',
         path='/mnt/disk/wang/coco128/images/train2017',
         batch_size = batch_size,
         num_workers=8,
         stride=stride,
-        imgsz=imgsz_test,
-        hyp=hyp
+        imgsz=imgsz_test
+
+        ),
+        test=dict(
+        path='/mnt/disk/wang/coco128/images/train2017',
+        batch_size = batch_size,
+        num_workers=8,
+        stride=stride,
+        imgsz=imgsz_test
         ),
     train=dict(
-        type=dataset_type,
-        task='train',
         path='/mnt/disk/wang/coco128/images/train2017',
         batch_size = batch_size,
         num_workers=8,
         stride=stride,
         imgsz=imgsz,
-        augment=True,
-        hyp=hyp
+        augment=True
         )
 )
 

@@ -27,7 +27,7 @@ class SGD(optim.SGD,Optimizer):
         super(SGD,self).__init__(params, lr, momentum, weight_decay, dampening, nesterov)
         self.grad_clip = grad_clip
 
-    def pre_step(self, loss):
+    def pre_step(self, loss, retain_graph=False):
         super(SGD,self).pre_step(loss)
         if self.grad_clip is not None:
             self.clip_grad_norm(**self.grad_clip)

@@ -7,7 +7,86 @@ from jdet.models.boxes.box_ops import bbox_iou_per_box
 from jdet.utils.general import make_divisible, check_img_size
 from jdet.utils.registry import MODELS
 
-__all__ = ['YOLOv3', 'YOLOv3SPP', 'YOLOv3Tiny', 'YOLOv3FPN', 'YOLOv5FPN', 'YOLOv5S']
+def copy_attr(a, b, include=(), exclude=()):
+    # Copy attributes from b to a, options to only include [...] and to exclude [...]
+    for k, v in b.__dict__.items():
+        if (len(include) and k not in include) or k.startswith('_') or k in exclude:
+            continue
+        else:
+            setattr(a, k, deepcopy(v))
+
+class ModelEMA:
+    """ Model Exponential Moving Average from https://github.com/rwightman/pytorch-image-models
+    Keep a moving average of everything in the model state_dict (parameters and buffers).
+    This is intended to allow functionality like
+    https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
+    A smoothed version of the weights is necessary for some training schemes to perform well.
+    This class is sensitive where it is initialized in the sequence of model init,
+    GPU assignment and distributed training wrappers.
+    """
+
+    def __init__(self, model, decay=0.9999, updates=0):
+        # Create EMA
+        self.ema = deepcopy(model)
+        self.ema.eval()  # FP32 EMA
+        self.updates = updates  # number of EMA updates
+        self.decay = lambda x: decay * (1 - math.exp(-x / 2000))  # decay exponential ramp (to help early epochs)
+        for p in self.ema.parameters():
+            p.stop_grad()
+
+    def update(self, model):
+        # Update EMA parameters
+        with jt.no_grad():
+            self.updates += 1
+            d = self.decay(self.updates)
+
+            msd = model.state_dict()  # model state_dict
+            for k, v in self.ema.state_dict().items():
+                if v.dtype == "float32":
+                    v *= d
+                    v += (1. - d) * msd[k].detach()
+            jt.sync_all()
+
+    def update_attr(self, model, include=(), exclude=('process_group', 'reducer')):
+        # Update EMA attributes
+        copy_attr(self.ema, model, include, exclude)
+
+class ModelEMAWraper(nn.Module):
+    def __init__(self, path, **kwargs):
+        # Create EMA
+        super().__init__()
+        self.model = _yolo(path, **kwargs)
+        self.ema_hooked = False
+
+    def hook_ema(self):
+        self.ema = ModelEMA(self.model)
+        self.ema_hooked = True
+        print("EMA enabled")
+        
+    def execute(self, x, targets=None):
+        if self.model.is_training():
+            if self.ema_hooked:
+                self.ema.update(self.model)
+            return self.model(x, targets)
+        else:
+            if self.ema_hooked:
+                self.ema.update_attr(self.model, include=['yaml', 'nc', 'hyp', 'gr', 'names', 'stride', 'class_weights'])
+                return self.ema.ema(x, targets)
+            else:
+                return self.model(x, targets)
+    
+    def state_dict(self):
+        if self.ema_hooked:
+            return self.ema.ema.state_dict()
+        else:
+            return self.model.state_dict()
+    
+    def load_parameters(self, data):
+        self.model.load_parameters(data)
+        if self.ema_hooked:
+            # rehook ema 
+            self.ema = ModelEMA(self.model)
+
 
 def fuse_conv_and_bn(conv, bn):
     # Fuse convolution and batchnorm layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/
@@ -130,7 +209,13 @@ class YOLO(nn.Module):
         nc=80,
         imgsz=640,
         anchors=None, 
-        hyp='data/hyp.scratch.yaml',
+        boxlg=0.05, # box loss gain
+        clslg=0.5,  # class loss gain
+        objlg=1.0,  # object loss gain
+        cls_pw=1.0, # cls BCELoss positive_weight
+        obj_pw=1.0, # obj BCELoss positive_weight
+        fl_gamma=0.0, # focal loss gamma
+        anchor_t = 4.0, # # anchor-multiple threshold
         single_cls=False):  # model, input channels, number of classes
         
         super().__init__()
@@ -142,9 +227,6 @@ class YOLO(nn.Module):
             self.yaml_file = Path(cfg).name
             with open(cfg) as f:
                 self.yaml = yaml.load(f, Loader=yaml.SafeLoader)  # model dict
-        
-        with open(hyp) as f:
-            self.hyp = yaml.load(f, Loader=yaml.SafeLoader)  # load hyps
         
 
         # Define model
@@ -187,9 +269,13 @@ class YOLO(nn.Module):
         
         imgsz = check_img_size(imgsz, gs)  # verify imgsz are gs-multiples
 
-        self.hyp['box'] *= 3. / nl  # scale to layers
-        self.hyp['cls'] *= self.nc / 80. * 3. / nl  # scale to classes and layers
-        self.hyp['obj'] *= (imgsz / 640) ** 2 * 3. / nl  # scale to image size and layers
+        self.box = boxlg * 3. / nl  # scale to layers
+        self.cls = clslg * self.nc / 80. * 3. / nl  # scale to classes and layers
+        self.obj = objlg * (imgsz / 640) ** 2 * 3. / nl  # scale to image size and layers
+        self.cls_pw = cls_pw
+        self.obj_pw = obj_pw
+        self.fl_gamma = fl_gamma
+        self.anchor_t = anchor_t
 
         #initializing hyperparams
         self.gr = 1.0 # iou loss ratio (obj_loss = 1.0 or iou)
@@ -203,9 +289,9 @@ class YOLO(nn.Module):
         x = self.forward_once(x)
         targets = targets[0]
 
-        loss, loss_items = self.compute_loss(x, targets)
+        losses = self.compute_loss(x, targets)
 
-        return loss, loss_items
+        return losses
 
     def execute_test(self, x, annos=None, conf_thres=0.001, iou_thres=0.65):
         results = self.forward_once(x)
@@ -287,17 +373,16 @@ class YOLO(nn.Module):
     def compute_loss(self, p, targets):  # predictions, targets, model
         lcls, lbox, lobj = jt.zeros((1,)), jt.zeros((1,)), jt.zeros((1,))
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
-        h = self.hyp  # hyperparameters
 
         # Define criteria
-        BCEcls = nn.BCEWithLogitsLoss(pos_weight=jt.array([self.hyp['cls_pw']]))  # weight=model.class_weights)
-        BCEobj = nn.BCEWithLogitsLoss(pos_weight=jt.array([self.hyp['obj_pw']]))
+        BCEcls = nn.BCEWithLogitsLoss(pos_weight=jt.array([self.cls_pw]))  # weight=model.class_weights)
+        BCEobj = nn.BCEWithLogitsLoss(pos_weight=jt.array([self.obj_pw]))
 
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
         cp, cn = smooth_BCE(eps=0.0)
 
         # Focal loss
-        g = self.hyp['fl_gamma']  # focal loss gamma
+        g = self.fl_gamma  # focal loss gamma
         if g > 0:
             BCEcls, BCEobj = FocalLoss(BCEcls, g), FocalLoss(BCEobj, g)
 
@@ -333,13 +418,12 @@ class YOLO(nn.Module):
 
             lobj += BCEobj(pi[..., 4], tobj) * balance[i]  # obj loss
 
-        lbox *= self.hyp['box']
-        lobj *= self.hyp['obj']
-        lcls *= self.hyp['cls']
+        lbox *= self.box
+        lobj *= self.obj
+        lcls *= self.cls
         bs = tobj.shape[0]  # batch size
-
-        loss = lbox + lobj + lcls
-        return loss * bs, dict(lbox=lbox, lobj=lobj, lcls=lcls, total=loss)
+        # return total_loss * bs, dict(box_loss=lbox * bs, obj_loss=lobj * bs, cls_loss=lcls * bs)
+        return dict(box_loss=lbox * bs, obj_loss=lobj * bs, cls_loss=lcls * bs)
 
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
@@ -367,7 +451,7 @@ class YOLO(nn.Module):
             if nt:
                 # Matches
                 r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
-                j = jt.maximum(r, 1. / r).max(2) < self.hyp['anchor_t']  # compare
+                j = jt.maximum(r, 1. / r).max(2) < self.anchor_t  # compare
                 # j = wh_iou(anchors, t[:, 4:6]) > self.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
                 t = t[j]  # filter
 
@@ -476,95 +560,55 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
     return nn.Sequential(*layers), sorted(save)
 
 
-class Yolo_Loss(nn.Module):
-    def __init__(self, cls_pw, obj_pw):
-
 
 def _yolo(cfg, **kwargs):
     model = YOLO(cfg=cfg, **kwargs)
     return model
 
 @MODELS.register_module()
-def YOLOv3(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov3.yaml"
-    model = _yolo(path, **kwargs)
-    if pretrained:
-        print('loading pretrained model for yolov3.')
-        model.load('/mnt/disk/wang/weights/yolov3.pkl')
-        model = model.fuse()
-    return model
-
-@MODELS.register_module()
-def YOLOv3SPP(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov3-spp.yaml"
-    model = _yolo(path, **kwargs)
-    if pretrained:
-        print('loading pretrained model for yolov3spp.')
-        model.load('/mnt/disk/wang/weights/yolov3-spp.pkl')
-        model = model.fuse()
-    return model
-
-@MODELS.register_module()
-def YOLOv3Tiny(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov3-tiny.yaml"
-    model = _yolo(path, **kwargs)
-    if pretrained:
-        print('loading pretrained model for yolov3tiny.')
-        model.load('/mnt/disk/wang/weights/yolov3-tiny.pkl')
-        model = model.fuse()
-    return model
-
-@MODELS.register_module()
-def YOLOv3FPN(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov3-fpn.yaml"
-    model = _yolo(path, **kwargs)
-    if pretrained:
-        model.load('')
-    return model
-
-@MODELS.register_module()
-def YOLOv5FPN(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov5-fpn.yaml"
-    model = _yolo(path, **kwargs)
-    if pretrained:
-        model.load('')
-    return model
-
-@MODELS.register_module()
-def YOLOv5S(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov5s.yaml"
-    model = _yolo(path, **kwargs)
+def YOLOv5S(pretrained=False, ema=True, **kwargs):
+    path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5s.yaml"
+    model = ModelEMAWraper(path, **kwargs) 
     if pretrained:
         print('loading pretrained model for yolov5s.')
-        model.load('/mnt/disk/wang/weights/yolov5s_coco128.pkl')
-        #model = model.fuse()
+        model.load('https://cloud.tsinghua.edu.cn/f/ecaaea26ff7d4d68b5a2/?dl=1')
+        model = model.model.fuse()
+    if ema:
+        model.hook_ema()
     return model
 
 @MODELS.register_module()
-def YOLOv5M(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov5m.yaml"
-    model = _yolo(path, **kwargs)
+def YOLOv5M(pretrained=False, ema=True, **kwargs):
+    path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5m.yaml"
+    model = ModelEMAWraper(path, **kwargs) 
     if pretrained:
         print('loading pretrained model for yolov5m.')
-        model.load('/mnt/disk/wang/weights/yolov5m.pkl')
+        model.load('https://cloud.tsinghua.edu.cn/f/99d62d77b1664415bfcc/?dl=1')
+        model = model.fuse()
+    if ema:
+        model.hook_ema()
     return model
 
 @MODELS.register_module()
-def YOLOv5L(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov5l.yaml"
-    model = _yolo(path, **kwargs)
+def YOLOv5L(pretrained=False, ema=True, **kwargs):
+    path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5l.yaml"
+    model = ModelEMAWraper(path, **kwargs)
     if pretrained:
         print('loading pretrained model for yolov5l.')
-        model.load('/mnt/disk/wang/weights/yolov5l.pkl')
-        #model = model.fuse()
+        model.load('https://cloud.tsinghua.edu.cn/f/f588a1a21c4343f6a70c/?dl=1')
+        model = model.fuse()
+    if ema:
+        model.hook_ema()
     return model
 
 @MODELS.register_module()
-def YOLOv5X(pretrained=False, **kwargs):
-    path = Path(__file__).parent / "./yolo_configs/yolov5x.yaml"
-    model = _yolo(path, **kwargs)
+def YOLOv5X(pretrained=False, ema=True, **kwargs):
+    path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5x.yaml"
+    model = ModelEMAWraper(path, **kwargs)
     if pretrained:
         print('loading pretrained model for yolov5x.')
-        model.load('/mnt/disk/wang/weights/yolov5x.pkl')
-        #model = model.fuse()
+        model.load('https://cloud.tsinghua.edu.cn/f/9eb98e5de2864b7dae4f/?dl=1')
+        model = model.fuse()
+    if ema:
+        model.hook_ema()
     return model
