@@ -66,7 +66,6 @@ def YoloDataset(path, task='val',
                 augment_hsv=None, 
                 flipud=None, 
                 fliplr=None,
-                annotation_path=None
                 ):
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     
@@ -114,8 +113,7 @@ def YoloDataset(path, task='val',
                                       save_txt=save_txt,
                                       prefix=colorstr('val: '),
                                       num_classes=nc, 
-                                      verbose=verbose,
-                                      annotation_path=annotation_path)
+                                      verbose=verbose)
     elif task == 'test':
         dataset = LoadImagesAndLabels(path, img_size=img_size, task=task, 
                                       augment=False,  # augment images
@@ -175,7 +173,6 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 augment_hsv=None, 
                 flipud=None, 
                 fliplr=None,
-                annotation_path=None
                 ):
         super(LoadImagesAndLabels,self).__init__(batch_size=batch_size,shuffle=shuffle,num_workers=num_workers, drop_last=drop_last)
         self.img_size = img_size
@@ -202,7 +199,6 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.is_coco = is_coco
         self.num_classes = num_classes
         self.verbose = verbose
-        self.annotation_path=annotation_path
 
 
         try:
