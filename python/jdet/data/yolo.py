@@ -12,7 +12,8 @@ from pathlib import Path
 from threading import Thread
 import pickle
 import yaml
-
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 import cv2
 import numpy as np
 import jittor as jt 
@@ -65,6 +66,7 @@ def YoloDataset(path, task='val',
                 augment_hsv=None, 
                 flipud=None, 
                 fliplr=None,
+                annotation_path=None
                 ):
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     
@@ -112,7 +114,8 @@ def YoloDataset(path, task='val',
                                       save_txt=save_txt,
                                       prefix=colorstr('val: '),
                                       num_classes=nc, 
-                                      verbose=verbose)
+                                      verbose=verbose,
+                                      annotation_path=annotation_path)
     elif task == 'test':
         dataset = LoadImagesAndLabels(path, img_size=img_size, task=task, 
                                       augment=False,  # augment images
@@ -172,6 +175,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 augment_hsv=None, 
                 flipud=None, 
                 fliplr=None,
+                annotation_path=None
                 ):
         super(LoadImagesAndLabels,self).__init__(batch_size=batch_size,shuffle=shuffle,num_workers=num_workers, drop_last=drop_last)
         self.img_size = img_size
@@ -198,6 +202,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.is_coco = is_coco
         self.num_classes = num_classes
         self.verbose = verbose
+        self.annotation_path=annotation_path
 
 
         try:
@@ -397,7 +402,9 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         
         #store meta data in the first two labels 
         if self.task is 'val' or self.task is 'test':
-            labels_out[0, 1] = index 
+            path = Path(self.img_files[index])
+            image_id = int(path.stem) if path.stem.isnumeric() else 0
+            labels_out[0, 1] = image_id
             labels_out[0,2:4] = jt.array(img.shape[:-1])
             labels_out[0, 4:6] = jt.array([h0, w0])
             labels_out[1, 1:3] = jt.array([h / h0, w / w0]) 
@@ -470,24 +477,22 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
         loss = jt.zeros((3,))
         jdict, stats, ap, ap_class = [], [], [], []
-        for batch_i, (inf_out, labels) in enumerate(results):
-            nb = inf_out.shape[0]
+        for batch_i, (output, labels) in enumerate(results):
+            nb = len(output)
             metas = [labels[labels[:, 0] == i][:2] for i in range(nb)]
             targets = jt.contrib.concat([jt.array(labels[labels[:, 0] == i][2:]) for i in range(nb)], 0)
-            indices = [int(meta[0, 1]) for meta in metas]
+            image_ids = [int(meta[0, 1]) for meta in metas]
             height = int(metas[0][0, 2])
             width = int(metas[0][0, 3])
-            paths = [self.img_files[idx] for idx in indices]
             shapes = [((int(meta[0, 4]), int(meta[0, 5])), ((meta[1, 1], meta[1, 2]), (meta[1, 3], meta[1, 4]))) for meta in metas]
 
             targets[:, 2:] *= jt.array([width, height, width, height])  # to pixels
-            lb = [] 
-            output = non_max_suppression(jt.array(inf_out), conf_thres=self.conf_thres, iou_thres=0.65 if self.is_coco else 0.6, labels=lb)
             for si, pred in enumerate(output):
+                pred = jt.array(pred)
                 labels = targets[targets[:, 0] == si, 1:]
                 nl = len(labels)
                 tcls = labels[:, 0].tolist() if nl else []  # target class
-                path = Path(paths[si])
+                image_id = image_ids[si]
                 seen += 1
 
                 if len(pred) == 0:
@@ -498,19 +503,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 # Predictions
                 predn = pred.clone()
                 predn[:, :4] = scale_coords((height, width), predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
-                # Append to text file
-                if self.save_txt:
-                    gn = jt.array(shapes[si][0])[jt.array([1, 0, 1, 0])]  # normalization gain whwh
-                    for *xyxy, conf, cls in predn.tolist():
-                        xywh = (xyxy2xywh(jt.array(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if self.save_conf else (cls, *xywh)  # label format
-                        with open(save_dir / 'labels' / (path.stem + '.txt'), 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                 # Append to pycocotools JSON dictionary
                 if self.save_json:
                     # [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...
-                    image_id = int(path.stem) if path.stem.isnumeric() else path.stem
                     box = xyxy2xywh(predn[:, :4])  # xywh
                     box[:, :2] -= box[:, 2:] / 2  # xy center to top-left corner
                     for p, b in zip(pred.tolist(), box.tolist()):
@@ -914,6 +910,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
     nc = prediction.shape[2] - 5  # number of classes
     xc = prediction[..., 4] > conf_thres  # candidates
+
 
     # Settings
     min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height

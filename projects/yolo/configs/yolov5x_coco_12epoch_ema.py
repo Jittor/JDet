@@ -9,12 +9,12 @@ imgsz=640
 imgsz_test=640
 dataset_type = 'YoloDataset'
 
+
 model = dict(
-    type='YOLOv5M',
+    type='YOLOv5X',
     pretrained=False,
     ema=True,
-    imgsz=imgsz,
-    is_coco=True
+    imgsz=imgsz
 )
 
 optimizer=dict(
@@ -39,7 +39,6 @@ dataset = dict(
         num_workers=8,
         stride=stride,
         imgsz=imgsz_test,
-        is_coco=True
         ),
     train=dict(
         type=dataset_type,
@@ -49,8 +48,7 @@ dataset = dict(
         num_workers=8,
         stride=stride,
         imgsz=imgsz,
-        augment=True,
-        is_coco=True
+        augment=True
         ),
     test=dict(
         type=dataset_type,
@@ -60,11 +58,10 @@ dataset = dict(
         num_workers=8,
         stride=stride,
         imgsz=imgsz_test,
-        is_coco=True
         ),
 )
 
 logger = dict(
     type="RunLogger")
 
-resume_path = '/mnt/disk/wang/JDet/projects/yolo/coco-v5m-12epoch-ema/checkpoints/ckpt_12.pkl'
+resume_path='/mnt/disk/wang/JDet/projects/yolo/coco-v5x-12epoch-ema/checkpoints/ckpt_12.pkl'

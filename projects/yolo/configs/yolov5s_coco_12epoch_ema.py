@@ -1,21 +1,20 @@
 _base_ = ['yolo_model_base.py', 'yolo_dataset_base.py', 'yolo_optimizer_base.py', 'yolo_scheduler_base.py']
 batch_size = 16
 max_epoch = 12
-log_interval=1000
-eval_interval=12
+log_interval=10
+eval_interval=13
 checkpoint_interval = 1
-work_dir='/mnt/disk/wang/JDet/projects/yolo/coco-v5s-12epoch-ema'
 stride=32
 imgsz=640
 imgsz_test=640
 dataset_type = 'YoloDataset'
 
-
 model = dict(
     type='YOLOv5S',
     pretrained=False,
     ema=True,
-    imgsz=imgsz
+    imgsz=imgsz,
+    is_coco=True
 )
 
 optimizer=dict(
@@ -28,7 +27,8 @@ parameter_groups_generator = dict(
     batch_size=batch_size
 )
 scheduler=dict(
-    max_steps=max_epoch
+    max_steps=max_epoch,
+    warmup_iters=22179
 )
 dataset = dict(
     val=dict(
@@ -38,7 +38,8 @@ dataset = dict(
         batch_size = batch_size,
         num_workers=8,
         stride=stride,
-        imgsz=imgsz_test
+        imgsz=imgsz_test,
+        is_coco=True
         ),
     train=dict(
         type=dataset_type,
@@ -48,18 +49,22 @@ dataset = dict(
         num_workers=8,
         stride=stride,
         imgsz=imgsz,
-        augment=True
+        augment=True,
+        is_coco=True
         ),
     test=dict(
         type=dataset_type,
-        task='train',
+        task='test',
         path='/mnt/disk/wang/coco/test-dev2017.txt',
         batch_size = batch_size,
         num_workers=8,
         stride=stride,
         imgsz=imgsz_test,
+        is_coco=True
         ),
 )
 
 logger = dict(
     type="RunLogger")
+
+resume_path='/mnt/disk/wang/JDet/projects/yolo/coco-v5s-12epoch-ema1/checkpoints/ckpt_12.pkl'

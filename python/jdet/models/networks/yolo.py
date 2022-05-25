@@ -6,6 +6,7 @@ from jdet.models.utils.yolo_modules import *
 from jdet.models.boxes.box_ops import bbox_iou_per_box
 from jdet.utils.general import make_divisible, check_img_size
 from jdet.utils.registry import MODELS
+from jdet.data.yolo import non_max_suppression
 
 def copy_attr(a, b, include=(), exclude=()):
     # Copy attributes from b to a, options to only include [...] and to exclude [...]
@@ -216,7 +217,9 @@ class YOLO(nn.Module):
         obj_pw=1.0, # obj BCELoss positive_weight
         fl_gamma=0.0, # focal loss gamma
         anchor_t = 4.0, # # anchor-multiple threshold
-        single_cls=False):  # model, input channels, number of classes
+        single_cls=False,
+        conf_thres=0.001,
+        is_coco=False):  # model, input channels, number of classes
         
         super().__init__()
 
@@ -276,6 +279,9 @@ class YOLO(nn.Module):
         self.obj_pw = obj_pw
         self.fl_gamma = fl_gamma
         self.anchor_t = anchor_t
+        self.conf_thres=conf_thres
+        self.is_coco = is_coco
+        self.iou_thres=0.65 if is_coco else 0.6
 
         #initializing hyperparams
         self.gr = 1.0 # iou loss ratio (obj_loss = 1.0 or iou)
@@ -293,10 +299,11 @@ class YOLO(nn.Module):
 
         return losses
 
-    def execute_test(self, x, annos=None, conf_thres=0.001, iou_thres=0.65):
-        results = self.forward_once(x)
+    def execute_test(self, x, labels=None, conf_thres=0.001, iou_thres=0.65):
+        inf_out, _ = self.forward_once(x)
         # x = inf_out, train_out
-        return [results[0]]
+        output = non_max_suppression(inf_out, conf_thres=self.conf_thres, iou_thres=self.iou_thres, labels=[])
+        return [output]
 
     def forward_once(self, x):
         y, dt = [], []  # outputs
@@ -580,11 +587,11 @@ def YOLOv5S(pretrained=False, ema=True, **kwargs):
 @MODELS.register_module()
 def YOLOv5M(pretrained=False, ema=True, **kwargs):
     path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5m.yaml"
-    model = ModelEMAWraper(path, **kwargs) 
+    model = ModelEMAWraper(path, **kwargs)
     if pretrained:
         print('loading pretrained model for yolov5m.')
         model.load('https://cloud.tsinghua.edu.cn/f/99d62d77b1664415bfcc/?dl=1')
-        model = model.fuse()
+        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
@@ -596,7 +603,7 @@ def YOLOv5L(pretrained=False, ema=True, **kwargs):
     if pretrained:
         print('loading pretrained model for yolov5l.')
         model.load('https://cloud.tsinghua.edu.cn/f/f588a1a21c4343f6a70c/?dl=1')
-        model = model.fuse()
+        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
@@ -608,7 +615,7 @@ def YOLOv5X(pretrained=False, ema=True, **kwargs):
     if pretrained:
         print('loading pretrained model for yolov5x.')
         model.load('https://cloud.tsinghua.edu.cn/f/9eb98e5de2864b7dae4f/?dl=1')
-        model = model.fuse()
+        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
