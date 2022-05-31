@@ -27,4 +27,4 @@ python run_net.py --config-file=“configs/yolov5x_coco_12epoch_ema.py” --task
 | YOLOV5X| COCO | 31.1 | 48.7 | 59.3 | 46.4 | [config](configs/yolov5x_coco_12epoch_ema.py) | [model](https://cloud.tsinghua.edu.cn/f/20405ba3e1984f889c22/?dl=1) |
 
 ## References
-https://github.com/dingjiansw101/aerialdetection
+https://github.com/ultralytics/yolov5/releases/tag/v5.0
