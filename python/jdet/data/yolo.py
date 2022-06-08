@@ -394,10 +394,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             img, labels = self.flipud(img, labels)
             img, labels = self.fliplr(img, labels)
 
-        labels_out = jt.zeros((nL, 6)) if self.task is 'train' else jt.zeros((nL + 2, 6))
+        labels_out = jt.zeros((nL, 6)) if self.task == 'train' else jt.zeros((nL + 2, 6))
         
         #store meta data in the first two labels 
-        if self.task is 'val' or self.task is 'test':
+        if self.task == 'val' or self.task == 'test':
             path = Path(self.img_files[index])
             image_id = int(path.stem) if path.stem.isnumeric() else 0
             labels_out[0, 1] = image_id
@@ -407,7 +407,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             labels_out[1, 3:5] = jt.array(list(pad))
 
         if nL:
-            if self.task is 'val' or self.task is 'test':
+            if self.task == 'val' or self.task == 'test':
                 labels_out[2:, 1:] = jt.array(labels)
             else:
                 labels_out[:, 1:] = jt.array(labels)
