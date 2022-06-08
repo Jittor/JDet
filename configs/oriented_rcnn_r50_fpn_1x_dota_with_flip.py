@@ -201,6 +201,7 @@ logger = dict(
     type="RunLogger")
 
 # when we the trained model from cshuan, image is rgb
+resume_path='/home/wang/workspace/weights/ckpt_12.pkl'
 max_epoch = 12
 eval_interval = 100
 checkpoint_interval = 1

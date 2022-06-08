@@ -82,12 +82,12 @@ class Runner:
         
         while not self.finish:
             self.train()
-            if check_interval(self.epoch,self.eval_interval) and True:
+            if check_interval(self.epoch,self.eval_interval) and False:
                 # TODO: need remove this
                 self.val()
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
-        self.val()
+        self.test()
 
     def test_time(self):
         warmup = 10

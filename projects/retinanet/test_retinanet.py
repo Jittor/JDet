@@ -85,9 +85,9 @@ def main():
             s_l1 = std_roi_cls_losses[batch_idx]
             l2 = losses["roi_loc_loss"].data[0]
             s_l2 = std_roi_loc_losses[batch_idx]
+            print(abs(l1 - s_l1) / abs(s_l1), abs(l2 - s_l2) / abs(s_l2))
             assert(abs(l1 - s_l1) / abs(s_l1) < 1e-3)
             assert(abs(l2 - s_l2) / abs(s_l2) < 1e-3)
-            print(abs(l1 - s_l1) / abs(s_l1), abs(l2 - s_l2) / abs(s_l2))
             all_loss,losses = parse_losses(losses)
             optimizer.step(all_loss)
             scheduler.step(iter,0,by_epoch=True)

@@ -8,11 +8,12 @@ import requests
 import jittor as jt 
 from jittor import nn
 from PIL import Image
+import cv2 
+import random
 
-from jdet.utils.yolo.datasets import letterbox
-from jdet.utils.yolo.general import non_max_suppression, make_divisible, scale_coords, xyxy2xywh
-from jdet.utils.yolo.plots import color_list,plot_one_box
-from jdet.utils.yolo.activations import SiLU
+
+from jdet.data.yolo import letterbox, non_max_suppression, scale_coords, xyxy2xywh
+from jdet.utils.general import make_divisible
 
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'
@@ -26,11 +27,15 @@ def DWConv(c1, c2, k=1, s=1, act=True):
     return Conv(c1, c2, k, s, g=math.gcd(c1, c2), act=act)
 
 
+# SiLU https://arxiv.org/pdf/1606.08415.pdf ----------------------------------------------------------------------------
+class SiLU(nn.Module):  # export-friendly version of nn.SiLU()
+    @staticmethod
+    def execute(x):
+        return x * jt.sigmoid(x)
+
 class Conv(nn.Module):
-    use_v3 = False
     # Standard convolution
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True,):  # ch_in, ch_out, kernel, stride, padding, groups
-        assert isinstance(self.use_v3,bool),"You need to decide whether use_yolov3 is True or False"
         super(Conv, self).__init__()
         if isinstance(k,list):
            assert len(k)<=2 and k[0]==k[-1]
@@ -41,7 +46,7 @@ class Conv(nn.Module):
              
         self.conv = nn.Conv(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm(c2)
-        self.act = (nn.LeakyReLU(0.1) if self.use_v3 else SiLU() )if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
+        self.act = SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
 
     def execute(self, x):
         return self.act(self.bn(self.conv(x)))
@@ -252,6 +257,29 @@ class autoShape(nn.Module):
             y[i][:, :4] = scale_coords(shape1, y[i][:, :4], shape0[i])
 
         return Detections(imgs, y,files, self.names)
+
+
+def color_list():
+    # Return first 10 plt colors as (r,g,b) https://stackoverflow.com/questions/51350872/python-from-color-name-to-rgb
+    def hex2rgb(h):
+        return tuple(int(h[1 + i:1 + i + 2], 16) for i in (0, 2, 4))
+
+    return [hex2rgb(h) for h in plt.rcParams['axes.prop_cycle'].by_key()['color']]
+
+def plot_one_box(x, img, color=None, label=None, line_thickness=None):
+    # Plots one bounding box on image img
+    tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
+    color = color or [random.randint(0, 255) for _ in range(3)]
+    if hasattr(x,"int"):
+        x = x.int()
+    c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
+    cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    if label:
+        tf = max(tl - 1, 1)  # font thickness
+        t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
+        c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+        cv2.rectangle(img, c1, c2, color, -1, cv2.LINE_AA)  # filled
+        cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
 
 class Detections:

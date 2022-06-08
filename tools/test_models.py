@@ -1,6 +1,5 @@
 import os
-tasks = ["roi_transformer", "faster_rcnn", "retinanet", "s2anet", "ssd", "gliding", 
-"oriented_rcnn", "fcos", "yolo"]
+tasks = [ "retinanet", "s2anet", "ssd",  "yolo"]
 zip_path = "https://cloud.tsinghua.edu.cn/f/e29bc9e04cda45bb8e66/?dl=1"
 
 if (not os.path.exists("test_datas.zip")):
@@ -15,5 +14,5 @@ if (not os.path.exists("test_datas.zip")):
         os.system(f"ln -s {src_path} {tar_path}")
 for task in tasks:
     print(f"===============testing {task}==================")
-    cmd = f"cd projects/{task} && python test_{task}.py"
+    cmd = f"cd projects/{task} && python3 test_{task}.py"
     os.system(cmd)
