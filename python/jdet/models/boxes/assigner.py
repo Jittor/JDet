@@ -156,6 +156,8 @@ class MaxIoUAssigner:
                         assigned_gt_inds[max_iou_inds] = i + 1
                     else:
                         assigned_gt_inds[gt_argmax_overlaps[i]] = i + 1
+                if i % 100 == 99:
+                    jt.sync_all()
 
         if gt_labels is not None:
             assigned_labels = jt.full((num_bboxes, ), self.assigned_labels_filled, dtype=assigned_gt_inds.dtype)
