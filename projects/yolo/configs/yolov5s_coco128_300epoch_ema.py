@@ -3,7 +3,6 @@ batch_size = 16
 max_epoch = 300
 log_interval=1
 eval_interval=300
-work_dir='/mnt/disk/wang/JDet/projects/yolo/coco128-v5s-300epoch-ema3'
 stride=32
 imgsz=640
 imgsz_test=640
@@ -11,7 +10,6 @@ dataset_type = 'YoloDataset'
 
 model = dict(
     type='YOLOv5S',
-    pretrained=False,
     ema=True,
     imgsz=imgsz
 )

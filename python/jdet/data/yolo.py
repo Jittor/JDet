@@ -473,7 +473,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
         loss = jt.zeros((3,))
         jdict, stats, ap, ap_class = [], [], [], []
-        for batch_i, (output, labels) in enumerate(results):
+        for batch_i, (output, labels) in enumerate(tqdm(results)):
             nb = len(output)
             metas = [labels[labels[:, 0] == i][:2] for i in range(nb)]
             targets = jt.contrib.concat([jt.array(labels[labels[:, 0] == i][2:]) for i in range(nb)], 0)

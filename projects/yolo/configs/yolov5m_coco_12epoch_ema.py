@@ -2,7 +2,7 @@ _base_ = ['yolo_model_base.py', 'yolo_dataset_base.py', 'yolo_optimizer_base.py'
 batch_size = 16
 max_epoch = 12
 log_interval=10
-eval_interval=13
+eval_interval=12
 checkpoint_interval = 1
 stride=32
 imgsz=640
@@ -11,7 +11,6 @@ dataset_type = 'YoloDataset'
 
 model = dict(
     type='YOLOv5M',
-    pretrained=False,
     ema=True,
     imgsz=imgsz,
     is_coco=True
@@ -55,7 +54,7 @@ dataset = dict(
     test=dict(
         type=dataset_type,
         task='test',
-        path='/mnt/disk/wang/coco/test-dev2017.txt',
+        path='/mnt/disk/wang/coco/val2017.txt',
         batch_size = batch_size,
         num_workers=8,
         stride=stride,
@@ -66,5 +65,3 @@ dataset = dict(
 
 logger = dict(
     type="RunLogger")
-
-resume_path = '/mnt/disk/wang/JDet/projects/yolo/coco-v5m-12epoch-ema/checkpoints/ckpt_12.pkl'

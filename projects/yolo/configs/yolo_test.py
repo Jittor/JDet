@@ -8,13 +8,12 @@ imgsz_test=640
 nc=80
 pretrained_weights='test_datas_yolo/test_yolo.pkl'
 dataset_type = 'YoloDataset'
-data_path='data/coco128.yaml'
 
 model = dict(
     type ='YOLOv5S',
     pretrained=False,
     imgsz=imgsz,
-    ema=True
+    ema=False
 )
 parameter_groups_generator = dict(
     batch_size=batch_size
@@ -27,4 +26,15 @@ optimizer=dict(
 )
 scheduler=dict(
     max_steps=max_epoch,
+)
+
+dataset = dict(
+    train=dict(
+        path='/mnt/disk1/wang/coco128/images/train2017',
+        batch_size = batch_size,
+        num_workers=8,
+        stride=stride,
+        imgsz=imgsz,
+        augment=False
+        )
 )

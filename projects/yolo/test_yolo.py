@@ -25,7 +25,6 @@ def main():
     model = build_from_cfg(cfg.model,MODELS)
     resume_data = jt.load(cfg.pretrained_weights)
     model.load_parameters(resume_data['model'])
-    model.fuse()
     if (cfg.parameter_groups_generator):
         params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=model.named_parameters(), model=model)
     else:
@@ -50,11 +49,11 @@ def main():
             # print(jdet.utils.general.sync(targets))
 
             losses = model(images,targets)
-            l1 = losses[1]["lbox"].data[0]
+            l1 = losses["box_loss"].data[0]
             box_losses.append(l1)
-            l2 = losses[1]["lcls"].data[0]
+            l2 = losses["cls_loss"].data[0]
             cls_losses.append(l2)
-            l3 = losses[1]["lobj"].data[0]
+            l3 = losses["obj_loss"].data[0]
             obj_losses.append(l3)
             if (batch_idx > 10):
                 break
@@ -90,11 +89,12 @@ def main():
             targets = targetss[batch_idx]
 
             losses = model(images,targets)
-            l1 = losses[1]["lcls"].data[0]
+            print(losses)
+            l1 = losses["cls_loss"].data[0]
             s_l1 = cls_losses[batch_idx]
-            l2 = losses[1]["lobj"].data[0]
+            l2 = losses["obj_loss"].data[0]
             s_l2 = obj_losses[batch_idx]
-            l3 = losses[1]["lbox"].data[0]
+            l3 = losses["box_loss"].data[0]
             s_l3 = box_losses[batch_idx]
             print(abs(l1 - s_l1) / abs(s_l1), abs(l2 - s_l2) / abs(s_l2), abs(l3 - s_l3) / abs(s_l3))
             assert(abs(l1 - s_l1) / abs(s_l1) < 1e-3)

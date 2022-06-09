@@ -10,6 +10,14 @@ from jdet.utils.general import make_divisible, check_img_size
 from jdet.utils.registry import MODELS
 from jdet.data.yolo import non_max_suppression
 
+def copy_attr(a, b, include=(), exclude=()):
+    # Copy attributes from b to a, options to only include [...] and to exclude [...]
+    for k, v in b.__dict__.items():
+        if (len(include) and k not in include) or k.startswith('_') or k in exclude:
+            continue
+        else:
+            setattr(a, k, deepcopy(v))
+
 class ModelEMA:
     """ Model Exponential Moving Average from https://github.com/rwightman/pytorch-image-models
     Keep a moving average of everything in the model state_dict (parameters and buffers).
@@ -567,49 +575,33 @@ def _yolo(cfg, **kwargs):
     return model
 
 @MODELS.register_module()
-def YOLOv5S(pretrained=False, ema=True, **kwargs):
+def YOLOv5S(ema=True, **kwargs):
     path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5s.yaml"
     model = ModelEMAWraper(path, **kwargs) 
-    if pretrained:
-        print('loading pretrained model for yolov5s.')
-        model.load('https://cloud.tsinghua.edu.cn/f/ecaaea26ff7d4d68b5a2/?dl=1')
-        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
 
 @MODELS.register_module()
-def YOLOv5M(pretrained=False, ema=True, **kwargs):
+def YOLOv5M(ema=True, **kwargs):
     path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5m.yaml"
     model = ModelEMAWraper(path, **kwargs)
-    if pretrained:
-        print('loading pretrained model for yolov5m.')
-        model.load('https://cloud.tsinghua.edu.cn/f/99d62d77b1664415bfcc/?dl=1')
-        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
 
 @MODELS.register_module()
-def YOLOv5L(pretrained=False, ema=True, **kwargs):
+def YOLOv5L(ema=True, **kwargs):
     path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5l.yaml"
     model = ModelEMAWraper(path, **kwargs)
-    if pretrained:
-        print('loading pretrained model for yolov5l.')
-        model.load('https://cloud.tsinghua.edu.cn/f/f588a1a21c4343f6a70c/?dl=1')
-        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
 
 @MODELS.register_module()
-def YOLOv5X(pretrained=False, ema=True, **kwargs):
+def YOLOv5X(ema=True, **kwargs):
     path = Path(__file__).parent / "../../../../projects/yolo/configs/yolo_configs/yolov5x.yaml"
     model = ModelEMAWraper(path, **kwargs)
-    if pretrained:
-        print('loading pretrained model for yolov5x.')
-        model.load('https://cloud.tsinghua.edu.cn/f/9eb98e5de2864b7dae4f/?dl=1')
-        model = model.model.fuse()
     if ema:
         model.hook_ema()
     return model
