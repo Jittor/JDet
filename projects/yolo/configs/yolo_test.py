@@ -11,7 +11,6 @@ dataset_type = 'YoloDataset'
 
 model = dict(
     type ='YOLOv5S',
-    pretrained=False,
     imgsz=imgsz,
     ema=False
 )
