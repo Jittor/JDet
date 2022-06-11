@@ -10,11 +10,12 @@ from jdet.config import get_cfg,save_cfg
 from jdet.utils.visualization import visualize_results
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
 from jdet.config import get_classes_by_name
-from jdet.utils.general import build_file, current_time, sync,check_file,build_file,check_interval,parse_losses,search_ckpt
+from jdet.utils.general import build_file, current_time, sync,check_file,check_interval,parse_losses,search_ckpt
 from jdet.data.devkits.data_merge import data_merge_result
 import os
 import shutil
 from tqdm import tqdm
+from jittor_utils import auto_diff
 import copy
 
 class Runner:
@@ -83,7 +84,6 @@ class Runner:
             self.train()
             if check_interval(self.epoch,self.eval_interval) and False:
                 # TODO: need remove this
-                self.model.eval()
                 self.val()
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
@@ -127,9 +127,8 @@ class Runner:
             all_loss,losses = parse_losses(losses)
             self.optimizer.step(all_loss)
             self.scheduler.step(self.iter,self.epoch,by_epoch=True)
-    
             if check_interval(self.iter,self.log_interval) and self.iter>0:
-                batch_size = len(targets)*jt.world_size
+                batch_size = len(images)*jt.world_size
                 ptime = time.time()-start_time
                 fps = batch_size*(batch_idx+1)/ptime
                 eta_time = (self.total_iter-self.iter)*ptime/(batch_idx+1)
@@ -147,14 +146,13 @@ class Runner:
                 )
                 data.update(losses)
                 data = sync(data)
-                # is_main use jt.rank==0, so it's scope must have no jt.Vars
+                # is_main use jt.rank==0, so its scope must have no jt.Vars
                 if jt.rank==0:
                     self.logger.log(data)
             
             self.iter+=1
             if self.finish:
                 break
-
         self.epoch +=1
 
 
@@ -177,14 +175,13 @@ class Runner:
         else:
             self.logger.print_log("Validating....")
             # TODO: need move eval into this function
-            # self.model.eval()
-            if self.model.is_training():
-                self.model.eval()
+            self.model.eval()
+            #if model.is_training():
+            #    model.eval()
             results = []
             for batch_idx,(images,targets) in tqdm(enumerate(self.val_dataset),total=len(self.val_dataset)):
                 result = self.model(images,targets)
                 results.extend([(r,t) for r,t in zip(sync(result),sync(targets))])
-
             eval_results = self.val_dataset.evaluate(results,self.work_dir,self.epoch,logger=self.logger)
 
             self.logger.log(eval_results,iter=self.iter)
@@ -240,9 +237,9 @@ class Runner:
             "scheduler": self.scheduler.parameters(),
             "optimizer": self.optimizer.parameters()
         }
-
         save_file = build_file(self.work_dir,prefix=f"checkpoints/ckpt_{self.epoch}.pkl")
         jt.save(save_data,save_file)
+        print("saved")
     
     def load(self, load_path, model_only=False):
         resume_data = jt.load(load_path)

@@ -1,0 +1,39 @@
+dataset_type = 'YoloDataset'
+dataset = dict(
+    val=dict(
+        type=dataset_type,
+        task='val'
+        ),
+    test=dict(
+        type=dataset_type,
+        task='test'
+        ),
+    train=dict(
+        type=dataset_type,
+        task='train',
+        random_perspective=dict(
+            type='YoloRandomPerspective',
+            degrees=0.0, 
+            translate=0.1, 
+            scale=.5, 
+            shear=0.0, 
+            perspective=0.0
+        ),
+        augment_hsv=dict(
+            type='YoloAugmentHSV',
+            hgain=0.015,
+            sgain=0.7,
+            vgain=0.4
+        ),
+        flipud=dict(
+            type='YoloRandomFlip',
+            direction='vertical',
+            prob=0.0
+        ),
+        fliplr=dict(
+            type='YoloRandomFlip',
+            direction='horizontal',
+            prob=0.5
+        )
+        )
+)

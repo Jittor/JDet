@@ -5,4 +5,5 @@ from .necks import *
 from .losses import *
 from . import boxes
 from .roi_extractors import *
+from .param_generators import *
 __all__ = []
