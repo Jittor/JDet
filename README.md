@@ -131,8 +131,8 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: ROI Transformer
 - :heavy_check_mark: fcos
 - :heavy_check_mark: Oriented R-CNN
+- :heavy_check_mark: YOLOv5
 - :clock3: ReDet
-- :clock3: YOLOv5
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
 - :heavy_plus_sign: CSL
