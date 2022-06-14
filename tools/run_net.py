@@ -1,5 +1,6 @@
 import argparse
 import jittor as jt
+jt.flags.use_cuda_managed_allocator=1
 from jdet.runner import Runner 
 from jdet.config import init_cfg
 
