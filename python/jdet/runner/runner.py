@@ -158,14 +158,14 @@ class Runner:
 
     @jt.no_grad()
     @jt.single_process_scope()
-    def run_on_images(self,save_dir=None):
+    def run_on_images(self,save_dir=None,**kwargs):
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
         self.model.eval()
         for i,(images,targets) in tqdm(enumerate(self.test_dataset)):
             results = self.model(images,targets)
             if save_dir:
-                visualize_results(sync(results),get_classes_by_name(self.test_dataset.dataset_type),[t["img_file"] for t in targets],save_dir)
+                visualize_results(sync(results),get_classes_by_name(self.test_dataset.dataset_type),[t["img_file"] for t in targets],save_dir, **kwargs)
 
     @jt.no_grad()
     @jt.single_process_scope()

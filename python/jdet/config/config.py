@@ -8,7 +8,7 @@ from importlib import import_module
 import sys
 import inspect
 
-__all__ = ["get_cfg","init_cfg","save_cfg","print_cfg"]
+__all__ = ["get_cfg","init_cfg","save_cfg","print_cfg","update_cfg"]
 BASE_KEY = "_base_"
 COVER_KEY = "_cover_"
 IGNORE_KEY = "_ignore_"
@@ -152,8 +152,8 @@ def init_cfg(filename):
 def get_cfg():
     return _cfg
 
-def update_cfg(**kwargs):
-    _cfg.update(kwargs)
+def update_cfg(args):
+    _cfg.update(args)
 
 def save_cfg(save_file):
     with open(save_file,"w") as f:
