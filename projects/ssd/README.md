@@ -1,7 +1,7 @@
 # SSD
 
 ## Preparing
-<a href="https://drive.google.com/file/d/1hZJCm3cbWdpPnk5yacnzu5aXJnTtZ3cp/view?usp=sharing">Download</a> pretrained weight to weights/vgg16_caffe.pkl
+<a href="https://cloud.tsinghua.edu.cn/f/d8077ff8c4654bbd8902/?dl=1">Download</a> pretrained weight to weights/vgg16_caffe_numpy.pkl
 
 ## Training
 ```sh
