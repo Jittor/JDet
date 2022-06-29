@@ -109,7 +109,6 @@ dataset = dict(
     val=dict(
         type="DOTADataset",
         dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
-        # images_dir='/mnt/disk/lxl/dataset/DOTA_1024/trainval_split/images/',
         transforms=[
             dict(
                 type="RotatedResize",
