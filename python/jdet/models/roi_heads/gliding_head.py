@@ -449,7 +449,7 @@ class GlidingHead(nn.Module):
 
                 poly = det_bboxes[:, :8]
                 scores = det_bboxes[:, 8]
-                labels = det_labels - 1
+                labels = det_labels
 
                 result.append((poly, scores, labels))
             

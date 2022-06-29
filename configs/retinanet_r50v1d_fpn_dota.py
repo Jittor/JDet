@@ -85,7 +85,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/DOTA/splits/test_600_150/images/",
+      images_dir= "/mnt/disk/flowey/dataset/processed_DOTA/test_600_150_1.0/images",
       transforms= [
         dict(
           type= "RotatedResize",

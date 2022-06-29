@@ -81,7 +81,7 @@ model = dict(
         )
     )
 
-data_root = "/mnt/disk/lxl/dataset/DOTA_1024_05_10_15"
+data_root = "/mnt/disk/flowey/dataset/processed_DOTA"
 train_root = f"{data_root}/trainval_1024_200_0.5-1.0-1.5"
 dataset = dict(
     train=dict(
