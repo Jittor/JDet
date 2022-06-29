@@ -1,6 +1,6 @@
 type='DOTA'
-source_dataset_path='/mnt/disk/czh/dota_images_single/dota_images'
-target_dataset_path='/home/czh/JDet/DOTA_single_jdet'
+source_dataset_path='/home/cxjyxx_me/workspace/JAD/datasets/DOTA/'
+target_dataset_path='/mnt/disk/flowey/dataset/processed_DOTA/'
 
 # available labels: train, val, test, trainval
 tasks=[
