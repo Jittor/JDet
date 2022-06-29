@@ -65,5 +65,3 @@ dataset = dict(
 
 logger = dict(
     type="RunLogger")
-
-# resume_path='/mnt/disk1/wang/JDet/work_dirs/yolov5s_coco_12epoch_ema/checkpoints/ckpt_12.pkl'
