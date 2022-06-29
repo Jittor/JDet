@@ -25,6 +25,8 @@ def process():
     # copy image
     img_path = pw.pin.pin.img_path
     if not os.path.exists(img_path):
+        with pw.output.use_scope('out'):
+            pw.output.put_text("图像不存在："+img_path)
         print("img not exist:", img_path)
         return
     img_name = os.path.basename(img_path)
