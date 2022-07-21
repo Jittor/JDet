@@ -1,0 +1,31 @@
+type='FAIR2M'
+source_fair_dataset_path='/mnt/disk/flowey/dataset/fair2m/data'
+source_dataset_path='/mnt/disk/flowey/dataset/fair2m/dota'
+target_dataset_path='/mnt/disk/flowey/dataset/fair2m/preprocessed'
+convert_tasks=['train','val']
+
+# available labels: train, val, test, trainval
+tasks=[
+    dict(
+        label='train',
+        config=dict(
+            subimage_size=1024,
+            overlap_size=200,
+            multi_scale=[1.],
+            horizontal_flip=False,
+            vertical_flip=False,
+            rotation_angles=[0.] 
+        )
+    ),
+    dict(
+        label='val',
+        config=dict(
+            subimage_size=1024,
+            overlap_size=200,
+            multi_scale=[1.],
+            horizontal_flip=False,
+            vertical_flip=False,
+            rotation_angles=[0.] 
+        )
+    )
+]
