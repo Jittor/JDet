@@ -1,3 +1,5 @@
+# {DATASET_PATH}
+dataset_root = '/mnt/disk/flowey/dataset/fair2m'
 # model settings
 model = dict(
     type='S2ANet',
@@ -83,7 +85,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="FAIR2MDataset",
-        dataset_dir='/mnt/disk/flowey/dataset/fair2m/preprocessed/train_1024_200_1.0',
+        dataset_dir=f'{dataset_root}/preprocessed/train_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -108,7 +110,7 @@ dataset = dict(
     ),
     val=dict(
         type="FAIR2MDataset",
-        dataset_dir='/mnt/disk/flowey/dataset/fair2m/preprocessed/val_1024_200_1.0',
+        dataset_dir=f'{dataset_root}/preprocessed/train_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -130,7 +132,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/mnt/disk/flowey/dataset/fair2m/preprocessed/val_1024_200_1.0/images',
+        images_dir=f'{dataset_root}/preprocessed/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type="RotatedResize",
