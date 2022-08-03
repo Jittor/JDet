@@ -4,11 +4,11 @@
 
 进入JDet的github主页：https://github.com/Jittor/JDet
 
-按照README的提示安装JDet及其所需环境，安装完成后切换到JDet-competition分支。
+按照README的提示安装JDet及其所需环境。
 
 ### 2. 下载数据集&数据预处理
 
-1. 下载数据集，解压后修改成以下形式：
+1. 在比赛页面下载FAIR1M 1.5数据集，解压后修改成以下形式：
 
     ```
     {DATASET_PATH}
