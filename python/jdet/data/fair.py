@@ -1,6 +1,6 @@
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.utils.registry import DATASETS
-from jdet.config.constant import FAIR_CLASSES_, FAIR2M_CLASSES
+from jdet.config.constant import FAIR_CLASSES_, FAIR1M_1_5_CLASSES
 from jdet.models.boxes.box_ops import rotated_box_to_poly_single
 from jdet.data.dota import DOTADataset
 import os
@@ -90,11 +90,11 @@ class FAIRDataset(DOTADataset):
         return img_infos
 
 @DATASETS.register_module()
-class FAIR2MDataset(DOTADataset):
-    CLASSES = FAIR2M_CLASSES
+class FAIR1M_1_5_Dataset(DOTADataset):
+    CLASSES = FAIR1M_1_5_CLASSES
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.CLASSES = FAIR2M_CLASSES
+        self.CLASSES = FAIR1M_1_5_CLASSES
 
         for img_info in self.img_infos:
             boxes = img_info["ann"]["bboxes"]

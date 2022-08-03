@@ -1,7 +1,7 @@
-type='FAIR2M'
-source_fair_dataset_path='/mnt/disk/flowey/dataset/fair2m/data'
-source_dataset_path='/mnt/disk/flowey/dataset/fair2m/dota'
-target_dataset_path='/mnt/disk/flowey/dataset/fair2m/preprocessed'
+type='FAIR1M_1_5'
+source_fair_dataset_path='/mnt/disk3/flowey/dataset/fair1m_1_5_a/data'
+source_dataset_path='/mnt/disk3/flowey/dataset/fair1m_1_5_a/dota'
+target_dataset_path='/mnt/disk3/flowey/dataset/fair1m_1_5_a/preprocessed'
 convert_tasks=['train','test']
 
 # available labels: train, val, test, trainval

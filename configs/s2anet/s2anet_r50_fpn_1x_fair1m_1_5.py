@@ -1,5 +1,5 @@
 # {DATASET_PATH}
-dataset_root = '/mnt/disk/flowey/dataset/fair2m'
+dataset_root = '/mnt/disk/flowey/dataset/fair1m_1_5'
 # model settings
 model = dict(
     type='S2ANet',
@@ -84,7 +84,7 @@ model = dict(
     )
 dataset = dict(
     train=dict(
-        type="FAIR2MDataset",
+        type="FAIR1M_1_5_Dataset",
         dataset_dir=f'{dataset_root}/preprocessed/train_1024_200_1.0',
         transforms=[
             dict(
@@ -109,7 +109,7 @@ dataset = dict(
         filter_empty_gt=False
     ),
     val=dict(
-        type="FAIR2MDataset",
+        type="FAIR1M_1_5_Dataset",
         dataset_dir=f'{dataset_root}/preprocessed/train_1024_200_1.0',
         transforms=[
             dict(
@@ -148,7 +148,7 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False,),
         ],
-        dataset_type="FAIR2M",
+        dataset_type="FAIR1M_1_5",
         num_workers=4,
         batch_size=1,
     )

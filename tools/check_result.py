@@ -6,7 +6,7 @@ from xml.dom.minidom import parse
 from tqdm import tqdm
 import os
 
-FAIR2M_CLASSES = ['Airplane', 'Ship', 'Vehicle', 'Basketball_Court', 'Tennis_Court', 
+FAIR1M_1_5_CLASSES = ['Airplane', 'Ship', 'Vehicle', 'Basketball_Court', 'Tennis_Court', 
         "Football_Field", "Baseball_Field", 'Intersection', 'Roundabout', 'Bridge']
 
 def iou_poly(poly1,poly2):
@@ -270,7 +270,7 @@ def main():
     args = parser.parse_args()
     gts = parse_dir(args.target)
     dets = parse_dir(args.result, True)
-    eval_result = evaluate(dets, gts, FAIR2M_CLASSES)
+    eval_result = evaluate(dets, gts, FAIR1M_1_5_CLASSES)
     print(eval_result)
 
 if __name__ == "__main__":

@@ -198,7 +198,7 @@ FAIR_CLASSES_ = ['Boeing737', 'Boeing747', 'Boeing777', 'Boeing787', 'C919',
         'Baseball_Field', 'Intersection', 'Roundabout', 'Bridge'
     ]
 
-FAIR2M_CLASSES = ['Airplane', 'Ship', 'Vehicle', 'Basketball_Court', 'Tennis_Court', 
+FAIR1M_1_5_CLASSES = ['Airplane', 'Ship', 'Vehicle', 'Basketball_Court', 'Tennis_Court', 
         "Football_Field", "Baseball_Field", 'Intersection', 'Roundabout', 'Bridge'
     ]
 
@@ -215,7 +215,7 @@ def get_classes_by_name(name):
         'DOTA1_5':  DOTA1_5_CLASSES,
         'DOTA2':    DOTA2_CLASSES,
         'FAIR':     FAIR_CLASSES_,
-        'FAIR2M':   FAIR2M_CLASSES,
+        'FAIR1M_1_5':   FAIR1M_1_5_CLASSES,
         'SSDD':     SSDD_CLASSES,
         'SSDD+':    SSDD_CLASSES,
     }
