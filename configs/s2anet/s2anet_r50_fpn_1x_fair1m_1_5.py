@@ -1,5 +1,5 @@
 # {DATASET_PATH}
-dataset_root = '/mnt/disk/flowey/dataset/fair1m_1_5'
+dataset_root = '/mnt/disk3/flowey/dataset/fair1m_1_5_a'
 # model settings
 model = dict(
     type='S2ANet',
