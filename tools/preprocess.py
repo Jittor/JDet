@@ -48,7 +48,7 @@ def run(cfg):
             convert_data_to_mmdet(out_path, os.path.join(out_path, 'labels.pkl'), type=cfg.type)
         return
 
-    if (cfg.type=='FAIR'):
+    if (cfg.type=='FAIR' or cfg.type=='FAIR1M_1_5'):
         for task in cfg.convert_tasks:
             print('==============')
             print("convert to dota:", task)

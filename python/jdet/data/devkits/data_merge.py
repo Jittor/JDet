@@ -8,7 +8,7 @@ import os
 import shutil
 from tqdm import tqdm
 import numpy as np
-from jdet.data.devkits.dota_to_fair import dota_to_fair
+from jdet.data.devkits.dota_to_fair import dota_to_fair, dota_to_fair1m_1_5
 from jdet.utils.general import is_win
 
 def flip_box(box, target):
@@ -54,7 +54,7 @@ def data_merge(result_pkl, save_path, final_path,dataset_type):
     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
-    assert dataset_type in ["FAIR", "DOTA", "DOTA1_5", "DOTA2"], "need to set dataset.test.dataset_type in the config file. FAIR, DOTA, DOTA1_5 and DOTA2 are supported"
+    assert dataset_type in ["FAIR", "DOTA", "DOTA1_5", "DOTA2", "FAIR1M_1_5"], "need to set dataset.test.dataset_type in the config file. FAIR, FAIR1M_1_5, DOTA, DOTA1_5 and DOTA2 are supported"
     print("Merge results...")
     save_path = os.path.join(work_dir, f"test/submit_{epoch}/before_nms")
     final_path = os.path.join(work_dir, f"test/submit_{epoch}/after_nms")
@@ -70,6 +70,11 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir="")
         final_fair_path = os.path.join(work_dir, f"test/submit_{epoch}/final_fair/test")
         dota_to_fair(final_path, final_fair_path, images_dir)
         final_path = final_fair_path
+    elif (dataset_type == 'FAIR1M_1_5'):
+        print("converting to fair1m_1.5...")
+        final_fair_path = os.path.join(work_dir, f"test/submit_{epoch}/final_fair1m_1_5/test")
+        dota_to_fair1m_1_5(final_path, final_fair_path, images_dir, name)
+        final_path = final_fair_path
     print("zip..")
     zip_path = os.path.join("submit_zips", name + ".zip")
     if (os.path.exists(zip_path)):
@@ -83,6 +88,12 @@ def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir="")
         else:
             os.system(f"cd {os.path.join(final_path, '..')} && zip -r -q {name+'.zip'} 'test'")
             os.system(f"mv {os.path.join(final_path, '..', name+'.zip')} {zip_path}")
+    elif (dataset_type == 'FAIR1M_1_5'):
+        if is_win():
+            raise NotImplementedError
+        else:
+            csv_path = os.path.join("submit_zips", name + ".csv")
+            os.system(f"mv {os.path.join(final_path, name+'.csv')} {csv_path}")
     else:
         if is_win():
             files = glob.glob(os.path.join(final_path,"*"))

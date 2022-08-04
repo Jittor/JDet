@@ -9,3 +9,4 @@ tqdm
 pycocotools
 terminaltables
 shapely
+requests

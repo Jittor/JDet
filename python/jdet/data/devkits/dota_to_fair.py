@@ -3,7 +3,7 @@ import os, sys
 import cv2
 from xml.dom.minidom import parse
 
-def pick_res(path, images_dir):
+def pick_res(path, images_dir, keep_underline=False):
     res={}
     imgs = []
     for root, dirs, files in os.walk(images_dir):
@@ -15,7 +15,10 @@ def pick_res(path, images_dir):
     for root, dirs, files in os.walk(path):
         for f in files:
             src=os.path.join(root, f)
-            cls=f[:-4].replace("_"," ")
+            if keep_underline:
+                cls = f[:-4]
+            else:
+                cls=f[:-4].replace("_"," ")
             with open(src, "r") as ff:
                 tot_data = ff.read().split("\n")
                 for data in tot_data:
@@ -95,6 +98,22 @@ def dota_to_fair(src_path, tar_path, images_dir):
         out_xml+=tail
         with open(tar_path+"/"+str(int(i[1:]))+".xml", 'w') as f:
             f.write(out_xml)
+
+def dota_to_fair1m_1_5(src_path, tar_path, images_dir, name):
+    data=pick_res(src_path, images_dir, keep_underline=True)
+    os.makedirs(tar_path, exist_ok=True)
+    lines = []
+    for i in data:
+        for obj in data[i]:
+            temp_txt = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(
+            str(int(i[1:]))+".tif", obj["cls"], 
+            obj["box"][0], obj["box"][1], obj["box"][2], obj["box"][3], 
+            obj["box"][4], obj["box"][5], obj["box"][6], obj["box"][7],
+            obj["p"])
+            lines.append(temp_txt)
+    f_out = open(os.path.join(tar_path, f"{name}.csv"), "w")
+    f_out.writelines(lines)
+    f_out.close()
 
 if __name__ == '__main__':
     src = sys.argv[1]
