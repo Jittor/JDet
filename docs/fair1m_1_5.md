@@ -1,4 +1,6 @@
-## JDet baseline使用说明
+## 粤港澳大湾区（黄埔）国际算法算力大赛-遥感图像目标检测赛道-Baseline使用说明
+
+比赛官方基于计图遥感图像目标检测算法库JDet提供了本次比赛的Baseline model，使用说明如下。
 
 ### 1. 安装JDet
 
@@ -52,4 +54,21 @@
     使用方法：修改`configs/s2anet/s2anet_r50_fpn_1x_fair1m_1_5.py`文件，**将`dataset_root`一项设为第一步中的`{DATASET_PATH}`**。修改完成后在`JDet`目录下执行`python tools/run_net.py --config-file configs/s2anet/s2anet_r50_fpn_1x_fair1m_1_5.py`即可自动进行训练和测试。
 
     测试得到的结果会储存在`submit_zips/s2anet_r50_fpn_1x_fair1m_1_5.csv`，将这个文件提交到竞赛网站上可以进行评测
+
+
+### 3. 其他资源
+为了方便各位选手使用和交流我们的官方Baseline代码和计图框架，我们创建了**遥感图像目标检测赛道选手交流QQ群**，请各位选手通过群号526028350或扫描以下的二维码入群：
+
+<img src="https://github.com/Jittor/JDet/blob/master/docs/images/qqgroup.jpg?raw=true" alt="QQ_Group" width="400"/>
+
+
+Jittor 是一个基于即时编译和元算子的高性能深度学习框架，整个框架在即时编译的同时，还集成了强大的Op编译器和调优器，为您的模型生成定制化的高性能代码。Jittor还包含了丰富的高性能模型库，涵盖范围包括：图像识别、检测、分割、生成、可微渲染、几何学习、强化学习等。
+
+Jittor前端语言为Python，使用了主流的包含模块化和动态图执行的接口设计，后端则使用高性能语言进行了深度优化。更多关于Jittor的信息可以参考：
+*  [Jittor官网](https://cg.cs.tsinghua.edu.cn/jittor/)
+*  [Jittor教程](https://cg.cs.tsinghua.edu.cn/jittor/tutorial/)
+*  [Jittor模型库](https://cg.cs.tsinghua.edu.cn/jittor/resources/)
+*  [Jittor文档](https://cg.cs.tsinghua.edu.cn/jittor/assets/docs/index.html)
+*  [Github开源仓库](https://github.com/jittor/jittor)
+*  [Jittor论坛](https://discuss.jittor.org)
 
