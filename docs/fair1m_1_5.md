@@ -59,7 +59,7 @@
 ### 3. 其他资源
 为了方便各位选手使用和交流我们的官方Baseline代码和计图框架，我们创建了**遥感图像目标检测赛道选手交流QQ群**，请各位选手通过群号526028350或扫描以下的二维码入群：
 
-<img src="https://github.com/Jittor/JDet/blob/master/docs/images/qqgroup.jpg?raw=true" alt="QQ_Group" width="400"/>
+<img src="https://user-images.githubusercontent.com/73881739/183240213-5b0ef70f-e11e-4d1c-bb3c-87c4e8a987f3.jpg" alt="QQ_Group" width="400"/>
 
 
 Jittor 是一个基于即时编译和元算子的高性能深度学习框架，整个框架在即时编译的同时，还集成了强大的Op编译器和调优器，为您的模型生成定制化的高性能代码。Jittor还包含了丰富的高性能模型库，涵盖范围包括：图像识别、检测、分割、生成、可微渲染、几何学习、强化学习等。
