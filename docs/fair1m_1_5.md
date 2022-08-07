@@ -2,6 +2,8 @@
 
 比赛官方基于计图遥感图像目标检测算法库JDet提供了本次比赛的Baseline model，使用说明如下。
 
+注意：baseline是基于Linux系统实现的，请在Ubuntu中使用这份代码。
+
 ### 1. 安装JDet
 
 进入JDet的github主页：https://github.com/Jittor/JDet
