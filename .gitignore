@@ -15,6 +15,8 @@ coco128
 exp*
 python/jdet/data/devkits/polyiou
 
+data/
+ckpts/
 eggs/
 .eggs/
 *.egg-info/
@@ -42,3 +44,4 @@ temp*
 configs/fair
 tools/convert_dataset.py
 tools/merge_results2.py
+test.py

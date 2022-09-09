@@ -42,12 +42,12 @@ model = dict(
 dataset = dict(
     val=dict(
         type="DOTADataset",
-        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
+        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
-                min_size=800,
-                max_size=800
+                min_size=1024,
+                max_size=1024
             ),
             dict(
                 type = "Normalize",
@@ -61,12 +61,12 @@ dataset = dict(
     ),
     train=dict(
         type="DOTADataset",
-        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
+        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
-                min_size=800,
-                max_size=800
+                min_size=1024,
+                max_size=1024
             ),
             dict(
                 type='RotatedRandomFlip', 
@@ -85,12 +85,12 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir= "/mnt/disk/flowey/dataset/processed_DOTA/test_600_150_1.0/images",
+      images_dir= "/home/zonlin/CU111/JDet/data/processed_DOTA/test_1024_200_1.0/images",
       transforms= [
         dict(
           type= "RotatedResize",
-          min_size= 800,
-          max_size= 800),
+          min_size= 1024,
+          max_size= 1024),
         dict(
           type= "Normalize",
           mean=  [123.675, 116.28, 103.53],
