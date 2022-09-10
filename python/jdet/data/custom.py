@@ -31,8 +31,8 @@ class CustomDataset(Dataset):
     ]
     '''
     CLASSES = None
-    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,filter_min_size=-1):
-        super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last)
+    def __init__(self,images_dir=None,annotations_file=None,dataset_dir=None,transforms=None,batch_size=1,num_workers=0,shuffle=False,drop_last=False,filter_empty_gt=True,filter_min_size=-1,buffer_size=512*1024*1024):
+        super(CustomDataset,self).__init__(batch_size=batch_size,num_workers=num_workers,shuffle=shuffle,drop_last=drop_last,buffer_size=buffer_size)
         if (dataset_dir is not None):
             assert(images_dir is None)
             assert(annotations_file is None)
