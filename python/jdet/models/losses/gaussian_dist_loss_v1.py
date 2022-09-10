@@ -26,7 +26,7 @@ def xy_wh_r_2_xy_sigma(xywhr):
     R = jt.stack((cos_r, -sin_r, sin_r, cos_r), dim=-1).reshape(-1, 2, 2)
     S = jt.array([0.5*jt.diag(_wh).numpy() for _wh in wh])
 
-    sigma = nn.bmm(nn.bmm(R, S*S), R.permute(0, 2, 1)).reshape(_shape[:-1] + (2, 2))
+    sigma = nn.bmm(nn.bmm(R, S.sqr()), R.permute(0, 2, 1)).reshape(_shape[:-1] + (2, 2))
 
     return xy, sigma
 
@@ -46,19 +46,18 @@ def gwd_loss(pred, target, fun='sqrt', tau=2.0):
     mu_p, sigma_p = pred
     mu_t, sigma_t = target
 
-    xy_distance = ((mu_p - mu_t)*(mu_p - mu_t)).sum(dim=-1)
+    xy_distance = (mu_p - mu_t).sqr().sum(dim=-1)
 
-    # TODO: check jt.diag work for batch?
-    whr_distance = jt.diag(sigma_p).sum(dim=-1)
-    whr_distance = whr_distance + sigma_t.diagonal(
-        dim1=-2, dim2=-1).sum(dim=-1)
+    whr_distance = jt.array([jt.diag(sigma_p_).numpy() for sigma_p_ in sigma_p]).sum(-1)
+    whr_distance += jt.array([jt.diag(sigma_t_).numpy() for sigma_t_ in sigma_t]).sum(-1)
 
-    _t_tr = jt.diag(nn.bmm(sigma_p, sigma_t)).sum(dim=-1)
-    _t_det_sqrt = (sigma_p.linalg.det() * sigma_t.linalg.det()).clamp(0).sqrt()
+    _sigma_p_t = nn.bmm(sigma_p, sigma_t)
+    _t_tr = jt.array([jt.diag(sigma_p_t).numpy() for sigma_p_t in _sigma_p_t]).sum(dim=-1)
+    _t_det_sqrt = (jt.linalg.det(sigma_p) * jt.linalg.det(sigma_t)).clamp(0).sqrt()
     whr_distance += (-2) * (_t_tr + 2 * _t_det_sqrt).clamp(0).sqrt()
 
     dis = xy_distance + whr_distance
-    gwd_dis = dis.clamp(min=1e-6)
+    gwd_dis = dis.clamp(min_v=1e-6)
 
     if fun == 'sqrt':
         loss = 1 - 1 / (tau + jt.sqrt(gwd_dis))
@@ -185,14 +184,14 @@ class GDLoss_v1(nn.Module):
         self.loss_weight = loss_weight
         self.kwargs = kwargs
 
-    def forward(self,
+    def execute(self,
                 pred,
                 target,
                 weight=None,
                 avg_factor=None,
                 reduction_override=None,
                 **kwargs):
-        """Forward function.
+        """Execute function.
 
         Args:
             pred (jittor.Var): Predicted convexes.
@@ -210,8 +209,8 @@ class GDLoss_v1(nn.Module):
             reduction_override if reduction_override else self.reduction)
         if (weight is not None) and (not jt.any(weight > 0)) and (
                 reduction != 'none'):
-            return (pred * weight).sum()
-        if weight is not None and weight.dim() > 1:
+            return (pred * weight.reshape(-1, 1)).sum()
+        if weight is not None and weight.ndim > 1:
             assert weight.shape == pred.shape
             weight = weight.mean(-1)
         _kwargs = deepcopy(self.kwargs)

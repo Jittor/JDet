@@ -29,6 +29,14 @@ model = dict(
         roi_beta= 1 / 9.,
         cls_loss_weight= 1.,
         loc_loss_weight= 0.2,
+        
+        loss_bbox=dict(
+            type='GDLoss_v1',
+            loss_type='gwd',
+            fun='log1p',
+            tau=1,
+            loss_weight=1.0
+        ),
 
         anchor_generator = dict(
           type= "AnchorGeneratorRotated",
