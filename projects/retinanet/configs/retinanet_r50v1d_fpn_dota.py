@@ -30,7 +30,7 @@ model = dict(
         cls_loss_weight= 1.,
         loc_loss_weight= 0.2,
         
-        loss_bbox=dict(
+        loc_loss=dict(
             type='GDLoss_v1',
             loss_type='gwd',
             fun='log1p',

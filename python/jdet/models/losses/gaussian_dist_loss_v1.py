@@ -3,6 +3,18 @@ import jittor as jt
 from jittor import nn
 from jdet.utils.registry import LOSSES
 
+def reduce_loss(loss, reduction='mean', avg_factor=None):
+    if avg_factor is None:
+        avg_factor = max(loss.shape[0],1)
+
+    if reduction == 'mean':
+        loss = loss.sum()/avg_factor
+
+    elif reduction == 'sum':
+        loss = loss.sum()
+
+    return loss
+
 
 def xy_wh_r_2_xy_sigma(xywhr):
     """Convert oriented bounding box to 2-D Gaussian distribution.
@@ -31,7 +43,8 @@ def xy_wh_r_2_xy_sigma(xywhr):
     return xy, sigma
 
 
-def gwd_loss(pred, target, fun='sqrt', tau=2.0):
+# TODO: add reduction
+def gwd_loss(pred, target, fun='sqrt', tau=2.0, reduction='mean', avg_factor=None):
     """Gaussian Wasserstein distance loss.
 
     Args:
@@ -66,9 +79,11 @@ def gwd_loss(pred, target, fun='sqrt', tau=2.0):
     else:
         scale = 2 * (_t_det_sqrt.sqrt().sqrt()).clamp(1e-7)
         loss = jt.log(1 + jt.sqrt(gwd_dis) / scale)
-    return loss
+
+    return reduce_loss(loss, reduction, avg_factor)
 
 
+# TODO: nan?
 def bcd_loss(pred, target, fun='log1p', tau=1.0):
     """Bhatacharyya distance loss.
 
@@ -93,13 +108,11 @@ def bcd_loss(pred, target, fun='log1p', tau=1.0):
     sigma = 0.5 * (sigma_p + sigma_t)
     sigma_inv = jt.linalg.inv(sigma)
 
-    # TODO: check transpose(-1, -2) work for batch?
-    term1 = jt.log(
-        jt.linalg.det(sigma) /
-        (jt.sqrt(jt.linalg.det(sigma_t.matmul(sigma_p))))).reshape(-1, 1)
+    term1 = jt.log(jt.linalg.det(sigma) /
+                  (jt.sqrt(jt.linalg.det(sigma_t.matmul(sigma_p))))).reshape(-1, 1)
     term2 = delta.transpose(-1, -2).matmul(sigma_inv).matmul(delta).squeeze(-1)
     dis = 0.5 * term1 + 0.125 * term2
-    bcd_dis = dis.clamp(min=1e-6)
+    bcd_dis = dis.clamp(min_v=1e-6)
 
     if fun == 'sqrt':
         loss = 1 - 1 / (tau + jt.sqrt(bcd_dis))
@@ -134,11 +147,11 @@ def kld_loss(pred, target, fun='log1p', tau=1.0):
     sigma_t_inv = jt.linalg.inv(sigma_t)
     term1 = delta.transpose(-1,
                             -2).matmul(sigma_t_inv).matmul(delta).squeeze(-1)
-    term2 = jt.diag(
-        sigma_t_inv.matmul(sigma_p)).sum(dim=-1, keepdim=True) + \
-        jt.log(jt.linalg.det(sigma_t) / jt.linalg.det(sigma_p)).reshape(-1, 1)
+    term2 = jt.array([jt.diag(sigma_p_inv_t).numpy() for sigma_p_inv_t in \
+                    sigma_t_inv.matmul(sigma_p)]).sum(dim=-1, keepdims=True) + \
+                    jt.log(jt.linalg.det(sigma_t) / jt.linalg.det(sigma_p)).reshape(-1, 1)
     dis = term1 + term2 - 2
-    kl_dis = dis.clamp(min=1e-6)
+    kl_dis = dis.clamp(min_v=1e-6)
 
     if fun == 'sqrt':
         kl_loss = 1 - 1 / (tau + jt.sqrt(kl_dis))
@@ -223,5 +236,6 @@ class GDLoss_v1(nn.Module):
         target = self.preprocess(target)
 
         return self.loss(
-            pred, target, fun=self.fun, tau=self.tau, **
+            pred, target, fun=self.fun, tau=self.tau,
+            reduction=reduction, avg_factor=avg_factor **
             _kwargs) * self.loss_weight
