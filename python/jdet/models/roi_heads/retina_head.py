@@ -44,19 +44,16 @@ class RetinaHead(nn.Module):
                  nms_pre = 1000,
                  max_dets = 100,
                  anchor_generator=None,
+                 bbox_coder = None,
+                 reg_decoded_bbox=False,
                  mode='H',
                  score_threshold = 0.05,
                  nms_iou_threshold = 0.5,
                  roi_beta = 0.,
+                 loc_loss = None,
+                 cls_loss = None,
                  cls_loss_weight=1.,
                  loc_loss_weight=0.2,
-                 loc_loss=dict(
-                    type='GDLoss_v1',
-                    loss_type='gwd',
-                    fun='log1p',
-                    tau=1,
-                    loss_weight=1.0
-                 ),
                  ):
         super(RetinaHead, self).__init__()
 
@@ -69,7 +66,10 @@ class RetinaHead(nn.Module):
         self.mode = mode
         
         self.anchor_generator = build_from_cfg(anchor_generator, BOXES)
+        self.reg_decoded_bbox = reg_decoded_bbox
+        self.bbox_coder = build_from_cfg(bbox_coder, BOXES)
         self.loc_loss = build_from_cfg(loc_loss, LOSSES)
+        self.cls_loss = build_from_cfg(cls_loss, LOSSES)
         self.anchor_mode = anchor_generator.mode
         n_anchor = self.anchor_generator.num_base_anchors[0]
 
@@ -277,27 +277,51 @@ class RetinaHead(nn.Module):
             results.append((polys, scores, labels))
         return results
 
-    def losses(self,all_bbox_pred_,all_cls_score_,all_gt_roi_locs_,all_gt_roi_labels_):
+    def losses(self,all_proposals_, all_bbox_pred_, all_cls_score_, all_gt_roi_locs_, all_gt_roi_labels_):
+        """
+            all_proposals_ (List[jittor.Var]): basic anchors, shape (N, num_total_anchors, 5)
+            all_bbox_pred_ (List[jittor.Var]): offset preds, shape (N, num_total_anchors, 5)
+        """
         batch_size = len(all_bbox_pred_)
         losses = dict(
-            roi_cls_loss=0,
-            roi_loc_loss=0
-        ) 
+            roi_cls_loss = 0,
+            roi_loc_loss = 0
+        )
+
+        # convert offsets to boxe
+        if self.reg_decoded_bbox:
+            all_proposals_ = jt.array([proposal.numpy() for proposal in all_proposals_])
+            all_bbox_pred_ = jt.array([bbox_pred.numpy() for bbox_pred in all_bbox_pred_])
+            all_gt_roi_locs_ = jt.array([gt_roi_loc.numpy() for gt_roi_loc in all_gt_roi_locs_])
+            N = all_bbox_pred_.shape(0)
+
+            all_bbox_pred_ = self.bbox_coder.decode(all_proposals_.reshape(-1 ,5), all_bbox_pred_.reshape(-1, 5))
+            all_gt_roi_locs_ = self.bbox_coder.decode(all_proposals_.reshape(-1, 5), all_gt_roi_locs_.reshape(-1, 5))
+            all_bbox_pred_ = all_bbox_pred_.reshape(N, -1, 5)
+            all_gt_roi_locs_ = all_gt_roi_locs_(N, -1, 5)
+
         for i in range(batch_size):
             all_gt_roi_labels = all_gt_roi_labels_[i]
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
+            # regression loss
             # only calculate the positive box,if beta==0. means L1 loss
-            # roi_loc_loss = smooth_l1_loss(all_bbox_pred_[i][all_gt_roi_labels>0],all_gt_roi_locs_[i][all_gt_roi_labels>0],beta=self.roi_beta,reduction="sum")
-            roi_loc_loss = self.loc_loss(all_bbox_pred_[i],all_gt_roi_locs_[i],all_gt_roi_labels)
+            """
+                smooth_l1_loss:
+                roi_loc_loss = smooth_l1_loss(all_bbox_pred_[i][all_gt_roi_labels>0],all_gt_roi_locs_[i][all_gt_roi_labels>0],beta=self.roi_beta,reduction="sum")
+            """
+            # TODO: no gradients
+            roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels)
 
+            # classification loss
             # build one hot with background
-            inputs = all_cls_score_[i][all_gt_roi_labels>=0]
-            cates = all_gt_roi_labels[all_gt_roi_labels>=0]#.unsqueeze(1)
+            inputs = all_cls_score_[i][all_gt_roi_labels >= 0]
+            cates = all_gt_roi_labels[all_gt_roi_labels >= 0]#.unsqueeze(1)
+            roi_cls_loss = self.cls_loss(inputs,cates,reduction_override = "sum")
 
-            roi_cls_loss = sigmoid_focal_loss(inputs,cates,reduction="sum",alpha=0.25)
             losses['roi_cls_loss'] += roi_cls_loss/normalizer
             losses['roi_loc_loss'] += roi_loc_loss/normalizer
+
         losses['roi_cls_loss'] *= self.cls_loss_weight / batch_size
         losses['roi_loc_loss'] *= self.loc_loss_weight / batch_size
         return losses
@@ -355,9 +379,9 @@ class RetinaHead(nn.Module):
         losses = dict()
         results = []
         if self.is_training():
-            losses = self.losses(all_bbox_pred,all_cls_score,all_gt_roi_locs,all_gt_roi_labels)
+            losses = self.losses(all_proposals, all_bbox_pred, all_cls_score, all_gt_roi_locs, all_gt_roi_labels)
         else:
-            results = self.get_bboxes(all_proposals,all_bbox_pred,all_cls_score,targets)
+            results = self.get_bboxes(all_proposals, all_bbox_pred, all_cls_score, targets)
 
         return results,losses 
         

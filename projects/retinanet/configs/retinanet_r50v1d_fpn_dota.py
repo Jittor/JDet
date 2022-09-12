@@ -29,23 +29,30 @@ model = dict(
         roi_beta= 1 / 9.,
         cls_loss_weight= 1.,
         loc_loss_weight= 0.2,
-        
         loc_loss=dict(
             type='GDLoss_v1',
             loss_type='gwd',
-            fun='log1p',
-            tau=1,
-            loss_weight=1.0
-        ),
-
+            fun='sqrt',
+            tau=2.0,
+            loss_weight=5.0),
+        cls_loss=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            alpha=0.25,
+            loss_weight=1.0),
         anchor_generator = dict(
-          type= "AnchorGeneratorRotated",
-          strides= [8, 16, 32, 64, 128],
-          ratios= [1, 0.5, 2.0, 0.3333333333333333, 3.0, 5.0, 0.2],
-          scales= [1, 1.2599210498948732, 1.5874010519681994],
-          base_sizes= [32, 64, 128, 256, 512],
-          angles= [-90, -75, -60, -45, -30, -15],
-          mode= "H")),
+            type= "AnchorGeneratorRotated",
+            strides= [8, 16, 32, 64, 128],
+            ratios= [1, 0.5, 2.0, 0.3333333333333333, 3.0, 5.0, 0.2],
+            scales= [1, 1.2599210498948732, 1.5874010519681994],
+            base_sizes= [32, 64, 128, 256, 512],
+            angles= [-90, -75, -60, -45, -30, -15],
+            mode= "H"),
+        bbox_coder=dict(
+            type='DeltaXYWHABBoxCoder',
+            target_means=(.0, .0, .0, .0, .0),
+            target_stds=(1.0, 1.0, 1.0, 1.0, 1.0)),
+        reg_decoded_bbox=True,),
 )
 dataset = dict(
     val=dict(

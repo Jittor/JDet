@@ -9,7 +9,6 @@ def reduce_loss(loss, reduction='mean', avg_factor=None):
 
     if reduction == 'mean':
         loss = loss.sum()/avg_factor
-
     elif reduction == 'sum':
         loss = loss.sum()
 
@@ -43,7 +42,6 @@ def xy_wh_r_2_xy_sigma(xywhr):
     return xy, sigma
 
 
-# TODO: add reduction
 def gwd_loss(pred, target, fun='sqrt', tau=2.0, reduction='mean', avg_factor=None):
     """Gaussian Wasserstein distance loss.
 
@@ -84,7 +82,7 @@ def gwd_loss(pred, target, fun='sqrt', tau=2.0, reduction='mean', avg_factor=Non
 
 
 # TODO: nan?
-def bcd_loss(pred, target, fun='log1p', tau=1.0):
+def bcd_loss(pred, target, fun='log1p', tau=1.0, reduction='mean', avg_factor=None):
     """Bhatacharyya distance loss.
 
     Args:
@@ -120,10 +118,11 @@ def bcd_loss(pred, target, fun='log1p', tau=1.0):
         loss = 1 - 1 / (tau + jt.log(1 + bcd_dis))
     else:
         loss = 1 - 1 / (tau + bcd_dis)
-    return loss
+        
+    return reduce_loss(loss, reduction, avg_factor)
 
 
-def kld_loss(pred, target, fun='log1p', tau=1.0):
+def kld_loss(pred, target, fun='log1p', tau=1.0, reduction='mean', avg_factor=None):
     """Kullback-Leibler Divergence loss.
 
     Args:
@@ -157,7 +156,8 @@ def kld_loss(pred, target, fun='log1p', tau=1.0):
         kl_loss = 1 - 1 / (tau + jt.sqrt(kl_dis))
     else:
         kl_loss = 1 - 1 / (tau + jt.log(1 + kl_dis))
-    return kl_loss
+
+    return reduce_loss(kl_loss, reduction, avg_factor)
 
 
 @LOSSES.register_module()
