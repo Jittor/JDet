@@ -290,9 +290,9 @@ class RetinaHead(nn.Module):
 
         # convert offsets to boxe
         if self.reg_decoded_bbox:
-            all_proposals_ = jt.array([proposal.numpy() for proposal in all_proposals_])
-            all_bbox_pred_ = jt.array([bbox_pred.numpy() for bbox_pred in all_bbox_pred_])
-            all_gt_roi_locs_ = jt.array([gt_roi_loc.numpy() for gt_roi_loc in all_gt_roi_locs_])
+            all_proposals_ = jt.stack(all_proposals_)
+            all_bbox_pred_ = jt.stack(all_bbox_pred_)
+            all_gt_roi_locs_ = jt.stack(all_gt_roi_locs_)
             N = all_bbox_pred_.shape(0)
 
             all_bbox_pred_ = self.bbox_coder.decode(all_proposals_.reshape(-1 ,5), all_bbox_pred_.reshape(-1, 5))

@@ -3,6 +3,18 @@ import jittor as jt
 from jittor import nn
 from jdet.utils.registry import LOSSES
 
+
+# TODO: remove this
+# def diag3d(x, diagonal=0):
+#     assert x.ndim==3 and x.shape[1]==x.shape[2]
+#     d = diagonal if diagonal >= 0 else -diagonal
+#     output_shape = (x.shape[0], x.shape[1]-d)
+#     return x.reindex(output_shape, ['i0', f'i1+{d}' if diagonal==0 else \
+#             'i1', f'i1+{d}' if diagonal >= 0 else 'i1'])
+def diag3d(x): # for test!!!
+    return jt.stack([jt.diag(x_) for x_ in x])
+
+
 def reduce_loss(loss, reduction='mean', avg_factor=None):
     if avg_factor is None:
         avg_factor = max(loss.shape[0],1)
@@ -35,7 +47,7 @@ def xy_wh_r_2_xy_sigma(xywhr):
     cos_r = jt.cos(r)
     sin_r = jt.sin(r)
     R = jt.stack((cos_r, -sin_r, sin_r, cos_r), dim=-1).reshape(-1, 2, 2)
-    S = jt.array([0.5*jt.diag(_wh).numpy() for _wh in wh])
+    S = 0.5 * diag3d(wh)
 
     sigma = nn.bmm(nn.bmm(R, S.sqr()), R.permute(0, 2, 1)).reshape(_shape[:-1] + (2, 2))
 
@@ -59,11 +71,10 @@ def gwd_loss(pred, target, fun='sqrt', tau=2.0, reduction='mean', avg_factor=Non
 
     xy_distance = (mu_p - mu_t).sqr().sum(dim=-1)
 
-    whr_distance = jt.array([jt.diag(sigma_p_).numpy() for sigma_p_ in sigma_p]).sum(-1)
-    whr_distance += jt.array([jt.diag(sigma_t_).numpy() for sigma_t_ in sigma_t]).sum(-1)
+    whr_distance = diag3d(sigma_p).sum(-1)
+    whr_distance += diag3d(sigma_t).sum(-1)
 
-    _sigma_p_t = nn.bmm(sigma_p, sigma_t)
-    _t_tr = jt.array([jt.diag(sigma_p_t).numpy() for sigma_p_t in _sigma_p_t]).sum(dim=-1)
+    _t_tr = diag3d(nn.bmm(sigma_p, sigma_t)).sum(dim=-1)
     _t_det_sqrt = (jt.linalg.det(sigma_p) * jt.linalg.det(sigma_t)).clamp(0).sqrt()
     whr_distance += (-2) * (_t_tr + 2 * _t_det_sqrt).clamp(0).sqrt()
 
@@ -146,9 +157,8 @@ def kld_loss(pred, target, fun='log1p', tau=1.0, reduction='mean', avg_factor=No
     sigma_t_inv = jt.linalg.inv(sigma_t)
     term1 = delta.transpose(-1,
                             -2).matmul(sigma_t_inv).matmul(delta).squeeze(-1)
-    term2 = jt.array([jt.diag(sigma_p_inv_t).numpy() for sigma_p_inv_t in \
-                    sigma_t_inv.matmul(sigma_p)]).sum(dim=-1, keepdims=True) + \
-                    jt.log(jt.linalg.det(sigma_t) / jt.linalg.det(sigma_p)).reshape(-1, 1)
+    term2 = diag3d(sigma_t_inv.matmul(sigma_p)).sum(dim=-1, keepdims=True) + \
+            jt.log(jt.linalg.det(sigma_t) / jt.linalg.det(sigma_p)).reshape(-1, 1)
     dis = term1 + term2 - 2
     kl_dis = dis.clamp(min_v=1e-6)
 
