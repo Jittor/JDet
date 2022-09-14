@@ -92,7 +92,6 @@ def gwd_loss(pred, target, fun='sqrt', tau=2.0, reduction='mean', avg_factor=Non
     return reduce_loss(loss, reduction, avg_factor)
 
 
-# TODO: nan?
 def bcd_loss(pred, target, fun='log1p', tau=1.0, reduction='mean', avg_factor=None):
     """Bhatacharyya distance loss.
 
