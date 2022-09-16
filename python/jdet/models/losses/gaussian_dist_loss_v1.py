@@ -5,14 +5,19 @@ from jdet.utils.registry import LOSSES
 
 
 # TODO: remove this
-# def diag3d(x, diagonal=0):
-#     assert x.ndim==3 and x.shape[1]==x.shape[2]
-#     d = diagonal if diagonal >= 0 else -diagonal
-#     output_shape = (x.shape[0], x.shape[1]-d)
-#     return x.reindex(output_shape, ['i0', f'i1+{d}' if diagonal==0 else \
-#             'i1', f'i1+{d}' if diagonal >= 0 else 'i1'])
-def diag3d(x): # for test!!!
-    return jt.stack([jt.diag(x_) for x_ in x])
+def diag3d(x, diagonal=0):
+    d = diagonal if diagonal >= 0 else -diagonal
+    if x.ndim == 3:
+        assert x.shape[1] == x.shape[2]
+        output_shape = (x.shape[0], x.shape[1]-d,)
+        return x.reindex(output_shape, ['i0', f'i1+{d}' if diagonal <= 0 else 'i1', f'i1+{d}' if diagonal >= 0 else 'i1'])
+    else:
+        assert x.ndim == 2
+        d_str = f'+{diagonal}' if diagonal >= 0 else f'{diagonal}'
+        output_shape = (x.shape[0], x.shape[1]+d, x.shape[1]+d)
+        return x.reindex(output_shape, ['i0', f'i2-{d}' if diagonal >= 0 else f'i1-{d}'], overflow_conditions = [f'i1{d_str}'!='i2'])
+# def diag3d(x): # for test!!!
+#     return jt.stack([jt.diag(x_) for x_ in x])
 
 
 def reduce_loss(loss, reduction='mean', avg_factor=None):
