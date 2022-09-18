@@ -251,5 +251,5 @@ class GDLoss_v1(nn.Module):
 
         return self.loss(
             pred, target, fun=self.fun, tau=self.tau,
-            reduction=reduction, avg_factor=avg_factor **
+            reduction=reduction, avg_factor=avg_factor, **
             _kwargs) * self.loss_weight

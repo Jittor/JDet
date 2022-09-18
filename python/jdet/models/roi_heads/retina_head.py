@@ -288,17 +288,17 @@ class RetinaHead(nn.Module):
             roi_loc_loss = 0
         )
 
-        # convert offsets to boxe
+        # decode to boxes
         if self.reg_decoded_bbox:
             all_proposals_ = jt.stack(all_proposals_)
             all_bbox_pred_ = jt.stack(all_bbox_pred_)
             all_gt_roi_locs_ = jt.stack(all_gt_roi_locs_)
-            N = all_bbox_pred_.shape(0)
+            N = all_bbox_pred_.shape[0]
 
             all_bbox_pred_ = self.bbox_coder.decode(all_proposals_.reshape(-1 ,5), all_bbox_pred_.reshape(-1, 5))
             all_gt_roi_locs_ = self.bbox_coder.decode(all_proposals_.reshape(-1, 5), all_gt_roi_locs_.reshape(-1, 5))
             all_bbox_pred_ = all_bbox_pred_.reshape(N, -1, 5)
-            all_gt_roi_locs_ = all_gt_roi_locs_(N, -1, 5)
+            all_gt_roi_locs_ = all_gt_roi_locs_.reshape(N, -1, 5)
 
         for i in range(batch_size):
             all_gt_roi_labels = all_gt_roi_labels_[i]
@@ -310,7 +310,6 @@ class RetinaHead(nn.Module):
                 smooth_l1_loss:
                 roi_loc_loss = smooth_l1_loss(all_bbox_pred_[i][all_gt_roi_labels>0],all_gt_roi_locs_[i][all_gt_roi_labels>0],beta=self.roi_beta,reduction="sum")
             """
-            # TODO: no gradients
             roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels)
 
             # classification loss
