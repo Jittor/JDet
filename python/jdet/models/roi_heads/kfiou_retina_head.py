@@ -288,18 +288,17 @@ class KFIoURetinaHead(nn.Module):
         all_gt_roi_locs_decode_ = self.bbox_coder.decode(all_proposals_.reshape(-1, 5), all_gt_roi_locs_.reshape(-1, 5))
         all_bbox_pred_decode_ = all_bbox_pred_decode_.reshape(N, -1, 5)
         all_gt_roi_locs_decode_ = all_gt_roi_locs_decode_.reshape(N, -1, 5)
-        print(all_bbox_pred_decode_.shape, all_gt_roi_labels_.shape)
 
         for i in range(batch_size):
             all_gt_roi_labels = all_gt_roi_labels_[i]
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
             # regression loss
-            roi_loc_loss = self.loc_loss(all_bbox_pred_[i],
-                                         all_gt_roi_locs_[i],
-                                         all_gt_roi_labels,
+            roi_loc_loss = self.loc_loss(pred=all_bbox_pred_[i],
+                                         target=all_gt_roi_locs_[i],
                                          pred_decode=all_bbox_pred_decode_[i],
-                                         target_decode=all_gt_roi_locs_decode_[i])
+                                         targets_decode=all_gt_roi_locs_decode_[i],
+                                         weight=all_gt_roi_labels)
 
             # classification loss
             inputs = all_cls_score_[i][all_gt_roi_labels >= 0]

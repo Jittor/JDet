@@ -140,10 +140,10 @@ class KFLoss(nn.Module):
     def execute(self,
                 pred,
                 target,
-                weight=None,
-                avg_factor=None,
                 pred_decode=None,
                 targets_decode=None,
+                weight=None,
+                avg_factor=None,
                 reduction_override=None,
                 **kwargs):
         """Forward function.
@@ -170,17 +170,22 @@ class KFLoss(nn.Module):
         if (weight is not None) and (not jt.any(weight > 0)) and (
                 reduction != 'none'):
             return (pred * weight).sum()
-        if weight is not None and weight.dim() > 1:
+        if weight is not None and weight.ndim > 1:
             assert weight.shape == pred.shape
             weight = weight.mean(-1)
 
+        mask = (weight > 0).detach()
+        pred = pred[mask]
+        target = target[mask]
+        pred_decode = pred_decode[mask]
+        targets_decode = targets_decode[mask]
+
         return kfiou_loss(
-            pred,
-            target,
-            fun=self.fun,
-            weight=weight,
-            avg_factor=avg_factor,
+            pred=pred,
+            target=target,
             pred_decode=pred_decode,
             targets_decode=targets_decode,
             reduction=reduction,
+            fun=self.fun,
+            avg_factor=avg_factor,
             **kwargs) * self.loss_weight
