@@ -95,6 +95,7 @@ def kfiou_loss(pred,
     K = nn.bmm(Sigma_p, jt.linalg.inv(Sigma_p + Sigma_t))
     Sigma = Sigma_p - nn.bmm(K, Sigma_p)
     Vb = 4 * jt.linalg.det(Sigma).sqrt()
+    # Issue: isnan?
     Vb = jt.where(jt.isnan(Vb), jt.full_like(Vb, 0), Vb)
     KFIoU = Vb / (Vb_p + Vb_t - Vb + eps)
 
@@ -169,7 +170,7 @@ class KFLoss(nn.Module):
             reduction_override if reduction_override else self.reduction)
         if (weight is not None) and (not jt.any(weight > 0)) and (
                 reduction != 'none'):
-            return (pred * weight).sum()
+            return (pred * weight.reshape(-1, 1)).sum()
         if weight is not None and weight.ndim > 1:
             assert weight.shape == pred.shape
             weight = weight.mean(-1)
