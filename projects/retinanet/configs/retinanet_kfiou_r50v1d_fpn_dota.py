@@ -48,8 +48,7 @@ model = dict(
         bbox_coder=dict(
             type='DeltaXYWHABBoxCoder',
             target_means=(.0, .0, .0, .0, .0),
-            target_stds=(1.0, 1.0, 1.0, 1.0, 1.0)),
-        reg_decoded_bbox=True,),
+            target_stds=(1.0, 1.0, 1.0, 1.0, 1.0))),
 )
 dataset = dict(
     val=dict(

@@ -4,12 +4,9 @@ import jittor as jt
 import numpy as np
 from jittor import nn, init 
 
-from jdet.models.losses.focal_loss import sigmoid_focal_loss
-from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
-from jdet.models.boxes.box_ops import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r, bbox2loc_r
 from jdet.ops import box_iou_rotated
-from jdet.utils.registry import HEADS
-from jdet.utils.registry import build_from_cfg,BOXES,LOSSES
+from jdet.utils.registry import build_from_cfg,HEADS,BOXES,LOSSES
+from jdet.models.boxes.box_ops import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r, bbox2loc_r
 from jdet.models.boxes.box_ops import rotated_box_to_bbox, boxes_xywh_to_x0y0x1y1, boxes_x0y0x1y1_to_xywh, rotated_box_to_poly
 # from  import get_var
 
@@ -23,16 +20,6 @@ class KFIoURetinaHead(nn.Module):
 
     The difference from `RetinaHead` is that its loss_bbox requires bbox_pred,
     bbox_targets, pred_decode and targets_decode as inputs.
-
-    Example:
-        >>> self = RetinaHead(11, 7)
-        >>> x = jt.randn(1, 7, 32, 32)
-        >>> cls_score, bbox_pred = self.forward_single(x)
-        >>> # Each anchor predicts a score for each class except background
-        >>> cls_per_anchor = cls_score.shape[1] / self.num_anchors
-        >>> box_per_anchor = bbox_pred.shape[1] / self.num_anchors
-        >>> assert cls_per_anchor == (self.num_classes)
-        >>> assert box_per_anchor == 4
     """
 
     #TODO: check 'H' mode
