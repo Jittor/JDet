@@ -236,7 +236,8 @@ class GDLoss_v1(nn.Module):
             reduction_override if reduction_override else self.reduction)
         if (weight is not None) and (not jt.any(weight > 0)) and (
                 reduction != 'none'):
-            return (pred * weight.reshape(-1, 1)).sum()
+            mask = (weight > 0).detach()
+            return (pred[mask] * weight[mask].reshape(-1, 1)).sum()
         if weight is not None and weight.ndim > 1:
             assert weight.shape == pred.shape
             weight = weight.mean(-1)
