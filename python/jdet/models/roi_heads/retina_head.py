@@ -277,7 +277,7 @@ class RetinaHead(nn.Module):
             results.append((polys, scores, labels))
         return results
 
-    def losses(self,all_proposals_, all_bbox_pred_, all_cls_score_, all_gt_roi_locs_, all_gt_roi_labels_):
+    def losses(self, all_proposals_, all_bbox_pred_, all_cls_score_, all_gt_roi_locs_, all_gt_roi_labels_):
         """
             all_proposals_ (List[jittor.Var]): basic anchors, shape (N, num_total_anchors, 5)
             all_bbox_pred_ (List[jittor.Var]): offset preds, shape (N, num_total_anchors, 5)
@@ -288,28 +288,30 @@ class RetinaHead(nn.Module):
             roi_loc_loss = 0
         )
 
-        # decode to boxes
-        if self.reg_decoded_bbox:
-            all_proposals_ = jt.stack(all_proposals_)
-            all_bbox_pred_ = jt.stack(all_bbox_pred_)
-            all_gt_roi_locs_ = jt.stack(all_gt_roi_locs_)
-            N = all_bbox_pred_.shape[0]
+            # all_proposals_ = jt.stack(all_proposals_)
+            # all_bbox_pred_ = jt.stack(all_bbox_pred_)
+            # all_gt_roi_locs_ = jt.stack(all_gt_roi_locs_)
+            # N = all_bbox_pred_.shape[0]
 
-            all_bbox_pred_ = self.bbox_coder.decode(all_proposals_.reshape(-1 ,5), all_bbox_pred_.reshape(-1, 5))
-            all_gt_roi_locs_ = self.bbox_coder.decode(all_proposals_.reshape(-1, 5), all_gt_roi_locs_.reshape(-1, 5))
-            all_bbox_pred_ = all_bbox_pred_.reshape(N, -1, 5)
-            all_gt_roi_locs_ = all_gt_roi_locs_.reshape(N, -1, 5)
+            # all_bbox_pred_ = self.bbox_coder.decode(all_proposals_.reshape(-1 ,5), all_bbox_pred_.reshape(-1, 5))
+            # all_gt_roi_locs_ = self.bbox_coder.decode(all_proposals_.reshape(-1, 5), all_gt_roi_locs_.reshape(-1, 5))
+            # all_bbox_pred_ = all_bbox_pred_.reshape(N, -1, 5)
+            # all_gt_roi_locs_ = all_gt_roi_locs_.reshape(N, -1, 5)
 
         for i in range(batch_size):
             all_gt_roi_labels = all_gt_roi_labels_[i]
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
+            # decode to boxes
+            if self.reg_decoded_bbox:
+                for j, proposal in enumerate(all_proposals_[i]):
+                    proposal = boxes_x0y0x1y1_to_xywh(proposal)
+                    proposal = self.cvt2_w_greater_than_h(proposal)
+                    proposal[:, 4] += 0.5 * np.pi
+                    all_bbox_pred_[i][j] = loc2bbox_r(proposal, all_bbox_pred_[i][j])
+                    all_gt_roi_locs_[i][j] = loc2bbox_r(proposal, all_gt_roi_locs_[i][j])
+
             # regression loss
-            # only calculate the positive box,if beta==0. means L1 loss
-            """
-                smooth_l1_loss:
-                roi_loc_loss = smooth_l1_loss(all_bbox_pred_[i][all_gt_roi_labels>0],all_gt_roi_locs_[i][all_gt_roi_labels>0],beta=self.roi_beta,reduction="sum")
-            """
             roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels)
 
             # classification loss
