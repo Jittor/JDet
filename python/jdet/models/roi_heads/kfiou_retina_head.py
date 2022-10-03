@@ -32,7 +32,7 @@ class KFIoURetinaHead(RetinaHead):
                  nms_pre = 1000,
                  max_dets = 100,
                  anchor_generator=None,
-                 bbox_coder = None,
+                 reg_decoded_bbox=False,
                  mode='H',
                  score_threshold = 0.05,
                  nms_iou_threshold = 0.5,
@@ -42,7 +42,27 @@ class KFIoURetinaHead(RetinaHead):
                  cls_loss_weight=1.,
                  loc_loss_weight=0.2,
                  ):
-        super(KFIoURetinaHead, self).__init__()
+        super(KFIoURetinaHead, self).__init__(
+            n_class=n_class,
+            in_channels=in_channels,
+            feat_channels=feat_channels,
+            stacked_convs=stacked_convs,
+            pos_iou_thresh=pos_iou_thresh,
+            neg_iou_thresh_hi=neg_iou_thresh_hi,
+            neg_iou_thresh_lo=neg_iou_thresh_lo,
+            nms_pre=nms_pre,
+            max_dets=max_dets,
+            anchor_generator=anchor_generator,
+            reg_decoded_bbox=reg_decoded_bbox,
+            mode=mode,
+            score_threshold=score_threshold,
+            nms_iou_threshold=nms_iou_threshold,
+            roi_beta=roi_beta,
+            loc_loss=loc_loss,
+            cls_loss=cls_loss,
+            cls_loss_weight=cls_loss_weight,
+            loc_loss_weight=loc_loss_weight
+        )
 
         self.pos_iou_thresh = pos_iou_thresh
         self.neg_iou_thresh_hi = neg_iou_thresh_hi
@@ -53,7 +73,6 @@ class KFIoURetinaHead(RetinaHead):
         self.mode = mode
         
         self.anchor_generator = build_from_cfg(anchor_generator, BOXES)
-        self.bbox_coder = build_from_cfg(bbox_coder, BOXES)
         self.loc_loss = build_from_cfg(loc_loss, LOSSES)
         self.cls_loss = build_from_cfg(cls_loss, LOSSES)
         self.anchor_mode = anchor_generator.mode
@@ -98,7 +117,7 @@ class KFIoURetinaHead(RetinaHead):
             # decode to boxes
             all_proposals_[i] = boxes_x0y0x1y1_to_xywh(all_proposals_[i])
             all_proposals_[i] = self.cvt2_w_greater_than_h(all_proposals_[i])
-            all_proposals_[:, 4] += 0.5 * np.pi
+            all_proposals_[i][:, 4] += 0.5 * np.pi
             bbox_pred_deocde_ = loc2bbox_r(all_proposals_[i], all_bbox_pred_[i])
             gt_roi_locs_decode_ = loc2bbox_r(all_proposals_[i], all_gt_roi_locs_[i])
 
