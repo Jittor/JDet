@@ -1,8 +1,5 @@
-import math
-import jdet
-import jittor as jt
 import numpy as np
-from jittor import nn, init 
+from jittor import nn
 
 from jdet.ops import box_iou_rotated
 from jdet.utils.registry import build_from_cfg,HEADS,BOXES,LOSSES
@@ -97,26 +94,22 @@ class KFIoURetinaHead(RetinaHead):
             roi_loc_loss = 0
         )
 
-        # decode `bbox_pred` `bbox_target` to boxes
-        all_proposals_ = jt.stack(all_proposals_)
-        all_bbox_pred_ = jt.stack(all_bbox_pred_)
-        all_gt_roi_locs_ = jt.stack(all_gt_roi_locs_)
-        N = all_bbox_pred_.shape[0]
-
-        all_bbox_pred_decode_ = self.bbox_coder.decode(all_proposals_.reshape(-1 ,5), all_bbox_pred_.reshape(-1, 5))
-        all_gt_roi_locs_decode_ = self.bbox_coder.decode(all_proposals_.reshape(-1, 5), all_gt_roi_locs_.reshape(-1, 5))
-        all_bbox_pred_decode_ = all_bbox_pred_decode_.reshape(N, -1, 5)
-        all_gt_roi_locs_decode_ = all_gt_roi_locs_decode_.reshape(N, -1, 5)
-
         for i in range(batch_size):
+            # decode to boxes
+            all_proposals_[i] = boxes_x0y0x1y1_to_xywh(all_proposals_[i])
+            all_proposals_[i] = self.cvt2_w_greater_than_h(all_proposals_[i])
+            all_proposals_[:, 4] += 0.5 * np.pi
+            bbox_pred_deocde_ = loc2bbox_r(all_proposals_[i], all_bbox_pred_[i])
+            gt_roi_locs_decode_ = loc2bbox_r(all_proposals_[i], all_gt_roi_locs_[i])
+
             all_gt_roi_labels = all_gt_roi_labels_[i]
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
             # regression loss
             roi_loc_loss = self.loc_loss(pred=all_bbox_pred_[i],
                                          target=all_gt_roi_locs_[i],
-                                         pred_decode=all_bbox_pred_decode_[i],
-                                         targets_decode=all_gt_roi_locs_decode_[i],
+                                         pred_decode=bbox_pred_deocde_,
+                                         targets_decode=gt_roi_locs_decode_,
                                          weight=all_gt_roi_labels)
 
             # classification loss
