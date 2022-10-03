@@ -44,7 +44,6 @@ class RetinaHead(nn.Module):
                  nms_pre = 1000,
                  max_dets = 100,
                  anchor_generator=None,
-                 bbox_coder = None,
                  reg_decoded_bbox=False,
                  mode='H',
                  score_threshold = 0.05,
@@ -288,12 +287,13 @@ class RetinaHead(nn.Module):
         )
 
         for i in range(batch_size):
-            # decode to boxes
-            all_proposals_[i] = boxes_x0y0x1y1_to_xywh(all_proposals_[i])
-            all_proposals_[i] = self.cvt2_w_greater_than_h(all_proposals_[i])
-            # proposal[:, 4] += 0.5 * np.pi
-            all_bbox_pred_[i] = loc2bbox_r(all_proposals_[i], all_bbox_pred_[i])
-            all_gt_roi_locs_[i] = loc2bbox_r(all_proposals_[i], all_gt_roi_locs_[i])
+            if self.reg_decoded_bbox:
+                # decode to boxes
+                all_proposals_[i] = boxes_x0y0x1y1_to_xywh(all_proposals_[i])
+                all_proposals_[i] = self.cvt2_w_greater_than_h(all_proposals_[i])
+                all_proposals_[:, 4] += 0.5 * np.pi
+                all_bbox_pred_[i] = loc2bbox_r(all_proposals_[i], all_bbox_pred_[i])
+                all_gt_roi_locs_[i] = loc2bbox_r(all_proposals_[i], all_gt_roi_locs_[i])
             
             all_gt_roi_labels = all_gt_roi_labels_[i]
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
