@@ -291,7 +291,7 @@ class RetinaHead(nn.Module):
                 # decode to boxes
                 all_proposals_[i] = boxes_x0y0x1y1_to_xywh(all_proposals_[i])
                 all_proposals_[i] = self.cvt2_w_greater_than_h(all_proposals_[i])
-                all_proposals_[:, 4] += 0.5 * np.pi
+                all_proposals_[i][:, 4] += 0.5 * np.pi
                 all_bbox_pred_[i] = loc2bbox_r(all_proposals_[i], all_bbox_pred_[i])
                 all_gt_roi_locs_[i] = loc2bbox_r(all_proposals_[i], all_gt_roi_locs_[i])
             
