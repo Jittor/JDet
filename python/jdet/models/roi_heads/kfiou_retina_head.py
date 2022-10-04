@@ -117,7 +117,6 @@ class KFIoURetinaHead(RetinaHead):
             # decode to boxes
             all_proposals_[i] = boxes_x0y0x1y1_to_xywh(all_proposals_[i])
             all_proposals_[i] = self.cvt2_w_greater_than_h(all_proposals_[i])
-            all_proposals_[i][:, 4] += 0.5 * np.pi
             bbox_pred_deocde_ = loc2bbox_r(all_proposals_[i], all_bbox_pred_[i])
             gt_roi_locs_decode_ = loc2bbox_r(all_proposals_[i], all_gt_roi_locs_[i])
 
