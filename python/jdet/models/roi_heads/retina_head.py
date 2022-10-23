@@ -48,7 +48,6 @@ class RetinaHead(nn.Module):
                  mode='H',
                  score_threshold = 0.05,
                  nms_iou_threshold = 0.5,
-                 roi_beta = 0.,
                  loc_loss = None,
                  cls_loss = None,
                  cls_loss_weight=1.,
@@ -85,7 +84,6 @@ class RetinaHead(nn.Module):
         else:
             self.retina_reg = nn.Conv(feat_channels, n_anchor * 5, 3, padding=1)
 
-        self.roi_beta = roi_beta
         self.nms_thresh = nms_iou_threshold
         self.score_thresh = score_threshold
         self.cls_loss_weight = cls_loss_weight
@@ -299,7 +297,7 @@ class RetinaHead(nn.Module):
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
             # regression loss
-            roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels)
+            roi_loc_loss = self.loc_loss(all_bbox_pred_[i][all_gt_roi_labels>0], all_gt_roi_locs_[i][all_gt_roi_labels>0])
 
             # classification loss
             # build one hot with background

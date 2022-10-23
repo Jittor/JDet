@@ -1,0 +1,12 @@
+#normal
+*.jpg
+*.pk
+submit_zips
+work_dirs
+
+weights
+share_outputs
+exps
+cache_check
+logs
+share

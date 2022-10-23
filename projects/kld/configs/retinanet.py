@@ -23,41 +23,27 @@ model = dict(
         in_channels= 256,
         stacked_convs= 4,
         mode= "R",
-        score_threshold= 0.3,
+        score_threshold= 0.05,
         nms_iou_threshold= 0.3,
         max_dets= 10000,
         roi_beta= 1 / 9.,
         cls_loss_weight= 1.,
-        loc_loss_weight= 1.,
-        loc_loss=dict(
-            type='GDLoss_v1',
-            loss_type='gwd',
-            fun='sqrt',
-            tau=2.0,
-            loss_weight=5.5),
-        cls_loss=dict(
-            type='FocalLoss',
-            use_sigmoid=True,
-            alpha=0.25,
-            loss_weight=1.0),
+        loc_loss_weight= 0.2,
+
         anchor_generator = dict(
-            type= "AnchorGeneratorRotated",
-            strides= [8, 16, 32, 64, 128],
-            ratios= [1, 0.5, 2.0, 0.3333333333333333, 3.0, 5.0, 0.2],
-            scales= [1, 1.2599210498948732, 1.5874010519681994],
-            base_sizes= [32, 64, 128, 256, 512],
-            angles= [-90, -75, -60, -45, -30, -15],
-            mode= "H"),
-        bbox_coder=dict(
-            type='DeltaXYWHABBoxCoder',
-            target_means=(.0, .0, .0, .0, .0),
-            target_stds=(1.0, 1.0, 1.0, 1.0, 1.0)),
-        reg_decoded_bbox=True,),
+          type= "AnchorGeneratorYangXue",
+          strides= [8, 16, 32, 64, 128],
+          ratios= [1, 0.5, 2.0, 0.3333333333333333, 3.0, 5.0, 0.2],
+          scales= [1, 1.2599210498948732, 1.5874010519681994],
+          base_sizes= [32, 64, 128, 256, 512],
+          angles= [-90, -75, -60, -45, -30, -15],
+          mode= "H",
+          yx_base_size= 4.)),
 )
 dataset = dict(
     val=dict(
         type="DOTADataset",
-        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
+        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -76,7 +62,7 @@ dataset = dict(
     ),
     train=dict(
         type="DOTADataset",
-        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
+        dataset_dir="/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_600_150_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -100,7 +86,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir= "/home/zonlin/CU111/JDet/data/processed_DOTA/test_1024_200_1.0/images",
+      images_dir= "/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_600_150_1.0/images/",
       transforms= [
         dict(
           type= "RotatedResize",
@@ -116,7 +102,7 @@ dataset = dict(
       batch_size= 32))
 optimizer = dict(
     type='GradMutilpySGD', 
-    lr=3 * 5e-4,
+    lr=5e-4,
     momentum=0.9, 
     weight_decay=1e-4,
     grad_clip=dict(
@@ -128,16 +114,16 @@ scheduler = dict(
     warmup= "linear",
     warmup_iters= 14000,
     warmup_ratio= 0.1,
-    milestones= [27])
+    milestones= [24])
 
 logger = dict(
     type= "RunLogger")
 
-max_epoch = 30
+max_epoch = 26
 eval_interval = 10
 log_interval = 50
 checkpoint_interval = 1
-pretrained_weights="weights/yx_init_pretrained.pk_jt.pk"
+pretrained_weights="test_datas_retinanet/yx_init_pretrained.pk_jt.pk"
 merge_nms_threshold_type = 1
 
 parameter_groups_generator = dict(
