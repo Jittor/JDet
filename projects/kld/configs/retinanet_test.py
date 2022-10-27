@@ -54,6 +54,7 @@ model = dict(
             loss_type='kld',
             fun='log1p',
             tau=1.0,
+            reduction='sum',
             loss_weight=5.5),
         cls_loss=dict(
             type='FocalLoss',

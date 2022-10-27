@@ -297,7 +297,7 @@ class RetinaHead(nn.Module):
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
             # regression loss
-            roi_loc_loss = self.loc_loss(all_bbox_pred_[i][all_gt_roi_labels>0], all_gt_roi_locs_[i][all_gt_roi_labels>0])
+            roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels.detach())
 
             # classification loss
             # build one hot with background

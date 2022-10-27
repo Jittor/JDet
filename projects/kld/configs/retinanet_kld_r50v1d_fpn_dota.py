@@ -52,7 +52,7 @@ model = dict(
 dataset = dict(
     val=dict(
         type="DOTADataset",
-        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
+        dataset_dir="/home/songxiufeng/workspace/code/JDetPrj/data/preprocessed_DOTA/DOTA1.0/1024_200/trainval_1024_200_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -71,7 +71,7 @@ dataset = dict(
     ),
     train=dict(
         type="DOTADataset",
-        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
+        dataset_dir="/home/songxiufeng/workspace/code/JDetPrj/data/preprocessed_DOTA/DOTA1.0/1024_200/trainval_1024_200_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -95,7 +95,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir= "/home/zonlin/CU111/JDet/data/processed_DOTA/test_1024_200_1.0/images",
+      images_dir= "/home/songxiufeng/workspace/code/JDetPrj/data/preprocessed_DOTA/DOTA1.0/1024_200/trainval_1024_200_1.0/images",
       transforms= [
         dict(
           type= "RotatedResize",

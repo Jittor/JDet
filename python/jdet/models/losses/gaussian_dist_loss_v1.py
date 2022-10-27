@@ -4,7 +4,6 @@ from jittor import nn
 from jdet.utils.registry import LOSSES
 
 
-# TODO: remove this
 def diag3d(x):
     return jt.stack([jt.diag(x_) for x_ in x])
 
@@ -203,6 +202,7 @@ class GDLoss_v1(nn.Module):
     def execute(self,
                 pred,
                 target,
+                weight=None,
                 avg_factor=None,
                 reduction_override=None,
                 **kwargs):
@@ -211,6 +211,8 @@ class GDLoss_v1(nn.Module):
         Args:
             pred (jittor.Var): Predicted convexes.
             target (jittor.Var): Corresponding gt convexes.
+            weight (jittor.Var): The weight of loss for each
+                prediction. Defaults to None.
             avg_factor (int, optional): Average factor that is used to average
                 the loss. Defaults to None.
             reduction_override (str, optional): The reduction method used to
@@ -219,9 +221,18 @@ class GDLoss_v1(nn.Module):
         """
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self.reduction)
+        if (weight is not None) and (not jt.any(weight > 0)) and (reduction != 'none'):
+            mask = (weight > 0).detach()
+            return (pred[mask] * weight[mask].reshape(-1, 1)).sum()
+        if weight is not None and weight.ndim > 1:
+            assert weight.shape == pred.shape
+            weight = weight.mean(-1)
         _kwargs = deepcopy(self.kwargs)
         _kwargs.update(kwargs)
 
+        mask = (weight > 0)
+        pred = pred[mask]
+        target = target[mask]
         pred = self.preprocess(pred)
         target = self.preprocess(target)
 
