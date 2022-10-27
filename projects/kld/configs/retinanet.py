@@ -23,22 +23,20 @@ model = dict(
         in_channels= 256,
         stacked_convs= 4,
         mode= "R",
-        score_threshold= 0.05,
+        score_threshold= 0.3,
         nms_iou_threshold= 0.3,
         max_dets= 10000,
-        roi_beta= 1 / 9.,
         cls_loss_weight= 1.,
-        loc_loss_weight= 0.2,
-
+        loc_loss_weight= 1.,
         anchor_generator = dict(
-          type= "AnchorGeneratorYangXue",
+          type= "AnchorGeneratorRotated",
           strides= [8, 16, 32, 64, 128],
           ratios= [1, 0.5, 2.0, 0.3333333333333333, 3.0, 5.0, 0.2],
           scales= [1, 1.2599210498948732, 1.5874010519681994],
           base_sizes= [32, 64, 128, 256, 512],
           angles= [-90, -75, -60, -45, -30, -15],
-          mode= "H",
-          yx_base_size= 4.)),
+          mode= "H"),
+        reg_decoded_bbox=True,),
 )
 dataset = dict(
     val=dict(

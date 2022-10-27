@@ -26,7 +26,6 @@ model = dict(
         score_threshold= 0.05,
         nms_iou_threshold= 0.3,
         max_dets= 10000,
-        roi_beta= 1 / 9.,
         cls_loss_weight= 1.,
         loc_loss_weight= 0.2,
 

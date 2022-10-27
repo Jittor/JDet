@@ -29,7 +29,6 @@ dataset = dict(
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False,)
-            
         ],
     ))
 
@@ -37,7 +36,7 @@ model = dict(
     rpn_net = dict(
         loc_loss=dict(
             type='smooth_l1_loss',
-            beta=0.,
+            beta=1 / 9,
             reduction='sum',
             loss_weight=1.0),
         cls_loss=dict(
