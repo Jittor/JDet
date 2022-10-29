@@ -6,6 +6,7 @@ from jittor import nn, init
 
 from jdet.models.losses.focal_loss import sigmoid_focal_loss
 from jdet.models.losses.smooth_l1_loss import smooth_l1_loss
+from jdet.models.losses.gaussian_dist_loss_v1 import GDLoss_v1
 from jdet.models.boxes.box_ops import bbox2loc, bbox_iou, loc2bbox, loc2bbox_r, bbox2loc_r
 from jdet.ops import box_iou_rotated
 from jdet.utils.registry import HEADS
@@ -297,7 +298,10 @@ class RetinaHead(nn.Module):
             normalizer = max((all_gt_roi_labels>0).sum().item(),1)
 
             # regression loss
-            roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels.detach())
+            if isinstance(self.loc_loss, GDLoss_v1):
+                roi_loc_loss = self.loc_loss(all_bbox_pred_[i], all_gt_roi_locs_[i], all_gt_roi_labels.detach())
+            else:
+                roi_loc_loss = self.loc_loss(all_bbox_pred_[i][all_gt_roi_labels>0], all_gt_roi_locs_[i][all_gt_roi_labels>0]) # smooth_l1_loss
 
             # classification loss
             # build one hot with background
