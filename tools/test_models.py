@@ -1,5 +1,5 @@
 import os
-tasks = ["roi_transformer", "faster_rcnn", "retinanet", "s2anet", "ssd", "gliding", 
+tasks = ["redet", "roi_transformer", "faster_rcnn", "retinanet", "s2anet", "ssd", "gliding", 
 "oriented_rcnn", "fcos", "yolo"]
 zip_path = "https://cloud.tsinghua.edu.cn/f/a5bcad6d48bc42a38c06/?dl=1"
 
