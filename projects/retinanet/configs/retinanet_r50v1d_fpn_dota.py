@@ -46,10 +46,6 @@ model = dict(
             base_sizes= [32, 64, 128, 256, 512],
             angles= [-90, -75, -60, -45, -30, -15],
             mode= "H"),
-        bbox_coder=dict(
-            type='DeltaXYWHABBoxCoder',
-            target_means=(.0, .0, .0, .0, .0),
-            target_stds=(1.0, 1.0, 1.0, 1.0, 1.0)),
         reg_decoded_bbox=True,),
 )
 dataset = dict(

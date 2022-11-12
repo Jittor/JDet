@@ -2,7 +2,7 @@ import jittor as jt
 from jdet.utils.registry import LOSSES
 from jittor import nn
 
-def smooth_l1_loss(pred,target,weight=None,beta=1.,avg_factor=None,reduction="mean"):
+def smooth_l1_loss(pred,target,weight=None,beta=1.,avg_factor=None,reduction="mean"): 
     diff = jt.abs(pred-target)
     if beta!=0.:
         flag = (diff<beta).float()

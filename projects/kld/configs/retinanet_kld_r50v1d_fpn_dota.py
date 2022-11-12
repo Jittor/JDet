@@ -26,14 +26,13 @@ model = dict(
         score_threshold= 0.3,
         nms_iou_threshold= 0.3,
         max_dets= 10000,
-        roi_beta= 1 / 9.,
         cls_loss_weight= 1.,
         loc_loss_weight= 1.,
         loc_loss=dict(
             type='GDLoss_v1',
-            loss_type='gwd',
-            fun='sqrt',
-            tau=2.0,
+            loss_type='kld',
+            fun='log1p',
+            tau=1.0,
             loss_weight=5.5),
         cls_loss=dict(
             type='FocalLoss',
@@ -48,16 +47,12 @@ model = dict(
             base_sizes= [32, 64, 128, 256, 512],
             angles= [-90, -75, -60, -45, -30, -15],
             mode= "H"),
-        bbox_coder=dict(
-            type='DeltaXYWHABBoxCoder',
-            target_means=(.0, .0, .0, .0, .0),
-            target_stds=(1.0, 1.0, 1.0, 1.0, 1.0)),
         reg_decoded_bbox=True,),
 )
 dataset = dict(
     val=dict(
         type="DOTADataset",
-        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
+        dataset_dir="/home/songxiufeng/workspace/code/JDetPrj/data/preprocessed_DOTA/DOTA1.0/1024_200/trainval_1024_200_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -76,7 +71,7 @@ dataset = dict(
     ),
     train=dict(
         type="DOTADataset",
-        dataset_dir="/home/zonlin/CU111/JDet/data/processed_DOTA/trainval_1024_200_1.0",
+        dataset_dir="/home/songxiufeng/workspace/code/JDetPrj/data/preprocessed_DOTA/DOTA1.0/1024_200/trainval_1024_200_1.0",
         transforms=[
             dict(
                 type="RotatedResize",
@@ -100,7 +95,7 @@ dataset = dict(
     ),
     test = dict(
       type= "ImageDataset",
-      images_dir= "/home/zonlin/CU111/JDet/data/processed_DOTA/test_1024_200_1.0/images",
+      images_dir= "/home/songxiufeng/workspace/code/JDetPrj/data/preprocessed_DOTA/DOTA1.0/1024_200/trainval_1024_200_1.0/images",
       transforms= [
         dict(
           type= "RotatedResize",

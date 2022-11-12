@@ -4,20 +4,8 @@ from jittor import nn
 from jdet.utils.registry import LOSSES
 
 
-# TODO: remove this
-def diag3d(x, diagonal=0):
-    d = diagonal if diagonal >= 0 else -diagonal
-    if x.ndim == 3:
-        assert x.shape[1] == x.shape[2]
-        output_shape = (x.shape[0], x.shape[1]-d,)
-        return x.reindex(output_shape, ['i0', f'i1+{d}' if diagonal <= 0 else 'i1', f'i1+{d}' if diagonal >= 0 else 'i1'])
-    else:
-        assert x.ndim == 2
-        d_str = f'+{diagonal}' if diagonal >= 0 else f'{diagonal}'
-        output_shape = (x.shape[0], x.shape[1]+d, x.shape[1]+d)
-        return x.reindex(output_shape, ['i0', f'i2-{d}' if diagonal >= 0 else f'i1-{d}'], overflow_conditions = [f'i1{d_str}'!='i2'])
-# def diag3d(x): # for test!!!
-#     return jt.stack([jt.diag(x_) for x_ in x])
+def diag3d(x):
+    return jt.stack([jt.diag(x_) for x_ in x])
 
 
 def reduce_loss(loss, reduction='mean', avg_factor=None):
@@ -223,7 +211,7 @@ class GDLoss_v1(nn.Module):
         Args:
             pred (jittor.Var): Predicted convexes.
             target (jittor.Var): Corresponding gt convexes.
-            weight (jittor.Var, optional): The weight of loss for each
+            weight (jittor.Var): The weight of loss for each
                 prediction. Defaults to None.
             avg_factor (int, optional): Average factor that is used to average
                 the loss. Defaults to None.
@@ -232,10 +220,8 @@ class GDLoss_v1(nn.Module):
                Defaults to None.
         """
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
-        if (weight is not None) and (not jt.any(weight > 0)) and (
-                reduction != 'none'):
+        reduction = (reduction_override if reduction_override else self.reduction)
+        if (weight is not None) and (not jt.any(weight > 0)) and (reduction != 'none'):
             mask = (weight > 0).detach()
             return (pred[mask] * weight[mask].reshape(-1, 1)).sum()
         if weight is not None and weight.ndim > 1:
@@ -244,7 +230,7 @@ class GDLoss_v1(nn.Module):
         _kwargs = deepcopy(self.kwargs)
         _kwargs.update(kwargs)
 
-        mask = (weight > 0).detach()
+        mask = (weight > 0)
         pred = pred[mask]
         target = target[mask]
         pred = self.preprocess(pred)
