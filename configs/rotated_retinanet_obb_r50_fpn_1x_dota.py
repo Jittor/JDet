@@ -32,9 +32,7 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox=dict(
-            type='GDLoss',
-            loss_type='gwd',
-            loss_weight=5.0),
+            type='L1Loss', loss_weight=1.0),
         test_cfg=dict(
             nms_pre=2000,
             min_bbox_size=0,
@@ -53,7 +51,6 @@ model = dict(
                                 target_means=(0., 0., 0., 0., 0.),
                                 target_stds=(1., 1., 1., 1., 1.),
                                 clip_border=True),
-                reg_decoded_bbox=True,
                 allowed_border=-1,
                 pos_weight=-1,
                 debug=False)
@@ -62,14 +59,15 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        dataset_dir='/home/featurize/data/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5),
+            dict(type='RotatedRandomFlip', prob=0.5, direction="horizontal"),
+            dict(type='RotatedRandomFlip', prob=0.5, direction="vertical"),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -87,7 +85,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        dataset_dir='/home/featurize/data/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -109,7 +107,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/home/featurize/data/processed_DOTA/test_1024_200_1.0/images',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type="RotatedResize",

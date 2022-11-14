@@ -32,11 +32,9 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox=dict(
-            type='GDLoss_v1',
-            loss_type='kld',
-            fun='log1p',
-            tau=1.0,
-            loss_weight=5.5),
+            type='GDLoss',
+            loss_type='gwd',
+            loss_weight=5.0),
         test_cfg=dict(
             nms_pre=2000,
             min_bbox_size=0,
@@ -50,7 +48,7 @@ model = dict(
                     neg_iou_thr=0.4,
                     min_pos_iou=0,
                     ignore_iof_thr=-1,
-                    iou_calculator=dict(type='BboxOverlaps2D_rotated')),
+                    iou_calculator=dict(type='FakeBboxOverlaps2D_rotated')),
                 bbox_coder=dict(type='DeltaXYWHABBoxCoder',
                                 target_means=(0., 0., 0., 0., 0.),
                                 target_stds=(1., 1., 1., 1., 1.),
@@ -64,7 +62,7 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        dataset_dir='/home/featurize/data/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -89,7 +87,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        dataset_dir='/home/featurize/data/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -111,7 +109,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/home/featurize/data/processed_DOTA/test_1024_200_1.0/images',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type="RotatedResize",
