@@ -117,7 +117,7 @@ class RotatedRetinaHead(nn.Module):
                     stride=1,
                     padding=1))
 
-        self.retina_reg = nn.Conv2d(self.feat_channels, 5, 1)
+        self.retina_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 1)
         self.retina_cls = nn.Conv2d(self.feat_channels, 
                                     self.num_anchors * self.cls_out_channels, 1)
 
@@ -138,14 +138,11 @@ class RotatedRetinaHead(nn.Module):
             reg_feat = reg_conv(reg_feat)
         bbox_pred = self.retina_reg(reg_feat)
 
-        # only forward during training
-        if self.is_training():
-            cls_feat = x
-            for cls_conv in self.cls_convs:
-                cls_feat = cls_conv(cls_feat)
-            cls_score = self.retina_cls(cls_feat)
-        else:
-            cls_score = None
+        cls_feat = x
+        for cls_conv in self.cls_convs:
+            cls_feat = cls_conv(cls_feat)
+        cls_score = self.retina_cls(cls_feat)
+
 
         return cls_score, bbox_pred
 
@@ -325,7 +322,6 @@ class RotatedRetinaHead(nn.Module):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         num_levels = len(cls_scores)
         anchor_list, _ = self.get_init_anchors(featmap_sizes, img_metas)
-        # anchors_list = self.anchor_generators.grid_anchors(featmap_sizes)
 
         result_list = []
         for img_id in range(len(img_metas)):
@@ -338,7 +334,7 @@ class RotatedRetinaHead(nn.Module):
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
             proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list, 
-                                               anchor_list, img_shape,
+                                               anchor_list[img_id], img_shape,
                                                scale_factor, cfg, rescale)
 
             result_list.append(proposals)
@@ -355,7 +351,6 @@ class RotatedRetinaHead(nn.Module):
         """
         Transform outputs for a single batch item into labeled boxes.
         """
-        
         assert len(cls_score_list) == len(bbox_pred_list) == len(mlvl_anchors)
         mlvl_bboxes = []
         mlvl_scores = []
