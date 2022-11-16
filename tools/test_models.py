@@ -1,6 +1,6 @@
 import os
 tasks = ["roi_transformer", "faster_rcnn", "retinanet", "s2anet", "ssd", "gliding", 
-"oriented_rcnn", "fcos", "yolo"]
+"oriented_rcnn", "fcos", "yolo", "rotated_retinanet"]
 zip_path = "https://cloud.tsinghua.edu.cn/f/a5bcad6d48bc42a38c06/?dl=1"
 
 if (not os.path.exists("test_datas.zip")):
