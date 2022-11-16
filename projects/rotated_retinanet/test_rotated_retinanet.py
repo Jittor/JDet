@@ -53,8 +53,8 @@ def main():
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         correct_loss = data["correct_loss"]
-        # correct_loss =[4.851482391357422, 4.919872760772705, 3.1842665672302246, 3.716217041015625, 4.287736415863037, 
-        #     3.794440269470215, 3.7207441329956055, 3.743844509124756, 4.571873664855957, 5.585651397705078, 3.2345163822174072]
+        # correct_loss =[1.852632999420166, 2.030822277069092, 1.9102485179901123, 2.9509782791137695, 2.3653626441955566, 
+        # 2.2163989543914795, 2.2501344680786133, 2.3585996627807617, 3.020094633102417, 2.5657663345336914, 3.5694150924682617]
         for batch_idx in range(len(imagess)):
             images = imagess[batch_idx]
             targets = targetss[batch_idx]
