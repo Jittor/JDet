@@ -3,3 +3,4 @@ from .focal_loss import FocalLoss
 from .cross_entropy_loss import CrossEntropyLoss
 from .l1_loss import L1Loss
 from .poly_iou_loss import PolyIoULoss
+from .gaussian_dist_loss_v1 import GDLoss_v1
