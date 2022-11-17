@@ -1,6 +1,7 @@
 from .rbbox_head import *
 from .convfc_rbbox_head import *
 from . import retina_head
+from . import rotated_retina_head
 from . import s2anet_head
 from . import rpn_head
 from . import oriented_rpn_head
