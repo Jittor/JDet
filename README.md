@@ -126,8 +126,8 @@ python run_net.py --config-file=configs/base.py --task=test
 
 - :heavy_check_mark: S2ANet
 - :heavy_check_mark: Gliding
-- :heavy_check_mark: Rotated-RetinaNet
 - :heavy_check_mark: RetinaNet
+- :heavy_check_mark: Rotated RetinaNet
 - :heavy_check_mark: Faster R-CNN
 - :heavy_check_mark: SSD
 - :heavy_check_mark: ROI Transformer
