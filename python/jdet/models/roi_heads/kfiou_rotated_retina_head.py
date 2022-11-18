@@ -6,7 +6,7 @@ from jdet.utils.registry import HEADS, BOXES, build_from_cfg
 from .rotated_retina_head import RotatedRetinaHead
 
 @HEADS.register_module()
-class KFIoURetinaHead(RotatedRetinaHead):
+class KFIoURRetinaHead(RotatedRetinaHead):
     r"""An anchor-based head used in `RetinaNet
     <https://arxiv.org/pdf/1708.02002.pdf>`_.
 
@@ -19,7 +19,7 @@ class KFIoURetinaHead(RotatedRetinaHead):
 
     #TODO: check 'H' mode
     def __init__(self,
-                 num_class,
+                 num_classes,
                  in_channels,
                  feat_channels=256,
                  stacked_convs=4,
@@ -59,8 +59,8 @@ class KFIoURetinaHead(RotatedRetinaHead):
                     allowed_border=-1,
                     pos_weight=-1,
                     debug=False)):
-        super(KFIoURetinaHead, self).__init__(
-            num_class=num_class,
+        super(KFIoURRetinaHead, self).__init__(
+            num_classes=num_classes,
             in_channels=in_channels,
             feat_channels=feat_channels,
             stacked_convs=stacked_convs,
