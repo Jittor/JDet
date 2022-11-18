@@ -91,18 +91,16 @@ class KFIoURRetinaHead(RotatedRetinaHead):
         bbox_weights = bbox_weights.reshape(-1, 5)
         bbox_pred = bbox_pred.permute(0, 2, 3, 1).reshape(-1, 5)
 
-        reg_decoded_bbox = cfg.get('reg_decoded_bbox', False)
-        if reg_decoded_bbox:
-            # When the regression loss (e.g. `IouLoss`, `GIouLoss`)
-            # is applied directly on the decoded bounding boxes, it
-            # decodes the already encoded coordinates to absolute format.
-            bbox_coder_cfg = cfg.get('bbox_coder', '')
-            if bbox_coder_cfg == '':
-                bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
-            bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
-            anchors = anchors.reshape(-1, 5)
-            bbox_pred_decode = bbox_coder.decode(anchors, bbox_pred)
-            bbox_targets_decode = bbox_coder.decode(anchors, bbox_targets)
+        # When the regression loss (e.g. `IouLoss`, `GIouLoss`)
+        # is applied directly on the decoded bounding boxes, it
+        # decodes the already encoded coordinates to absolute format.
+        bbox_coder_cfg = cfg.get('bbox_coder', '')
+        if bbox_coder_cfg == '':
+            bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
+        bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
+        anchors = anchors.reshape(-1, 5)
+        bbox_pred_decode = bbox_coder.decode(anchors, bbox_pred)
+        bbox_targets_decode = bbox_coder.decode(anchors, bbox_targets)
         loss_bbox = self.loss_bbox(
             bbox_pred,
             bbox_targets,
