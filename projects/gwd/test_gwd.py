@@ -17,7 +17,7 @@ def main():
 
     jt.flags.use_cuda=1
     jt.set_global_seed(666)
-    init_cfg("projects/kld/configs/rotated_retinanet_kld_test.py")
+    init_cfg("configs/rotated_retinanet_gwd_test.py")
     cfg = get_cfg()
 
     model = build_from_cfg(cfg.model,MODELS)
@@ -44,12 +44,12 @@ def main():
             "targetss": targetss,
             "correct_loss": correct_loss,
         }
-        if (not os.path.exists("test_datas_rotated_retinanet_kld")):
-            os.makedirs("test_datas_rotated_retinanet_kld")
-        pk.dump(data, open("test_datas_rotated_retinanet_kld/test_data.pk", "wb"))
+        if (not os.path.exists("test_datas_gwd")):
+            os.makedirs("test_datas_gwd")
+        pk.dump(data, open("test_datas_gwd/test_data.pk", "wb"))
         print(correct_loss)
     else:
-        data = pk.load(open("test_datas_rotated_retinanet_kld/test_data.pk", "rb"))
+        data = pk.load(open("test_datas_gwd/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         correct_loss = data["correct_loss"]
