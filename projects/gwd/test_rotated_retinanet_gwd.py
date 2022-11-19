@@ -44,8 +44,8 @@ def main():
             "targetss": targetss,
             "correct_loss": correct_loss,
         }
-        if (not os.path.exists("test_datas_rotated_retinanet")):
-            os.makedirs("test_datas_rotated_retinanet")
+        if (not os.path.exists("test_datas_rotated_retinanet_gwd")):
+            os.makedirs("test_datas_rotated_retinanet_gwd")
         pk.dump(data, open("test_datas_rotated_retinanet_gwd/test_data.pk", "wb"))
         print(correct_loss)
     else:
