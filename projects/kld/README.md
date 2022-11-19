@@ -12,12 +12,12 @@ Existing rotated object detectors are mostly inherited from the horizontal detec
 
 ### Training
 ```sh
-python run_net.py --config-file=configs/rotated_retinanet_obb_kld_r50_fpn_1x_dota.py --task=train
+python run_net.py --config-file=configs/rotated_retinanet_hbb_kld_r50_fpn_1x_dota.py --task=train
 ```
 
 ### Testing
 ```sh
-python run_net.py --config-file=configs/rotated_retinanet_obb_kld_r50_fpn_1x_dota.py --task=test
+python run_net.py --config-file=configs/rotated_retinanet_hbb_kld_r50_fpn_1x_dota.py --task=test
 ```
 
 ### Performance
