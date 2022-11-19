@@ -136,6 +136,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Oriented R-CNN
 - :heavy_check_mark: YOLOv5
 - :heavy_check_mark: KLD
+- :clock3: H2RBox
 - :clock3: ReDet
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
