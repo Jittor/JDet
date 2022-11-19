@@ -9,4 +9,5 @@ from .faster_rcnn_obb import FasterRCNNOBB
 from .roi_transformer import RoITransformer
 from .fcos import FCOS
 from .yolo import *
+from .h2rbox import H2RBox
 __all__ = []
