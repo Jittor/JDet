@@ -17,7 +17,7 @@ def main():
 
     jt.flags.use_cuda=1
     jt.set_global_seed(666)
-    init_cfg("configs/rotated_retinanet_test.py")
+    init_cfg("projects/kld/configs/rotated_retinanet_kld_test.py")
     cfg = get_cfg()
 
     model = build_from_cfg(cfg.model,MODELS)
@@ -53,8 +53,7 @@ def main():
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         correct_loss = data["correct_loss"]
-        # correct_loss =[1.852632999420166, 2.030822277069092, 1.9102485179901123, 2.9509782791137695, 2.3653626441955566, 
-        # 2.2163989543914795, 2.2501344680786133, 2.3585996627807617, 3.020094633102417, 2.5657663345336914, 3.5694150924682617]
+        
         for batch_idx in range(len(imagess)):
             images = imagess[batch_idx]
             targets = targetss[batch_idx]
