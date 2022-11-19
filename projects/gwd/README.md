@@ -21,10 +21,9 @@ python run_net.py --config-file=configs/rotated_retinanet_hbb_gwd_r50_fpn_1x_dot
 python run_net.py --config-file=configs/rotated_retinanet_hbb_gwd_r50_fpn_1x_dota.py --task=test
 ```
 ### Performance
-|    Models     | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper | Config     | Download   |
-| :-----------: | :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
-| GWD-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 68.88   | [arxiv](https://arxiv.org/abs/2101.11952)| [config](configs/rotated_retinanet_hbb_gwd_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/b261e36e4cf04d6b830a/?dl=1
-) |
+|            Models             | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper | Config     | Download   |
+|:-----------------------------:| :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
+|          GWD-R50-FPN          | DOTA1.0| 1024/200| flip|-|  SGD   |   1x    | 68.88   | [arxiv](https://arxiv.org/abs/2101.11952)| [config](projects/gwd/configs/rotated_retinanet_hbb_gwd_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/b261e36e4cf04d6b830a/?dl=1) |
 
 ### Citation
 
