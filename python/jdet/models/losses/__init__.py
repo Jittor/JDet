@@ -4,5 +4,6 @@ from .cross_entropy_loss import CrossEntropyLoss
 from .l1_loss import L1Loss
 from .poly_iou_loss import PolyIoULoss
 from .kf_iou_loss import KFLoss
+from .gaussian_dist_loss import GDLoss
 from .gaussian_dist_loss_v1 import GDLoss_v1
 from .iou_loss import IoULoss

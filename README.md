@@ -105,6 +105,7 @@ python run_net.py --config-file=configs/base.py --task=test
 |        Gliding-R50-FPN        |DOTA1.0|1024/200|Flip+ra90+bc|-|  SGD   |   1x    | 74.93   | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip_rotate_balance_cate.py) | [model](https://cloud.tsinghua.edu.cn/f/395ecd3ddaf44bb58ac9/?dl=1) |
 | RetinaNet-hbb-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 68.02   | [arxiv](https://arxiv.org/abs/1908.05612)| [config](configs/rotated_retinanet/rotated_retinanet_hbb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/6018635728b942c5beb8/?dl=1) |
 | RetinaNet-obb-R50-FPN | DOTA1.0| 1024/200| flip|-|  SGD   |   1x    | 68.07   | [arxiv](https://arxiv.org/abs/1908.05612)| [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/24bbb1448d4d4a3ba436/?dl=1) |
+|          GWD-R50-FPN          | DOTA1.0| 1024/200| flip|-|  SGD   |   1x    | 68.88   | [arxiv](https://arxiv.org/abs/2101.11952)| [config](projects/gwd/configs/rotated_retinanet_hbb_gwd_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/b261e36e4cf04d6b830a/?dl=1) |
 |          KLD-R50-FPN          | DOTA1.0| 1024/200| flip|-|  SGD   |   1x    | 69.10   | [arxiv](https://arxiv.org/abs/2106.01883)| [config](projects/kld/configs/rotated_retinanet_hbb_kld_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/fa7e892f90304af6988b/?dl=1) |
 |      FasterRCNN-R50-FPN       |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 69.631   | [arxiv](https://arxiv.org/abs/1506.01497)| [config](configs/faster_rcnn_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/29197095057348d0a392/?dl=1) |
 |    RoITransformer-R50-FPN     |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 73.842   | [arxiv](https://arxiv.org/abs/1812.00155)| [config](configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/55fe6380928f4a6582f8/?dl=1) |
@@ -135,6 +136,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: FCOS
 - :heavy_check_mark: Oriented R-CNN
 - :heavy_check_mark: YOLOv5
+- :heavy_check_mark: GWD
 - :heavy_check_mark: KLD
 - :clock3: H2RBox
 - :clock3: ReDet
@@ -142,7 +144,6 @@ python run_net.py --config-file=configs/base.py --task=test
 - :clock3: Cascade R-CNN
 - :heavy_plus_sign: CSL
 - :heavy_plus_sign: DCL
-- :heavy_plus_sign: GWD
 - :heavy_plus_sign: Double Head OBB
 - :heavy_plus_sign: Oriented Reppoints
 - :heavy_plus_sign: Guided Anchoring
