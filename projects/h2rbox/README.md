@@ -35,7 +35,7 @@ python run_net.py --config-file=configs/h2rbox_obb_r50_adamw_fpn_1x_dota.py --ta
 
 ```
 @article{yang2022h2rbox,
-  title={H2RBox: Horizonal Box Annotation is All You Need for Oriented Object Detection},
+  title={H2RBox: Horizontal Box Annotation is All You Need for Oriented Object Detection},
   author={Yang, Xue and Zhang, Gefan and Li, Wentong and Wang, Xuehui and Zhou, Yue and Yan, Junchi},
   journal={arXiv preprint arXiv:2210.06742},
   year={2022}
