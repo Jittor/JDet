@@ -27,9 +27,9 @@ python run_net.py --config-file=configs/h2rbox_obb_r50_adamw_fpn_1x_dota.py --ta
 
 **Notes:**
 
+- [Original PyTorch Implementation (Paper) for H2RBox](https://github.com/yangxue0827/h2rbox-mmrotate)
+- [MMRotate 1.x Implementation for H2RBox](https://github.com/open-mmlab/mmrotate)
 - [Jittor Implementation for H2RBox](https://github.com/yangxue0827/h2rbox-jittor)
-- [PyTorch Implementation for H2RBox](https://github.com/yangxue0827/h2rbox-mmrotate)
-
 
 ### Citation
 
