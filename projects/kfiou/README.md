@@ -37,7 +37,7 @@ python run_net.py --config-file=configs/rotated_retinanet_hbb_kfiou_r50_fpn_1x_d
 
 |   Models    | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper |                             Config                             | Download   |
 |:-----------:| :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------------------------------------------------------------:| :--------: |
-| KFIoU-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 69.36   | [arxiv](https://arxiv.org/abs/2101.11952)| [config](configs/rotated_retinanet_hbb_kfiou_r50_fpn_1x_dota.py) | [model]() |
+| KFIoU-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 69.36   | [arxiv](https://arxiv.org/abs/2101.11952)| [config](configs/rotated_retinanet_hbb_kfiou_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/9d24118280864511b943/?dl=1) |
 
 ## Citation
 
