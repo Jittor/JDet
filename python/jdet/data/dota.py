@@ -135,14 +135,14 @@ class DOTADataset(CustomDataset):
                     diffculty = diffculty.astype(bool)
                     g = np.concatenate([g,dg])
                     classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
-                rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly,ovthresh=0.5+0.05*iii)
+                rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly,ovthresh=0.95-0.05*iii)
                 aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
             map = sum(list(aps.values()))/len(aps)
             AP[iii]=map
-            if iii==0:
+            if iii==9:
                 aps["eval/0_meanAP"]=map
         AP[10] = np.mean(AP[:10])
-        print('Evaluation Results: AP50, AP55, AP60, AP65, AP70, AP75, AP80, AP85, AP90, AP95, AP')
+        print('Evaluation Results: AP95, AP90, AP85, AP80, AP75, AP70, AP65, AP60, AP55, AP50, AP')
         print(AP)
         return aps
             
