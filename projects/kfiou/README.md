@@ -1,6 +1,6 @@
 # KFIoU
 
-> [The KFIoU Loss for Rotated Object Detection](https://arxiv.org/pdf/2101.11952.pdf)
+> [The KFIoU Loss for Rotated Object Detection](https://arxiv.org/abs/2201.12558)
 
 <!-- [ALGORITHM] -->
 
@@ -37,17 +37,15 @@ python run_net.py --config-file=configs/rotated_retinanet_hbb_kfiou_r50_fpn_1x_d
 
 |   Models    | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper |                             Config                             | Download   |
 |:-----------:| :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------------------------------------------------------------:| :--------: |
-| KFIoU-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 69.36   | [arxiv](https://arxiv.org/abs/2101.11952)| [config](configs/rotated_retinanet_hbb_kfiou_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/9d24118280864511b943/?dl=1) |
+| KFIoU-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 69.36   | [arxiv](https://arxiv.org/abs/2201.12558)| [config](configs/rotated_retinanet_hbb_kfiou_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/9d24118280864511b943/?dl=1) |
 
 ## Citation
 
 ```
-@misc{yang2022kfiou,
+@article{yang2022kfiou,
       title={The KFIoU Loss for Rotated Object Detection},
       author={Xue Yang and Yue Zhou and Gefan Zhang and Jirui Yang and Wentao Wang and Junchi Yan and Xiaopeng Zhang and Qi Tian},
+      journal={arXiv preprint arXiv:2201.12558},
       year={2022},
-      eprint={2201.12558},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
 }
 ```
