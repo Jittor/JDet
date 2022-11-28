@@ -139,8 +139,6 @@ class DOTADataset(CustomDataset):
                 aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
             map = sum(list(aps.values()))/len(aps)
             AP[iii]=map
-            if iii==9:
-                aps["eval/0_meanAP"]=map
         AP[10] = np.mean(AP[:10])
         print('Evaluation Results: AP95, AP90, AP85, AP80, AP75, AP70, AP65, AP60, AP55, AP50, AP')
         print(AP)
