@@ -705,3 +705,19 @@ def distance2obb(points, distance, max_shape=None):
 
     obbs = jt.concat([ctr, wh, theta], dim=1)
     return regular_obb(obbs)
+
+def integral(x, n):
+    e=jt.linspace(-2, 2, n+1)
+    y=x.reshape(-1, n+1)
+    y=jt.nn.softmax(y,dim=1)
+    e=jt.Var.expand_as(e,y)
+    p=jt.ops.multiply(y, e).sum(dim=1).reshape(-1, 4)
+    return p
+
+def integral_angle(x, n):
+    e=jt.linspace(-5, 2, n+1)
+    y=x.reshape(-1, n+1)
+    y=jt.nn.softmax(y,dim=1)
+    e=jt.Var.expand_as(e,y)
+    p=jt.ops.multiply(y, e).sum(dim=1).reshape(-1)
+    return p
