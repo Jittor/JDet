@@ -12,4 +12,5 @@ from . import ssd_head
 from . import fasterrcnn_head
 from . import fcos_head
 from . import kfiou_rotated_retina_head
+from . import h2rbox_head
 __all__ = []

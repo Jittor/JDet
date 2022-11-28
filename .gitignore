@@ -42,3 +42,4 @@ temp*
 configs/fair
 tools/convert_dataset.py
 tools/merge_results2.py
+*.DS_Store*
