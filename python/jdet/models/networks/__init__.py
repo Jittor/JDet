@@ -10,4 +10,5 @@ from .roi_transformer import RoITransformer
 from .fcos import FCOS
 from .yolo import *
 from .h2rbox import H2RBox
+from .kd_one_stage import KnowledgeDistillationSingleStageDetector
 __all__ = []
