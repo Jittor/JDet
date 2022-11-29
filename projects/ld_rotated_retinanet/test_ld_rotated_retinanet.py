@@ -44,17 +44,19 @@ def main():
             "targetss": targetss,
             "correct_loss": correct_loss,
         }
-        if (not os.path.exists("test_datas_rotated_retinanet")):
-            os.makedirs("test_datas_rotated_retinanet")
-        pk.dump(data, open("test_datas_rotated_retinanet/test_data.pk", "wb"))
+        if (not os.path.exists("test_datas_ld_rotated_retinanet")):
+            os.makedirs("test_datas_ld_rotated_retinanet")
+            model.save("test_datas_ld_rotated_retinanet/init_pretrained.pk_jt.pk")
+        pk.dump(data, open("test_datas_ld_rotated_retinanet/test_data.pk", "wb"))
         print(correct_loss)
     else:
-        data = pk.load(open("test_datas_rotated_retinanet/test_data.pk", "rb"))
+        model.load("test_datas_ld_rotated_retinanet/init_pretrained.pk_jt.pk")
+        data = pk.load(open("test_datas_ld_rotated_retinanet/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
         correct_loss = data["correct_loss"]
-        # correct_loss =[1.852632999420166, 2.030822277069092, 1.9102485179901123, 2.9509782791137695, 2.3653626441955566, 
-        # 2.2163989543914795, 2.2501344680786133, 2.3585996627807617, 3.020094633102417, 2.5657663345336914, 3.5694150924682617]
+        # correct_loss =[7.707034587860107, 7.684121131896973, 7.08363151550293, 9.16530990600586, 10.82699203491211,
+        # 8.036815643310547, 7.295466899871826, 8.06069564819336, 11.572449684143066, 7.808135509490967, 10.91604232788086]
         for batch_idx in range(len(imagess)):
             images = imagess[batch_idx]
             targets = targetss[batch_idx]
