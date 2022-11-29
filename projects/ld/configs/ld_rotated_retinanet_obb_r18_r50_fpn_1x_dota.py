@@ -2,7 +2,7 @@
 teacher_ckpt = './rotated_retinanet_obb_distribution_r50_1x.pkl'  # noqa
 model = dict(
     type='KnowledgeDistillationSingleStageDetector',
-    teacher_config='configs/rotated_retinanet/rotated_retinanet_obb_distribution_r50_fpn_1x_dota.py',
+    teacher_config='configs/ld/rotated_retinanet_obb_distribution_r50_fpn_1x_dota.py',
     teacher_ckpt=teacher_ckpt,
     backbone=dict(
         type='Resnet18',
