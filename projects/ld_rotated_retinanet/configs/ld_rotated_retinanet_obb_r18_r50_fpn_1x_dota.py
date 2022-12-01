@@ -1,5 +1,5 @@
 # model settings
-teacher_ckpt = './rotated_retinanet_obb_distribution_r50_1x.pkl'  # noqa
+teacher_ckpt = 'https://cloud.tsinghua.edu.cn/f/b737fe43de8c47a6810e/?dl=1'  # noqa
 model = dict(
     type='KnowledgeDistillationSingleStageDetector',
     teacher_config='configs/rotated_retinanet_obb_distribution_r50_fpn_1x_dota.py',
