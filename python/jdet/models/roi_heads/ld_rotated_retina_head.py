@@ -473,6 +473,13 @@ class RotatedRetinaLocalizationDistillationHead(nn.Module):
             return img_metas
         return gt_bboxes,gt_labels,img_metas,gt_bboxes_ignore
 
+    def execute(self, feats,targets):
+        outs = multi_apply(self.forward_single, feats, self.anchor_strides)
+        if self.is_training():
+            return self.loss(*outs,*self.parse_targets(targets))
+        else:
+            return self.get_bboxes(*outs,self.parse_targets(targets,is_train=False))
+
     def execute_train(self, feats, feats_teacher, logits_teacher, targets):
         outs = multi_apply(self.forward_single, feats, self.anchor_strides)
         if self.is_training():
