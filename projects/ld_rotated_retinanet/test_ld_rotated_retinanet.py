@@ -17,7 +17,7 @@ def main():
 
     jt.flags.use_cuda=1
     jt.set_global_seed(666)
-    init_cfg("projects/ld_rotated_retinanet/configs/ld_rotated_retinanet_obb_r18_r50_fpn_1x_dota.py")
+    init_cfg("configs/ld_rotated_retinanet_obb_r18_r50_fpn_1x_dota.py")
     cfg = get_cfg()
 
     model = build_from_cfg(cfg.model,MODELS)
