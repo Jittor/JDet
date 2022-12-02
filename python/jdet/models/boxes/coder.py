@@ -596,6 +596,6 @@ class CSLCoder:
                 Has shape (num_anchors * H * W, 1)
         """
         angle_cls_inds = jt.argmax(angle_preds, dim=1)
-        angle_pred = ((angle_cls_inds + 0.5) *
+        angle_pred = ((angle_cls_inds + 0.5 * jt.ones_like(angle_cls_inds)) *
                       self.omega) % self.angle_range - self.angle_offset
         return angle_pred * (math.pi / 180)
