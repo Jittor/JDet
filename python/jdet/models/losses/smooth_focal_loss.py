@@ -1,4 +1,3 @@
-# Copyright (c) OpenMMLab. All rights reserved.
 import jittor as jt
 from jittor import nn
 from .focal_loss import binary_cross_entropy_with_logits
