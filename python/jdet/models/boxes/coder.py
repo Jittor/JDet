@@ -512,3 +512,90 @@ class OrientedDeltaXYWHTCoder:
         new_bboxes = jt.stack([gx, gy, gw, gh, gtheta], dim=-1)
         new_bboxes = regular_obb(new_bboxes)
         return new_bboxes.view_as(pred_bboxes)
+
+@BOXES.register_module()
+class CSLCoder:
+    """Circular Smooth Label Coder.
+    `Circular Smooth Label (CSL)
+    <https://link.springer.com/chapter/10.1007/978-3-030-58598-3_40>`_ .
+    Args:
+        omega (float, optional): Angle discretization granularity.
+            Default: 1.
+        window (str, optional): Window function. Default: gaussian.
+        radius (int/float): window radius, int type for
+            ['triangle', 'rect', 'pulse'], float type for
+            ['gaussian']. Default: 6.
+    """
+
+    def __init__(self, omega=1, window='gaussian', radius=6):
+        assert window in ['gaussian', 'triangle', 'rect', 'pulse']
+        self.angle_range =  180
+        self.angle_offset = 45
+        self.omega = omega
+        self.window = window
+        self.radius = radius
+        self.coding_len = int(self.angle_range // omega)
+
+    def encode(self, angle_targets):
+        """Circular Smooth Label Encoder."""
+
+        # radius to degree
+        angle_targets_deg = angle_targets * (180 / math.pi)
+        # empty label
+        smooth_label = jt.zeros_like(angle_targets).repeat(
+            1, self.coding_len)
+        angle_targets_deg = (angle_targets_deg +
+                             self.angle_offset) / self.omega
+        # Float to Int
+        angle_targets_long = angle_targets_deg.long()
+
+        if self.window == 'pulse':
+            radius_range = angle_targets_long % self.coding_len
+            smooth_value = 1.0
+        elif self.window == 'rect':
+            base_radius_range = jt.arange(
+                -self.radius, self.radius)
+            radius_range = (base_radius_range +
+                            angle_targets_long) % self.coding_len
+            smooth_value = 1.0
+        elif self.window == 'triangle':
+            base_radius_range = jt.arange(
+                -self.radius, self.radius)
+            radius_range = (base_radius_range +
+                            angle_targets_long) % self.coding_len
+            smooth_value = 1.0 - jt.abs(
+                (1 / self.radius) * base_radius_range)
+
+        elif self.window == 'gaussian':
+            base_radius_range = jt.arange(
+                -self.angle_range // 2,
+                self.angle_range // 2)
+
+            radius_range = (base_radius_range +
+                            angle_targets_long) % self.coding_len
+            smooth_value = jt.exp(-jt.pow(base_radius_range, 2) /
+                                     (2 * self.radius**2))
+
+        else:
+            raise NotImplementedError
+
+        if isinstance(smooth_value, jt.Var):
+            smooth_value = smooth_value.unsqueeze(0).repeat(
+                smooth_label.size(0), 1)
+
+        return smooth_label.scatter(1, radius_range, smooth_value)
+
+    def decode(self, angle_preds):
+        """Circular Smooth Label Decoder.
+        Args:
+            angle_preds (Tensor): The csl encoding of angle offset
+                for each scale level.
+                Has shape (num_anchors * H * W, coding_len)
+        Returns:
+            list[Tensor]: Angle offset for each scale level.
+                Has shape (num_anchors * H * W, 1)
+        """
+        angle_cls_inds = jt.argmax(angle_preds, dim=1)
+        angle_pred = ((angle_cls_inds + 0.5) *
+                      self.omega) % self.angle_range - self.angle_offset
+        return angle_pred * (math.pi / 180)

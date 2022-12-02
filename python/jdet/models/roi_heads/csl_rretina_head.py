@@ -4,15 +4,15 @@ from jittor import nn
 
 from jdet.models.utils.weight_init import normal_init,bias_init_with_prob
 from jdet.models.utils.modules import ConvModule
-from jdet.utils.general import multi_apply
+from jdet.utils.general import multi_apply,unmap
 from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 
 
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import delta2bbox_rotated, rotated_box_to_poly
-from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
+from jdet.models.boxes.anchor_target import images_to_levels, anchor_inside_flags
 from jdet.models.boxes.anchor_generator import AnchorGeneratorRotatedRetinaNet
-
+from jdet.models.boxes.sampler import PseudoSampler
 
 @HEADS.register_module()
 class CSLRRetinaHead(nn.Module):
@@ -42,6 +42,8 @@ class CSLRRetinaHead(nn.Module):
                     omega=4,
                     window='gaussian',
                     radius=3),
+                loss_angle=dict(
+                    type='SmoothFocalLoss', gamma=2.0, alpha=0.25, loss_weight=0.8),
                  test_cfg=dict(
                     nms_pre=2000,
                     min_bbox_size=0,
@@ -64,6 +66,9 @@ class CSLRRetinaHead(nn.Module):
                     pos_weight=-1,
                     debug=False)):
         super(CSLRRetinaHead, self).__init__()
+        self.angle_coder = build_from_cfg(angle_coder,BOXES)
+        self.coding_len = self.angle_coder.coding_len
+
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.feat_channels = feat_channels
@@ -86,8 +91,7 @@ class CSLRRetinaHead(nn.Module):
             raise ValueError('num_classes={} is too small'.format(num_classes))
         self.loss_cls = build_from_cfg(loss_cls,LOSSES)
         self.loss_bbox = build_from_cfg(loss_bbox,LOSSES)
-
-        self.angle_coder = build_from_cfg(angle_coder,BOXES)
+        self.loss_angle = build_from_cfg(loss_angle,LOSSES)
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
@@ -124,7 +128,10 @@ class CSLRRetinaHead(nn.Module):
         self.retina_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 1)
         self.retina_cls = nn.Conv2d(self.feat_channels, 
                                     self.num_anchors * self.cls_out_channels, 1)
-
+        self.retina_angle_cls = nn.Conv2d(self.feat_channels, 
+                                          self.num_anchors * self.coding_len,
+                                          3,
+                                          padding=1)
         self.init_weights()
 
     def init_weights(self):
@@ -135,20 +142,21 @@ class CSLRRetinaHead(nn.Module):
         bias_cls = bias_init_with_prob(0.01)
         normal_init(self.retina_reg, std=0.01)
         normal_init(self.retina_cls, std=0.01, bias=bias_cls)
+        normal_init(self.retina_angle_cls, std=0.01, bias=bias_cls)
 
     def forward_single(self, x, stride):
         reg_feat = x
         for reg_conv in self.reg_convs:
             reg_feat = reg_conv(reg_feat)
         bbox_pred = self.retina_reg(reg_feat)
+        angle_cls = self.retina_angle_cls(reg_feat)
 
         cls_feat = x
         for cls_conv in self.cls_convs:
             cls_feat = cls_conv(cls_feat)
         cls_score = self.retina_cls(cls_feat)
-
-
-        return cls_score, bbox_pred
+        
+        return cls_score, bbox_pred, angle_cls
 
     def get_init_anchors(self,
                          featmap_sizes,
@@ -188,39 +196,10 @@ class CSLRRetinaHead(nn.Module):
             valid_flag_list.append(multi_level_flags)
         return anchor_list, valid_flag_list
 
-    def get_refine_anchors(self,
-                           featmap_sizes,
-                           refine_anchors,
-                           img_metas,
-                           is_train=True):
-        num_levels = len(featmap_sizes)
-
-        refine_anchors_list = []
-        for img_id, img_meta in enumerate(img_metas):
-            mlvl_refine_anchors = []
-            for i in range(num_levels):
-                refine_anchor = refine_anchors[i][img_id].reshape(-1, 5)
-                mlvl_refine_anchors.append(refine_anchor)
-            refine_anchors_list.append(mlvl_refine_anchors)
-
-        valid_flag_list = []
-        if is_train:
-            for img_id, img_meta in enumerate(img_metas):
-                multi_level_flags = []
-                for i in range(num_levels):
-                    anchor_stride = self.anchor_strides[i]
-                    feat_h, feat_w = featmap_sizes[i]
-                    w,h = img_meta['pad_shape'][:2]
-                    valid_feat_h = min(int(np.ceil(h / anchor_stride)), feat_h)
-                    valid_feat_w = min(int(np.ceil(w / anchor_stride)), feat_w)
-                    flags = self.anchor_generators[i].valid_flags((feat_h, feat_w), (valid_feat_h, valid_feat_w))
-                    multi_level_flags.append(flags)
-                valid_flag_list.append(multi_level_flags)
-        return refine_anchors_list, valid_flag_list
-
     def loss(self,
              cls_scores,
              bbox_preds,
+             angle_clses,
              gt_bboxes,
              gt_labels,
              img_metas,
@@ -240,9 +219,8 @@ class CSLRRetinaHead(nn.Module):
             concat_anchor_list.append(jt.contrib.concat(anchor_list[i]))
         all_anchor_list = images_to_levels(concat_anchor_list,num_level_anchors)
 
-        # Feature Alignment Module
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
-        cls_reg_targets = anchor_target(
+        cls_reg_targets = self.anchor_target(
             anchor_list,
             valid_flag_list,
             gt_bboxes,
@@ -256,33 +234,40 @@ class CSLRRetinaHead(nn.Module):
             sampling=self.sampling)
         if cls_reg_targets is None:
             return None
-        labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,num_total_pos, num_total_neg = cls_reg_targets
+        labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,num_total_pos, num_total_neg, angle_targets_list, angle_weights_list = cls_reg_targets
         
         num_total_samples = num_total_pos + num_total_neg if self.sampling else num_total_pos
 
-        losses_cls, losses_bbox = multi_apply(
+        losses_cls, losses_bbox, losses_angle = multi_apply(
             self.loss_single,
             cls_scores,
             bbox_preds,
+            angle_clses,
             all_anchor_list,
             labels_list,
             label_weights_list,
             bbox_targets_list,
             bbox_weights_list,
+            angle_targets_list,
+            angle_weights_list,
             num_total_samples=num_total_samples,
             cfg=cfg)
 
         return dict(loss_cls=losses_cls,
-                    loss_bbox=losses_bbox)
+                    loss_bbox=losses_bbox,
+                    loss_angle=losses_angle)
 
     def loss_single(self,
                         cls_score,
                         bbox_pred,
+                        angle_cls,
                         anchors,
                         labels,
                         label_weights,
                         bbox_targets,
                         bbox_weights,
+                        angle_targets,
+                        angle_weights,
                         num_total_samples,
                         cfg):
         # classification loss
@@ -313,11 +298,23 @@ class CSLRRetinaHead(nn.Module):
             bbox_targets,
             bbox_weights,
             avg_factor=num_total_samples)
-        return loss_cls, loss_bbox
+
+        angle_cls = angle_cls.permute(0, 2, 3, 1).reshape(-1, self.coding_len)
+        angle_targets = angle_targets.reshape(-1, self.coding_len)
+        angle_weights = angle_weights.reshape(-1, 1)
+
+        loss_angle = self.loss_angle(
+            angle_cls,
+            angle_targets,
+            weight=angle_weights,
+            avg_factor=num_total_samples)
+        
+        return loss_cls, loss_bbox, loss_angle
 
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
+                   angle_clses,
                    img_metas,
                    rescale=True):
         assert len(cls_scores) == len(bbox_preds)
@@ -335,9 +332,12 @@ class CSLRRetinaHead(nn.Module):
             bbox_pred_list = [
                 bbox_preds[i][img_id].detach() for i in range(num_levels)
             ]
+            angle_cls_list = [
+                angle_clses[i][img_id].detach() for i in range(num_levels)
+            ]
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
-            proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list, 
+            proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list, angle_cls_list,
                                                anchor_list[img_id], img_shape,
                                                scale_factor, cfg, rescale)
 
@@ -347,6 +347,7 @@ class CSLRRetinaHead(nn.Module):
     def get_bboxes_single(self,
                           cls_score_list,
                           bbox_pred_list,
+                          angle_cls_list,
                           mlvl_anchors,
                           img_shape,
                           scale_factor,
@@ -358,8 +359,8 @@ class CSLRRetinaHead(nn.Module):
         assert len(cls_score_list) == len(bbox_pred_list) == len(mlvl_anchors)
         mlvl_bboxes = []
         mlvl_scores = []
-        for cls_score, bbox_pred, anchors in zip(cls_score_list,
-                                                 bbox_pred_list, mlvl_anchors):
+        for cls_score, bbox_pred, angle_cls, anchors in zip(cls_score_list,
+                                                 bbox_pred_list, angle_cls_list, mlvl_anchors):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             cls_score = cls_score.permute(
                 1, 2, 0).reshape(-1, self.cls_out_channels)
@@ -370,6 +371,10 @@ class CSLRRetinaHead(nn.Module):
                 scores = cls_score.softmax(-1)
 
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 5)
+
+            angle_cls = angle_cls.permute(1, 2, 0).reshape(
+                -1, self.coding_len).sigmoid()
+
             # anchors = rect2rbox(anchors)
             nms_pre = cfg.get('nms_pre', -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:
@@ -382,6 +387,11 @@ class CSLRRetinaHead(nn.Module):
                 anchors = anchors[topk_inds, :]
                 bbox_pred = bbox_pred[topk_inds, :]
                 scores = scores[topk_inds, :]
+                angle_cls = angle_cls[topk_inds, :]
+
+            # Angle decoder
+            angle_pred = self.angle_coder.decode(angle_cls)
+            bbox_pred[..., -1] = angle_pred
             bboxes = delta2bbox_rotated(anchors, bbox_pred, self.target_means,
                                         self.target_stds, img_shape)
             mlvl_bboxes.append(bboxes)
@@ -431,27 +441,162 @@ class CSLRRetinaHead(nn.Module):
         else:
             return self.get_bboxes(*outs,self.parse_targets(targets,is_train=False))
 
-def bbox_decode(
-        bbox_preds,
-        anchors,
-        means=[0, 0, 0, 0, 0],
-        stds=[1, 1, 1, 1, 1]):
-    """
-    Decode bboxes from deltas
-    :param bbox_preds: [N,5,H,W]
-    :param anchors: [H*W,5]
-    :param means: mean value to decode bbox
-    :param stds: std value to decode bbox
-    :return: [N,H,W,5]
-    """
-    num_imgs, _, H, W = bbox_preds.shape
-    bboxes_list = []
-    for img_id in range(num_imgs):
-        bbox_pred = bbox_preds[img_id]
-        # bbox_pred.shape=[5,H,W]
-        bbox_delta = bbox_pred.permute(1, 2, 0).reshape(-1, 5)
-        bboxes = delta2bbox_rotated(
-            anchors, bbox_delta, means, stds, wh_ratio_clip=1e-6)
-        bboxes = bboxes.reshape(H, W, 5)
-        bboxes_list.append(bboxes)
-    return jt.stack(bboxes_list, dim=0)
+    def anchor_target(self, 
+                    anchor_list,
+                    valid_flag_list,
+                    gt_bboxes_list,
+                    img_metas,
+                    target_means,
+                    target_stds,
+                    cfg,
+                    gt_bboxes_ignore_list=None,
+                    gt_labels_list=None,
+                    label_channels=1,
+                    sampling=True,
+                    unmap_outputs=True):
+        """Compute regression and classification targets for anchors.
+
+        Args:
+            anchor_list (list[list]): Multi level anchors of each image.
+            valid_flag_list (list[list]): Multi level valid flags of each image.
+            gt_bboxes_list (list[Tensor]): Ground truth bboxes of each image.
+            img_metas (list[dict]): Meta info of each image.
+            target_means (Iterable): Mean value of regression targets.
+            target_stds (Iterable): Std value of regression targets.
+            cfg (dict): RPN train configs.
+
+        Returns:
+            tuple
+        """
+        num_imgs = len(img_metas)
+        assert len(anchor_list) == len(valid_flag_list) == num_imgs
+
+        # anchor number of multi levels
+        num_level_anchors = [anchors.size(0) for anchors in anchor_list[0]]
+        # concat all level anchors and flags to a single tensor
+        for i in range(num_imgs):
+            assert len(anchor_list[i]) == len(valid_flag_list[i])
+            anchor_list[i] = jt.contrib.concat(anchor_list[i])
+            valid_flag_list[i] = jt.contrib.concat(valid_flag_list[i])
+
+        # compute targets for each image
+        if gt_bboxes_ignore_list is None:
+            gt_bboxes_ignore_list = [None for _ in range(num_imgs)]
+        if gt_labels_list is None:
+            gt_labels_list = [None for _ in range(num_imgs)]
+        (all_labels, all_label_weights, all_bbox_targets, all_bbox_weights,
+        pos_inds_list, neg_inds_list, all_angle_targets, all_angle_weights) = multi_apply(
+            self.anchor_target_single,
+            anchor_list,
+            valid_flag_list,
+            gt_bboxes_list,
+            gt_bboxes_ignore_list,
+            gt_labels_list,
+            img_metas,
+            target_means=target_means,
+            target_stds=target_stds,
+            cfg=cfg,
+            label_channels=label_channels,
+            sampling=sampling,
+            unmap_outputs=unmap_outputs)
+        # no valid anchors
+        if any([labels is None for labels in all_labels]):
+            return None
+        # sampled anchors of all images
+        num_total_pos = sum([max(inds.numel(), 1) for inds in pos_inds_list])
+        num_total_neg = sum([max(inds.numel(), 1) for inds in neg_inds_list])
+        # split targets to a list w.r.t. multiple levels
+        labels_list = images_to_levels(all_labels, num_level_anchors)
+        label_weights_list = images_to_levels(all_label_weights, num_level_anchors)
+        bbox_targets_list = images_to_levels(all_bbox_targets, num_level_anchors)
+        bbox_weights_list = images_to_levels(all_bbox_weights, num_level_anchors)
+        angle_targets_list = images_to_levels(all_angle_targets, num_level_anchors)
+        angle_weights_list = images_to_levels(all_angle_weights, num_level_anchors)
+
+        return (labels_list, label_weights_list, bbox_targets_list,
+                bbox_weights_list, num_total_pos, num_total_neg, angle_targets_list, angle_weights_list)
+
+    def anchor_target_single(self,
+                            flat_anchors,
+                            valid_flags,
+                            gt_bboxes,
+                            gt_bboxes_ignore,
+                            gt_labels,
+                            img_meta,
+                            target_means,
+                            target_stds,
+                            cfg=None,
+                            label_channels=1,
+                            sampling=True,
+                            unmap_outputs=True):
+        bbox_coder_cfg = cfg.get('bbox_coder', '')
+        if bbox_coder_cfg == '':
+            bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
+        bbox_coder = build_from_cfg(bbox_coder_cfg, BOXES)
+        # Set True to use IoULoss
+        reg_decoded_bbox = cfg.get('reg_decoded_bbox', False)
+
+        inside_flags = anchor_inside_flags(flat_anchors, valid_flags,
+                                        img_meta['img_shape'][:2],
+                                        cfg.get('allowed_border', -1))
+        if not inside_flags.any(0):
+            return (None,) * 6
+        # assign gt and sample anchors
+        anchors = flat_anchors[inside_flags, :]
+
+        if sampling:
+            assign_result, sampling_result = assign_and_sample(
+                anchors, gt_bboxes, gt_bboxes_ignore, None, cfg)
+        else:
+            bbox_assigner = build_from_cfg(cfg.get('assigner', ''), BOXES)
+            assign_result = bbox_assigner.assign(anchors, gt_bboxes,
+                                                gt_bboxes_ignore, gt_labels)
+            bbox_sampler = PseudoSampler()
+            sampling_result = bbox_sampler.sample(assign_result, anchors,
+                                                gt_bboxes)
+
+        num_valid_anchors = anchors.shape[0]
+        bbox_targets = jt.zeros_like(anchors)
+        bbox_weights = jt.zeros_like(anchors)
+        angle_targets = jt.zeros_like(bbox_targets[:, 4:5])
+        angle_weights = jt.zeros_like(bbox_targets[:, 4:5])
+        labels = jt.zeros(num_valid_anchors).int()
+        label_weights = jt.zeros(num_valid_anchors).float()
+        pos_inds = sampling_result.pos_inds
+        neg_inds = sampling_result.neg_inds
+        if len(pos_inds) > 0:
+            if not reg_decoded_bbox:
+                pos_bbox_targets = bbox_coder.encode(sampling_result.pos_bboxes,
+                                                    sampling_result.pos_gt_bboxes)
+            else:
+                pos_bbox_targets = sampling_result.pos_gt_bboxes
+            bbox_targets[pos_inds, :] = pos_bbox_targets.cast(bbox_targets.dtype)
+            bbox_weights[pos_inds, :] = 1.0
+
+            angle_targets[pos_inds, :] = pos_bbox_targets[:, 4:5]
+            # Angle encoder
+            angle_targets = self.angle_coder.encode(angle_targets)
+            angle_weights[pos_inds, :] = 1.0
+
+            if gt_labels is None:
+                labels[pos_inds] = 1
+            else:
+                labels[pos_inds] = gt_labels[sampling_result.pos_assigned_gt_inds]
+            if cfg.pos_weight <= 0:
+                label_weights[pos_inds] = 1.0
+            else:
+                label_weights[pos_inds] = cfg.get('pos_weight', -1)
+        if len(neg_inds) > 0:
+            label_weights[neg_inds] = 1.0
+
+        # map up to original set of anchors
+        if unmap_outputs:
+            num_total_anchors = flat_anchors.size(0)
+            labels = unmap(labels, num_total_anchors, inside_flags)
+            label_weights = unmap(label_weights, num_total_anchors, inside_flags)
+            bbox_targets = unmap(bbox_targets, num_total_anchors, inside_flags)
+            bbox_weights = unmap(bbox_weights, num_total_anchors, inside_flags)
+            angle_targets = unmap(angle_targets, num_total_anchors, inside_flags)
+            angle_weights = unmap(angle_weights, num_total_anchors, inside_flags)
+        return (labels, label_weights, bbox_targets, bbox_weights, pos_inds,
+                neg_inds, angle_targets, angle_weights)

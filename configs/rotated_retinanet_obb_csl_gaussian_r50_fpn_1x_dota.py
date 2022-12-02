@@ -33,6 +33,11 @@ model = dict(
             loss_weight=1.0),
         loss_bbox=dict(
             type='L1Loss', loss_weight=1.0),
+        angle_coder=dict(
+            type='CSLCoder',
+            omega=4,
+            window='gaussian',
+            radius=3),
         loss_angle=dict(
             type='SmoothFocalLoss', gamma=2.0, alpha=0.25, loss_weight=0.8),
         test_cfg=dict(
@@ -61,15 +66,14 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/lustre/home/acct-seejx/seejx-user1/main/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5, direction="horizontal"),
-            dict(type='RotatedRandomFlip', prob=0.5, direction="vertical"),
+            dict(type='RotatedRandomFlip', prob=0.5),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -87,7 +91,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        dataset_dir='/lustre/home/acct-seejx/seejx-user1/main/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -109,7 +113,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images',
+        images_dir='/lustre/home/acct-seejx/seejx-user1/main/datasets/processed_DOTA/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -154,13 +158,3 @@ max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
-
-# model = dict(
-#     bbox_head=dict(
-#         type='CSLRRetinaHead',
-        # angle_coder=dict(
-        #     type='CSLCoder',
-        #     angle_version=angle_version,
-        #     omega=4,
-        #     window='gaussian',
-        #     radius=3),
