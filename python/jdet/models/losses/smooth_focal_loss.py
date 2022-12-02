@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import jittor as jt
 from jittor import nn
 from .focal_loss import binary_cross_entropy_with_logits
@@ -6,7 +7,6 @@ from jdet.utils.registry import LOSSES
 
 def smooth_focal_loss(pred,
                       target,
-                      weight=None,
                       gamma=2.0,
                       alpha=0.25,
                       reduction='mean',
@@ -17,7 +17,7 @@ def smooth_focal_loss(pred,
     focal_weight = (alpha * target + (1 - alpha) *
                     (1 - target)) * pt.pow(gamma)
     loss = binary_cross_entropy_with_logits(pred, 
-        target, weight, reduction="none") * focal_weight
+        target, weight=None, reduction="none") * focal_weight
 
     if reduction == "mean":
         loss = loss.sum()/avg_factor
@@ -51,11 +51,19 @@ class SmoothFocalLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
+        if (weight is not None) and (not jt.any(weight > 0)) and (reduction != 'none'):
+            mask = (weight > 0).detach()
+            return (pred[mask] * weight[mask].reshape(-1, 1)).sum()
+        if weight is not None and weight.ndim > 1:
+            weight = weight.mean(-1)
+    
+        mask = (weight > 0)
+        pred = pred[mask]
+        target = target[mask]
 
         loss_cls = self.loss_weight * smooth_focal_loss(
             pred,
             target,
-            weight,
             gamma=self.gamma,
             alpha=self.alpha,
             reduction=reduction,
