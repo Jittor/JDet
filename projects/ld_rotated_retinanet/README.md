@@ -26,8 +26,8 @@ python run_net.py --config-file=configs/ld_rotated_retinanet_obb_r18_r50_fpn_1x_
 
 #### Rotated-RetinaNet-obb-R18-FPN-1x, train set: DOTA-1.0 train, test set: DOTA-1.0 val.
 
-|    Method     | Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | AP | AP50 | AP75 | Config     | Download   |
-| :-----------: | :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
-| Original |600/150| flip|-|  SGD   |   1x    | 37.6 | 67.2 | 33.8 | [config](configs/rotated_retinanet_obb_r18_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/5b7825e148024e38b57d/?dl=1) |
-| box distribution | 600/150| flip|-|  SGD   |   1x    | 38.1 | 68.5 | 34.0 | [config](configs/rotated_retinanet_obb_distribution_r18_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/43000d3adc1349138632/?dl=1) |
-| LD + KD | 600/150| flip|-|  SGD   |   1x    | 39.6 | 69.8 | 36.2 | [config](configs/ld_rotated_retinanet_obb_r18_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/0f3f65c1e7b5401cb5b3/?dl=1) |
+|    Method     | Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | AP50 | Config     | Download   |
+| :-----------: | :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: | :--------: |
+| Original |600/150| flip|-|  SGD   |   1x    | 67.2 | [config](configs/rotated_retinanet_obb_r18_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/5b7825e148024e38b57d/?dl=1) |
+| box distribution | 600/150| flip|-|  SGD   |   1x    | 68.5 | [config](configs/rotated_retinanet_obb_distribution_r18_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/43000d3adc1349138632/?dl=1) |
+| LD + KD | 600/150| flip|-|  SGD   |   1x    | 69.8 | [config](configs/ld_rotated_retinanet_obb_r18_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/0f3f65c1e7b5401cb5b3/?dl=1) |
