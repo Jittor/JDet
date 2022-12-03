@@ -8,3 +8,5 @@ from .gaussian_dist_loss import GDLoss
 from .gaussian_dist_loss_v1 import GDLoss_v1
 from .iou_loss import IoULoss
 from .h2rbox_loss import H2RBoxLoss
+from .kd_loss import KnowledgeDistillationKLDivLoss
+from .kd_loss import IMLoss
