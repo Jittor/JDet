@@ -119,29 +119,23 @@ class DOTADataset(CustomDataset):
         dets = np.concatenate(dets)
         gts = np.concatenate(gts)
         aps = {}
-        AP = np.zeros(11)
-        for iii in range(10):
-
-            for i,classname in tqdm(enumerate(self.CLASSES),total=len(self.CLASSES)):
-                c_dets = dets[dets[:,-1]==(i+1)][:,:-1]
-                c_gts = gts[gts[:,-1]==(i+1)][:,:-1]
-                img_idx = gts[:,0].copy()
-                classname_gts = {}
-                for idx in np.unique(img_idx):
-                    g = c_gts[c_gts[:,0]==idx,:][:,1:]
-                    dg = diffcult_polys[idx].copy().reshape(-1,8)
-                    diffculty = np.zeros(g.shape[0]+dg.shape[0])
-                    diffculty[int(g.shape[0]):]=1
-                    diffculty = diffculty.astype(bool)
-                    g = np.concatenate([g,dg])
-                    classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
-                rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly,ovthresh=0.95-0.05*iii)
-                aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
-            map = sum(list(aps.values()))/len(aps)
-            AP[iii]=map
-        AP[10] = np.mean(AP[:10])
-        print('Evaluation Results: AP95, AP90, AP85, AP80, AP75, AP70, AP65, AP60, AP55, AP50, AP')
-        print(AP)
+        for i,classname in tqdm(enumerate(self.CLASSES),total=len(self.CLASSES)):
+            c_dets = dets[dets[:,-1]==(i+1)][:,:-1]
+            c_gts = gts[gts[:,-1]==(i+1)][:,:-1]
+            img_idx = gts[:,0].copy()
+            classname_gts = {}
+            for idx in np.unique(img_idx):
+                g = c_gts[c_gts[:,0]==idx,:][:,1:]
+                dg = diffcult_polys[idx].copy().reshape(-1,8)
+                diffculty = np.zeros(g.shape[0]+dg.shape[0])
+                diffculty[int(g.shape[0]):]=1
+                diffculty = diffculty.astype(bool)
+                g = np.concatenate([g,dg])
+                classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
+            rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly)
+            aps["eval/"+str(i+1)+"_"+classname+"_AP"]=ap 
+        map = sum(list(aps.values()))/len(aps)
+        aps["eval/0_meanAP"]=map
         return aps
             
             
