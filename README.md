@@ -142,6 +142,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: KLD
 - :heavy_check_mark: H2RBox
 - :heavy_check_mark: KFIoU
+- :heavy_check_mark: Localization Distillation
 - :clock3: ReDet
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
