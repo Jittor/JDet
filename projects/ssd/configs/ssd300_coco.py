@@ -55,8 +55,8 @@ model = dict(
 dataset = dict(
     train=dict(
         type="COCODataset",
-        anno_file='/mnt/disk/flowey/dataset/coco/annotations/instances_train2017.json',
-        root='/mnt/disk/flowey/dataset/coco/images/train2017/',
+        anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_train2017.json',
+        root='/mnt/disk/lxl/dataset/coco/images/train2017/',
         transforms=[
             dict(
                 type='PhotoMetricDistortion',
@@ -92,8 +92,8 @@ dataset = dict(
     ),
     val=dict(
         type="COCODataset",
-        anno_file='/mnt/disk/flowey/dataset/coco/annotations/instances_val2017.json',
-        root='/mnt/disk/flowey/dataset/coco/images/val2017/',
+        anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json',
+        root='/mnt/disk/lxl/dataset/coco/images/val2017/',
         transforms=[
             dict(
                 type="Resize_keep_ratio",
@@ -112,8 +112,8 @@ dataset = dict(
     ),
     test=dict(
         type="COCODataset",
-        anno_file='/mnt/disk/flowey/dataset/coco/annotations/instances_val2017.json',
-        root='/mnt/disk/flowey/dataset/coco/images/val2017/',
+        anno_file='/mnt/disk/lxl/dataset/coco/annotations/instances_val2017.json',
+        root='/mnt/disk/lxl/dataset/coco/images/val2017/',
         transforms=[
             dict(
                 type="Resize_keep_ratio",

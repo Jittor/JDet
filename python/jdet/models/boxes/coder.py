@@ -157,13 +157,17 @@ class GVFixCoder:
         hbboxes = jt.stack([min_x, min_y, max_x, max_y], dim=1)
 
         polys = polys.view(-1, 4, 2)
-        num_polys = polys.size(0)
-        polys_ordered = jt.zeros_like(polys)
-        polys_ordered[:, 0] = polys[range(num_polys), min_y_idx]
-        polys_ordered[:, 1] = polys[range(num_polys), max_x_idx]
-        polys_ordered[:, 2] = polys[range(num_polys), max_y_idx]
-        polys_ordered[:, 3] = polys[range(num_polys), min_x_idx]
+        # num_polys = polys.size(0)
+        # polys_ordered = jt.zeros_like(polys)
+        # polys_ordered[:, 0] = polys[range(num_polys), min_y_idx]
+        # polys_ordered[:, 1] = polys[range(num_polys), max_x_idx]
+        # polys_ordered[:, 2] = polys[range(num_polys), max_y_idx]
+        # polys_ordered[:, 3] = polys[range(num_polys), min_x_idx]
 
+        ordered_index = jt.stack([min_y_idx, max_x_idx, max_y_idx, min_x_idx], dim=1)
+        ordered_index = jt.unsqueeze(ordered_index, -1)
+        ordered_index = jt.broadcast(ordered_index, polys.shape)
+        polys_ordered = jt.gather(polys, dim=1, index=ordered_index)
         t_x = polys_ordered[:, 0, 0]
         r_y = polys_ordered[:, 1, 1]
         d_x = polys_ordered[:, 2, 0]

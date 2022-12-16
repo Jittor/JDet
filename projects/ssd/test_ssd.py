@@ -29,6 +29,7 @@ def main():
     model.train()
 
     if (args.set_data):
+        model.save("test_datas_ssd/init_pretrained.pk_jt.pk")
         train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
         imagess = []
         targetss = []
@@ -62,6 +63,7 @@ def main():
         print(std_roi_cls_losses)
         print(std_roi_loc_losses)
     else:
+        model.load("test_datas_ssd/init_pretrained.pk_jt.pk")
         data = pk.load(open("test_datas_ssd/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
