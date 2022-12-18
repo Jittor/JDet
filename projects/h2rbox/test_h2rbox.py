@@ -17,7 +17,7 @@ def main():
 
     jt.flags.use_cuda=1
     jt.set_global_seed(666)
-    init_cfg("projects/h2rbox/configs/h2rbox_test.py")
+    init_cfg("configs/h2rbox_test.py")
     cfg = get_cfg()
 
     model = build_from_cfg(cfg.model,MODELS)
@@ -64,8 +64,8 @@ def main():
             c_l = correct_loss[batch_idx]
             err_rate = abs(c_l-l)/min(c_l,l)
             print(f"correct loss is {c_l:.4f}, runtime loss is {l:.4f}, err rate is {err_rate*100:.2f}%")
-            assert err_rate<1e-3,"LOSS is not correct, please check it"
-        print(f"Loss is correct with err_rate<{1e-3}")
+            assert err_rate<1e-2,"LOSS is not correct, please check it"
+        print(f"Loss is correct with err_rate<{1e-2}")
     print("success!")
     
 if __name__ == "__main__":

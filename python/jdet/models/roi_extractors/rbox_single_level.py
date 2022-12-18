@@ -78,13 +78,13 @@ class RboxSingleRoIExtractor(nn.Module):
         num_levels = len(feats)
         target_lvls = self.map_roi_levels(rois, num_levels)
         if isinstance(out_size, int):
-            roi_feats = jt.zeros(shape=(rois.shape[0], self.out_channels,
+            roi_feats = jt.zeros((rois.shape[0], self.out_channels,
                                     out_size, out_size), dtype="float32")
         elif isinstance(out_size, tuple):
             assert len(out_size) == 2
             assert isinstance(out_size[0], int)
             assert isinstance(out_size[1], int)
-            roi_feats = jt.zeros(shape=(rois.shape[0], self.out_channels,
+            roi_feats = jt.zeros((rois.shape[0], self.out_channels,
                                     out_size[0], out_size[1]), dtype="float32")
 
         for i in range(num_levels):

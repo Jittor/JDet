@@ -25,6 +25,7 @@ def main():
 
     model.train()
     if (args.set_data):
+        model.save("test_datas_s2anet/init_pretrained.pk_jt.pk")
         imagess = []
         targetss = []
         correct_loss = []
@@ -49,6 +50,7 @@ def main():
         pk.dump(data, open("test_datas_s2anet/test_data.pk", "wb"))
         print(correct_loss)
     else:
+        model.load("test_datas_s2anet/init_pretrained.pk_jt.pk")
         data = pk.load(open("test_datas_s2anet/test_data.pk", "rb"))
         imagess = jdet.utils.general.to_jt_var(data["imagess"])
         targetss = jdet.utils.general.to_jt_var(data["targetss"])

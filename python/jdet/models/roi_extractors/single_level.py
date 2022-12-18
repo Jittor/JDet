@@ -74,7 +74,7 @@ class SingleRoIExtractor(nn.Module):
         out_size = self.roi_layers[0].output_size[0]            #not sure
         num_levels = len(feats)
         target_lvls = self.map_roi_levels(rois, num_levels)
-        roi_feats = jt.zeros(shape=(rois.shape[0], self.out_channels,
+        roi_feats = jt.zeros((rois.shape[0], self.out_channels,
                                             out_size, out_size), dtype="float32")
         for i in range(num_levels):
             inds = target_lvls == i
