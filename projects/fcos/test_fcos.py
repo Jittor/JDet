@@ -69,7 +69,7 @@ def main():
             err_rate = abs(c_l-l)/min(c_l,l)
             print(f"correct loss is {c_l:.4f}, runtime loss is {l:.4f}, err rate is {err_rate*100:.2f}%")
             assert err_rate<0.1,"LOSS is not correct, please check it"
-        print(f"Loss is correct with err_rate<{1e-3}")
+        print(f"Loss is correct with err_rate<{0.1}")
     print("success!")
     
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ model = dict(
     backbone=dict(
         type='SSD_VGG16',
         input_size=input_size,
-        pretrained='test_datas_ssd/vgg16_caffe.pkl'),
+    ),
     neck=dict(
         type='SSDNeck',
         in_channels=(512, 1024),
