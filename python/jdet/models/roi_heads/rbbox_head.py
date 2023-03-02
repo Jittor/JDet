@@ -220,7 +220,7 @@ class BBoxHeadRbbox(nn.Module):
     def init_weights(self):
         if self.with_cls:
 #            nn.init.normal_(self.fc_cls.weight, 0, 0.01)
-            nn.init.gauss_(self.fc_cls,0, 0.01)
+            nn.init.gauss_(self.fc_cls.weight,0, 0.01)
             nn.init.constant_(self.fc_cls.bias, 0)
         if self.with_reg:
 #            nn.init.normal_(self.fc_reg.weight, 0, 0.001)

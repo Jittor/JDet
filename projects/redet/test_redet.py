@@ -3,10 +3,32 @@ import jittor as jt
 from jdet.config import init_cfg, get_cfg
 from jdet.utils.general import parse_losses
 from jdet.utils.registry import build_from_cfg,MODELS,SCHEDULERS,DATASETS,HOOKS,OPTIMS
-import models
 import argparse
 import os
 import pickle as pk
+import numpy as np
+import random
+
+def fake_argsort(x, dim=0, descending=False):
+    return jt.index(x)[0], x
+
+def fake_argsort2(x, dim=0, descending=False):
+    x_ = x.data
+    if (descending):
+        x__ = -x_
+    else:
+        x__ = x_
+    index_ = np.argsort(x__, axis=dim, kind="stable")
+    y_ = x_[index_]
+    index = jt.array(index_)
+    y = jt.array(y_)
+    return index, y
+
+def fake_sort2(x):
+    x_ = x.data
+    y_ = np.sort(x_, kind="stable")
+    y = jt.array(y_)
+    return y
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor Object Detection Training")
@@ -16,14 +38,17 @@ def main():
     )
     args = parser.parse_args()
 
+    jt.sort = fake_sort2
+    jt.argsort = fake_argsort2
     jt.flags.use_cuda=1
-    jt.set_global_seed(666)
-    init_cfg("configs/retinanet_test.py")
+    jt.set_global_seed(223)
+    np.random.seed(0)
+    random.seed(0)
+    init_cfg("configs/ReDet_re50_refpn_1x_dota1_test.py")
     cfg = get_cfg()
 
     iter = 0
     model = build_from_cfg(cfg.model,MODELS)
-    model.load(cfg.pretrained_weights)
     if (cfg.parameter_groups_generator):
         params = build_from_cfg(cfg.parameter_groups_generator,MODELS,named_params=model.named_parameters(), model=model)
     else:
@@ -33,63 +58,53 @@ def main():
     model.train()
 
     if (args.set_data):
+        os.makedirs("test_datas_redet",exist_ok=True)
+        model.save("test_datas_redet/init_pretrained.pk_jt.pk")
+
         imagess = []
         targetss = []
-        std_roi_cls_losses = []
-        std_roi_loc_losses = []
+        loss_list = []
 
         train_dataset = build_from_cfg(cfg.dataset.train,DATASETS,drop_last=jt.in_mpi) if cfg.dataset.train else None
         for batch_idx,(images,targets) in enumerate(train_dataset):
-            print(batch_idx)
+            print("batch_idx=" + str(batch_idx))
             imagess.append(jdet.utils.general.sync(images))
             targetss.append(jdet.utils.general.sync(targets))
-            # print(targets)
-            # print(jdet.utils.general.sync(targets))
 
             losses = model(images,targets)
-            l1 = losses["roi_cls_loss"].data[0]
-            std_roi_cls_losses.append(l1)
-            l2 = losses["roi_loc_loss"].data[0]
-            std_roi_loc_losses.append(l2)
+            all_loss,losses = parse_losses(losses)
+            loss_list.append(all_loss.item())
             if (batch_idx > 10):
                 break
-            all_loss,losses = parse_losses(losses)
             optimizer.step(all_loss)
             scheduler.step(iter,0,by_epoch=True)
             iter+=1
         data = {
             "imagess": imagess,
             "targetss": targetss,
-            "std_roi_cls_losses": std_roi_cls_losses,
-            "std_roi_loc_losses": std_roi_loc_losses
-        }
-        if (not os.path.exists("test_datas_retinanet")):
-            os.makedirs("test_datas_retinanet")
-        pk.dump(data, open("test_datas_retinanet/test_data.pk", "wb"))
-        print(std_roi_cls_losses)
-        print(std_roi_loc_losses)
+            "losses" : loss_list
+        }            
+        pk.dump(data, open("test_datas_redet/test_data.pk", "wb"))
+        print(loss_list)
     else:
-        data = pk.load(open("test_datas_retinanet/test_data.pk", "rb"))
-        imagess = jdet.utils.general.to_jt_var(data["imagess"])
+        model.load("test_datas_redet/init_pretrained.pk_jt.pk")
+        data = pk.load(open("test_datas_redet/test_data.pk", "rb"))
         targetss = jdet.utils.general.to_jt_var(data["targetss"])
-        std_roi_cls_losses = data["std_roi_cls_losses"]
-        std_roi_loc_losses = data["std_roi_loc_losses"]
-        # std_roi_cls_losses = [1.1452212, 1.1484368, 1.1538603, 1.1621443, 1.1542724, 1.1430459, 1.1834915, 1.1830766, 1.5154903, 1.1654731, 1.1685958, 1.1577367]
-        # std_roi_loc_losses = [0.17455772, 0.3866686, 0.2991456, 0.232427, 0.2683379, 0.33200195, 0.39404622, 0.39015254, 0.23770154, 0.3625164, 0.3487473, 0.3281753]
+        imagess = jdet.utils.general.to_jt_var(data["imagess"])
+        loss_list = data["losses"]
+        thr = 0.2
         for batch_idx in range(len(imagess)):
             images = imagess[batch_idx]
             targets = targetss[batch_idx]
 
             losses = model(images,targets)
-            l1 = losses["roi_cls_loss"].data[0]
-            s_l1 = std_roi_cls_losses[batch_idx]
-            l2 = losses["roi_loc_loss"].data[0]
-            s_l2 = std_roi_loc_losses[batch_idx]
-            print(abs(l1 - s_l1) / abs(s_l1), abs(l2 - s_l2) / abs(s_l2))
-            # TODO(514flowey): modify err thr from 1e-3 to 0.1. Try to Fix it.
-            assert(abs(l1 - s_l1) / abs(s_l1) < 0.1)
-            assert(abs(l2 - s_l2) / abs(s_l2) < 0.1)
             all_loss,losses = parse_losses(losses)
+            jt.sync_all(True)
+            l = all_loss.item()
+            c_l = loss_list[batch_idx]
+            err_rate = float(abs(c_l - l)/c_l)
+            print(f"correct loss is {float(c_l):.4f}, runtime loss is {float(l):.4f}, err rate is {err_rate*100:.2f}%")
+            assert err_rate<thr,f"LOSS is not correct, please check it"
             optimizer.step(all_loss)
             scheduler.step(iter,0,by_epoch=True)
             iter+=1

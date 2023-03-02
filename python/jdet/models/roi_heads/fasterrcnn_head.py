@@ -1,4 +1,5 @@
 from __future__ import division
+from lib2to3.pgen2.token import tok_name
 
 import numpy as np
 import jittor as jt
@@ -323,5 +324,77 @@ class FasterrcnnHead(AnchorHead):
             scores = proposals[:, 4]
             num = min(cfg['max_num'], proposals.shape[0])
             _, topk_inds = scores.topk(num)
+            proposals = proposals[topk_inds, :]
+        return proposals
+
+# Debug only.
+@HEADS.register_module()
+class FasterrcnnHeadFixed(FasterrcnnHead):
+    def __init__(self, no_sort1=True, no_sort2=True, no_nms1=True, no_nms2=True, **kwargs):
+        super(FasterrcnnHeadFixed, self).__init__(**kwargs)
+        self.no_sort1 = no_sort1
+        self.no_nms1 = no_nms1
+        self.no_sort2 = no_sort2
+        self.no_nms2 = no_nms2
+
+    def get_bboxes_single(self,
+                          cls_scores,
+                          bbox_preds,
+                          mlvl_anchors,
+                          img_shape,
+                          scale_factor,
+                          cfg,
+                          rescale=False):
+        mlvl_proposals = []
+        for idx in range(len(cls_scores)):
+            rpn_cls_score = cls_scores[idx]
+            rpn_bbox_pred = bbox_preds[idx]
+            assert rpn_cls_score.shape[-2:] == rpn_bbox_pred.shape[-2:]
+            anchors = mlvl_anchors[idx]
+            rpn_cls_score = rpn_cls_score.permute(1, 2, 0)
+            if self.use_sigmoid_cls:
+                rpn_cls_score = rpn_cls_score.reshape(-1)
+                scores = rpn_cls_score.sigmoid()
+            else:
+                rpn_cls_score = rpn_cls_score.reshape(-1, 2)
+                scores = rpn_cls_score.softmax(dim=1)[:, 1]
+            rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+            if cfg['nms_pre'] > 0 and scores.shape[0] > cfg['nms_pre']:
+                if self.no_sort1:
+                    topk_inds = jt.arange(cfg['nms_pre'])
+                else:
+                    _, topk_inds = scores.topk(cfg['nms_pre'])
+                rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
+                anchors = anchors[topk_inds, :]
+                scores = scores[topk_inds]
+            proposals = delta2bbox(anchors, rpn_bbox_pred, self.target_means,
+                                   self.target_stds, img_shape)
+            if cfg['min_bbox_size'] > 0:
+                w = proposals[:, 2] - proposals[:, 0] + 1
+                h = proposals[:, 3] - proposals[:, 1] + 1
+                valid_inds = jt.nonzero((w >= cfg['min_bbox_size']) &
+                                           (h >= cfg['min_bbox_size'])).squeeze()
+                proposals = proposals[valid_inds, :]
+                scores = scores[valid_inds]
+            proposals = jt.contrib.concat([proposals, scores.unsqueeze(-1)], dim=-1)
+            #proposals, _ = jt.nms(proposals, cfg.nms_thr)
+            if not self.no_nms1:
+                proposals_inds = jt.nms(proposals, cfg['nms_thr'])
+                proposals = proposals[proposals_inds]
+            proposals = proposals[:cfg['nms_post'], :]
+            mlvl_proposals.append(proposals)
+        proposals = jt.contrib.concat(mlvl_proposals, 0)
+        if cfg['nms_across_levels']:
+            #proposals, _ = jt.nms(proposals, cfg.nms_thr)
+            if not self.no_nms2:
+                proposals = jt.nms(proposals, cfg['nms_thr'])
+                proposals = proposals[:cfg['max_num'], :]
+        else:
+            scores = proposals[:, 4]
+            num = min(cfg['max_num'], proposals.shape[0])
+            if self.no_sort2:
+                topk_inds = jt.arange(num)
+            else:
+                _, topk_inds = scores.topk(num)
             proposals = proposals[topk_inds, :]
         return proposals

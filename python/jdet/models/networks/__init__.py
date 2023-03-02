@@ -11,4 +11,5 @@ from .fcos import FCOS
 from .yolo import *
 from .h2rbox import H2RBox
 from .kd_one_stage import KnowledgeDistillationSingleStageDetector
+from .redet import ReDet
 __all__ = []
