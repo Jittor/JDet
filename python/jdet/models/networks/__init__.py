@@ -1,6 +1,7 @@
 from .rcnn import RCNN
 from .retinanet import RetinaNet
 from .rotated_retinanet import RotatedRetinaNet
+from .r3det import R3Det
 from .s2anet import S2ANet
 from .gliding_vertex import GlidingVertex
 from .oriented_rcnn import OrientedRCNN
