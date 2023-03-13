@@ -14,14 +14,14 @@ model = dict(
         add_extra_convs="on_input",
         num_outs=5),
     bbox_head=dict(
-        type='CSLRRetinaHead',
+        type='RotatedATSSHead',
         num_classes=16,
         in_channels=256,
         feat_channels=256,
         stacked_convs=4,
         octave_base_scale=4,
-        scales_per_octave=3,
-        anchor_ratios=[1.0, 0.5, 2.0],
+        scales_per_octave=1,
+        anchor_ratios=[1.0],
         anchor_strides=[8, 16, 32, 64, 128],
         target_means=[.0, .0, .0, .0, .0],
         target_stds=[1.0, 1.0, 1.0, 1.0, 1.0],
@@ -33,13 +33,6 @@ model = dict(
             loss_weight=1.0),
         loss_bbox=dict(
             type='L1Loss', loss_weight=1.0),
-        angle_coder=dict(
-            type='CSLCoder',
-            omega=4,
-            window='gaussian',
-            radius=3),
-        loss_angle=dict(
-            type='SmoothFocalLoss', gamma=2.0, alpha=0.25, loss_weight=0.8),
         test_cfg=dict(
             nms_pre=2000,
             min_bbox_size=0,
@@ -48,11 +41,8 @@ model = dict(
             max_per_img=2000),
         train_cfg=dict(
                 assigner=dict(
-                    type='MaxIoUAssigner',
-                    pos_iou_thr=0.5,
-                    neg_iou_thr=0.4,
-                    min_pos_iou=0,
-                    ignore_iof_thr=-1,
+                    type='ATSSAssignerRbbox',
+                    topk=9,
                     iou_calculator=dict(type='BboxOverlaps2D_rotated')),
                 bbox_coder=dict(type='DeltaXYWHABBoxCoder',
                                 target_means=(0., 0., 0., 0., 0.),
@@ -66,15 +56,15 @@ model = dict(
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        images_dir='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/images/',
-        annotations_file='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5),
+            dict(type='RotatedRandomFlip', prob=0.5, direction="horizontal"),
+            # dict(type='RotatedRandomFlip', prob=0.5, direction="vertical"),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -92,8 +82,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        images_dir='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/images/',
-        annotations_file='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -115,7 +104,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/mnt/disk/flowey/dataset/DOTA_1024/test_split/images/',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type="RotatedResize",

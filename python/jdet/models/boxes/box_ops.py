@@ -721,3 +721,33 @@ def integral_angle(x, n):
     e=jt.Var.expand_as(e,y)
     p=jt.ops.multiply(y, e).sum(dim=1).reshape(-1)
     return p
+
+def points_in_rotated_boxes(points:jt.Var, rrects:jt.Var):
+    """check point inside rect
+
+    Args:
+        points (jt.Var): [n, 2], [x, y] for every point
+        rrects (jt.Var): [m, 5], [x_ctr, y_ctr, w, h, angle] for every rrect
+    Returns:
+        flags (jt.Var): [n, m], True for point inside rrect
+    """
+    offsets = points[:, None, :2] - rrects[None, :, :2]
+    offset_angles = jt.atan2(offsets[..., 1], offsets[..., 0])
+    offset_distances = offsets.sqr().sum(-1).sqrt()
+    delta_angles = offset_angles - rrects[None, :, 4]
+    delta_w = jt.abs(offset_distances * jt.cos(delta_angles))
+    delta_h = jt.abs(offset_distances * jt.sin(delta_angles))
+    flags = jt.logical_and(delta_w < rrects[None, :, 2] / 2, delta_h < rrects[None, :, 3] / 2)
+    return flags
+
+    # extend_points = jt.expand(jt.unsqueeze(points[:, :2], dim=1), (n_points, n_rrects, 2))
+    # extend_rrects = jt.expand(jt.unsqueeze(rrects[:, :5], dim=0), (n_points, n_rrects, 2))
+    # offsets = extend_points - extend_rrects[..., :2]
+    # offset_angles = jt.atan2(offsets[..., 1], offsets[..., 0])
+    # offset_distances = offsets.sqr().sum(-1).sqrt()
+    # delta_angles = offset_angles - extend_rrects[..., 4]
+    # delta_w = jt.abs(offset_distances * jt.cos(delta_angles))
+    # delta_h = jt.abs(offset_distances * jt.sin(delta_angles))
+    # flags = jt.logical_and(delta_w < extend_rrects[..., 2], delta_h < extend_rrects[..., 3])
+    # return flags
+

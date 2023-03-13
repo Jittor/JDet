@@ -1,6 +1,6 @@
 # model settings
 model = dict(
-    type='RotatedRetinaNet',
+    type='S2ANet',
     backbone=dict(
         type='Resnet50',
         frozen_stages=1,
@@ -14,32 +14,33 @@ model = dict(
         add_extra_convs="on_input",
         num_outs=5),
     bbox_head=dict(
-        type='CSLRRetinaHead',
+        type='S2ANetHead',
         num_classes=16,
         in_channels=256,
         feat_channels=256,
-        stacked_convs=4,
-        octave_base_scale=4,
-        scales_per_octave=3,
-        anchor_ratios=[1.0, 0.5, 2.0],
+        stacked_convs=2,
+        with_orconv=True,
+        anchor_ratios=[1.0],
         anchor_strides=[8, 16, 32, 64, 128],
+        anchor_scales=[4],
         target_means=[.0, .0, .0, .0, .0],
         target_stds=[1.0, 1.0, 1.0, 1.0, 1.0],
-        loss_cls=dict(
+        loss_fam_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(
-            type='L1Loss', loss_weight=1.0),
-        angle_coder=dict(
-            type='CSLCoder',
-            omega=4,
-            window='gaussian',
-            radius=3),
-        loss_angle=dict(
-            type='SmoothFocalLoss', gamma=2.0, alpha=0.25, loss_weight=0.8),
+        loss_fam_bbox=dict(
+            type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
+        loss_odm_cls=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2.0,
+            alpha=0.25,
+            loss_weight=1.0),
+        loss_odm_bbox=dict(
+            type='RIDetLoss', beta=1.0, loss_weight=1.0),
         test_cfg=dict(
             nms_pre=2000,
             min_bbox_size=0,
@@ -47,6 +48,7 @@ model = dict(
             nms=dict(type='nms_rotated', iou_thr=0.1),
             max_per_img=2000),
         train_cfg=dict(
+            fam_cfg=dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
                     pos_iou_thr=0.5,
@@ -60,14 +62,29 @@ model = dict(
                                 clip_border=True),
                 allowed_border=-1,
                 pos_weight=-1,
-                debug=False)
+                debug=False),
+            odm_cfg=dict(
+                assigner=dict(
+                    type='MaxIoUAssigner',
+                    pos_iou_thr=0.5,
+                    neg_iou_thr=0.4,
+                    min_pos_iou=0,
+                    ignore_iof_thr=-1,
+                    iou_calculator=dict(type='BboxOverlaps2D_rotated')),
+                bbox_coder=dict(type='DeltaXYWHABBoxCoder',
+                                target_means=(0., 0., 0., 0., 0.),
+                                target_stds=(1., 1., 1., 1., 1.),
+                                clip_border=True),
+                allowed_border=-1,
+                pos_weight=-1,
+                reg_decoded_bbox=True,
+                debug=False))
         )
     )
 dataset = dict(
     train=dict(
         type="DOTADataset",
-        images_dir='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/images/',
-        annotations_file='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -92,8 +109,7 @@ dataset = dict(
     ),
     val=dict(
         type="DOTADataset",
-        images_dir='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/images/',
-        annotations_file='/mnt/disk/flowey/dataset/DOTA_1024/trainval_split/trainval1024.pkl',
+        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -115,7 +131,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/mnt/disk/flowey/dataset/DOTA_1024/test_split/images/',
+        images_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/test_1024_200_1.0/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -156,6 +172,7 @@ scheduler = dict(
 logger = dict(
     type="RunLogger")
 
+# when we the trained model from cshuan, image is rgb
 max_epoch = 12
 eval_interval = 1
 checkpoint_interval = 1

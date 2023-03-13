@@ -608,6 +608,21 @@ def poly2hbb(polys):
 
 
 def obb2poly(obboxes):
+    # x = obboxes[:, 0]
+    # y = obboxes[:, 1]
+    # w = obboxes[:, 2]
+    # h = obboxes[:, 3]
+    # a = obboxes[:, 4]
+    # cosa = jt.cos(a)
+    # sina = jt.sin(a)
+    # wx, wy = w / 2 * cosa, w / 2 * sina
+    # hx, hy = -h / 2 * sina, h / 2 * cosa
+    # p1x, p1y = x - wx - hx, y - wy - hy
+    # p2x, p2y = x + wx - hx, y + wy - hy
+    # p3x, p3y = x + wx + hx, y + wy + hy
+    # p4x, p4y = x - wx + hx, y - wy + hy
+    # return jt.stack([p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y], dim=-1)
+
     center, w, h, theta = jt.split(obboxes, [2, 1, 1, 1], dim=-1)
     Cos, Sin = jt.cos(theta), jt.sin(theta)
 

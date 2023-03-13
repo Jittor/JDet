@@ -14,7 +14,7 @@ model = dict(
         add_extra_convs="on_input",
         num_outs=5),
     bbox_head=dict(
-        type='CSLRRetinaHead',
+        type='RSDetHead',
         num_classes=16,
         in_channels=256,
         feat_channels=256,
@@ -32,14 +32,7 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox=dict(
-            type='L1Loss', loss_weight=1.0),
-        angle_coder=dict(
-            type='CSLCoder',
-            omega=4,
-            window='gaussian',
-            radius=3),
-        loss_angle=dict(
-            type='SmoothFocalLoss', gamma=2.0, alpha=0.25, loss_weight=0.8),
+            type='RSDetLoss', sigma=3.0, loss_weight=1.0, reg_type='5p'),
         test_cfg=dict(
             nms_pre=2000,
             min_bbox_size=0,
@@ -74,7 +67,7 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5),
+            dict(type='RotatedRandomFlip', prob=0.5, direction="horizontal"),
             dict(
                 type = "Pad",
                 size_divisor=32),

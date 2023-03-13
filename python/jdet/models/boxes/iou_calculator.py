@@ -1,5 +1,6 @@
 import jittor as jt
 from jdet.ops import box_iou_rotated, box_iou_rotated_v1
+from jdet.ops.reppoints_convex_iou import reppoints_convex_iou
 from jdet.ops.bbox_transforms import obb2hbb, hbb2obb
 from jdet.utils.registry import BOXES
 import numpy as np
@@ -189,6 +190,35 @@ class BboxOverlaps2D_rotated_v1:
         assert mode == "iou" and is_aligned == False
         # TODO: add giou....
         return bbox_overlaps_rotated(bboxes1, bboxes2, version=1)
+
+    def __repr__(self):
+        """str: a string describing the module"""
+        repr_str = self.__class__.__name__ + '()'
+        return repr_str
+
+@BOXES.register_module()
+class ConvexOverlaps:
+    """Calculate overlap between polys and pointsets"""
+
+    def __call__(self, bboxes, pointsets, mode='iou', is_aligned=False):
+        """Calculate IoU between 2D bboxes.
+        Args:
+            bboxes1 (Tensor): bboxes have shape (m, 8) in <x1,y1,x2,y2,x3,y3,x4,y4> format
+            bboxes2 (Tensor): pointsets have shape (n, 18) format.
+                If ``is_aligned `` is ``True``, then m and n must be equal.
+            mode (str): "iou" (intersection over union), "iof" (intersection
+                over foreground), or "giou" (generalized intersection over
+                union).
+            is_aligned (bool, optional): If True, then m and n must be equal.
+                Default False.
+        Returns:
+            Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
+        """
+        assert bboxes.shape[-1] == 8
+        assert pointsets.shape[-1] == 18
+
+        assert mode == "iou" and is_aligned == False
+        return jt.transpose(reppoints_convex_iou(pointsets, bboxes))
 
     def __repr__(self):
         """str: a string describing the module"""
