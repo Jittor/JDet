@@ -113,6 +113,11 @@ python run_net.py --config-file=configs/base.py --task=test
 | RoITransformer-R50-FPN | DOTA1.0  |        1024/200         |      Flip       |     -     |  SGD   |    1x    | 73.842 |                                                   [arxiv](https://arxiv.org/abs/1812.00155)                                                   |                  [config](configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py)                  |                                          [model](https://cloud.tsinghua.edu.cn/f/55fe6380928f4a6582f8/?dl=1)                                           |
 |      FCOS-R50-FPN      | DOTA1.0  |        1024/200         |      flip       |     -     |  SGD   |    1x    | 70.40  | [ICCV19](https://openaccess.thecvf.com/content_ICCV_2019/papers/Tian_FCOS_Fully_Convolutional_One-Stage_Object_Detection_ICCV_2019_paper.pdf) |                        [config](configs/fcos_obb_r50_fpn_1x_dota.py)                        |                     [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Ffcos_r50%2Fckpt_12.pkl&dl=1)                     |
 |  OrientedRCNN-R50-FPN  | DOTA1.0  |        1024/200         |      Flip       |     -     |  SGD   |    1x    | 75.62  |          [ICCV21](https://openaccess.thecvf.com/content/ICCV2021/papers/Xie_Oriented_R-CNN_for_Object_Detection_ICCV_2021_paper.pdf)          |                [config](configs/oriented_rcnn_r50_fpn_1x_dota_with_flip.py)                 |                                          [model](https://cloud.tsinghua.edu.cn/f/a50517f7b8e840949d3f/?dl=1)                                           |
+| ReDet-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 76.23  | [arxiv](https://arxiv.org/abs/2103.07733)| [config](configs/ReDet_re50_refpn_1x_dota1.py) | [model](https://cloud.tsinghua.edu.cn/f/ddc0573facf04f04b404/?dl=1) | [pretrained](https://cloud.tsinghua.edu.cn/f/a9b594c65afb4b958787/?dl=1) |
+| CSL-R50-FPN |DOTA1.0|1024/200| flip|-| SGD | 1x | 67.99 | [arxiv](https://link.springer.com/chapter/10.1007/978-3-030-58598-3_40)| [config](configs/rotated_retinanet_obb_csl_gaussian_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/c556626b85b845f1878a/?dl=1) |
+| RSDet-R50-FPN | DOTA1.0|1024/200|Flip|-| SGD | 1x | 68.41 | [arxiv](https://arxiv.org/abs/1911.08299) | [config](configs/rotated_retinanet/rsdet_obb_r50_fpn_1x_dota_lmr5p.py) | [model](https://cloud.tsinghua.edu.cn/f/642e200f5a8a420eb726/?dl=1) |
+| ATSS-R50-FPN|DOTA1.0|1024/200| flip|-| SGD | 1x | 72.44 | [arxiv](https://arxiv.org/abs/1912.02424) | [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota_atss.py) | [model](https://cloud.tsinghua.edu.cn/f/5168189dcd364eaebce5/?dl=1) |
+| Reppoints-R50-FPN|DOTA1.0|1024/200| flip|-| SGD | 1x | 56.34 | [arxiv](https://arxiv.org/abs/1904.11490) | [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota_atss.py) | [model](https://cloud.tsinghua.edu.cn/f/be359ac932c84f9c839e/?dl=1) |
 
 
 **Notice**:
@@ -143,13 +148,16 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: H2RBox
 - :heavy_check_mark: KFIoU
 - :heavy_check_mark: Localization Distillation
-- :clock3: ReDet
+- :heavy_check_mark: ReDet
+- :heavy_check_mark: CSL
+- :heavy_check_mark: Reppoints
+- :heavy_check_mark: RSDet
+- :heavy_check_mark: ATSS
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
-- :heavy_plus_sign: CSL
+- :clock3: Oriented Reppoints
 - :heavy_plus_sign: DCL
 - :heavy_plus_sign: Double Head OBB
-- :heavy_plus_sign: Oriented Reppoints
 - :heavy_plus_sign: Guided Anchoring
 - :heavy_plus_sign: ...
 
