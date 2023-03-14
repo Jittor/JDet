@@ -1,8 +1,9 @@
 from jittor import nn
 import jittor as jt
 from jittor.misc import _pair
+from .riroi_align import RiRoIAlign
 
-__all__ = ["ROIAlign"]
+__all__ = ["ROIAlign", "RiRoIAlign"]
 
 CUDA_HEADER = r'''
 #include <cmath>

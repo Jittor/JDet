@@ -126,7 +126,7 @@ class ConvFCBBoxHeadRbbox(BBoxHeadRbbox):
         return branch_convs, branch_fcs, last_layer_dim
 
     def init_weights(self):
-        super(SharedFCBBoxHeadRbbox, self).init_weights()
+        super(ConvFCBBoxHeadRbbox, self).init_weights()
         for module_list in [self.shared_fcs, self.cls_fcs, self.reg_fcs]:
             for m in module_list.modules():
                 if isinstance(m, nn.Linear):
