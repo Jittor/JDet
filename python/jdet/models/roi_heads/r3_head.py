@@ -146,10 +146,10 @@ class R3Head(nn.Module):
                     stride=1,
                     padding=1))
 
-        # self.init_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 3, padding=1)
-        # self.init_cls = nn.Conv2d(self.feat_channels, self.num_anchors * self.cls_out_channels, 3, padding=1)
-        self.init_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 1)
-        self.init_cls = nn.Conv2d(self.feat_channels, self.num_anchors * self.cls_out_channels, 1)
+        self.init_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 3, padding=1)
+        self.init_cls = nn.Conv2d(self.feat_channels, self.num_anchors * self.cls_out_channels, 3, padding=1)
+        # self.init_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 1)
+        # self.init_cls = nn.Conv2d(self.feat_channels, self.num_anchors * self.cls_out_channels, 1)
 
         self.refine_reg_convs = nn.ModuleList()
         self.refine_cls_convs = nn.ModuleList()
@@ -214,7 +214,7 @@ class R3Head(nn.Module):
         bbox_pred = self.refine_reg(reg_feat)
         return cls_score, bbox_pred
 
-    def filter_bboxes(self, cls_scores, bbox_preds):
+    def filter_bboxes(self, cls_scores, bbox_preds, img_metas):
         """Filter predicted bounding boxes at each position of the feature
         maps. Only one bounding boxes with highest score will be left at each
         position. This filter will be used in R3Det prior to the first feature
@@ -249,7 +249,7 @@ class R3Head(nn.Module):
             cls_score = cls_score.reshape(num_imgs, -1, self.num_anchors,
                                           self.cls_out_channels)
 
-            cls_score = cls_score.max(dim=-1, keepdims=True)
+            cls_score = cls_score.max(dim=3, keepdims=True)
             best_ind, _ = cls_score.argmax(dim=2, keepdims=True)
             best_ind = best_ind.expand(-1, -1, -1, 5)
 
@@ -266,12 +266,9 @@ class R3Head(nn.Module):
                 best_anchor_i = anchors.gather(
                     dim=-2, index=best_ind_i).squeeze(dim=-2)
 
-                bbox_coder_cfg = self.train_cfg.init_cfg.get('bbox_coder', '')
-                if bbox_coder_cfg == '':
-                    bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
-                bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
-                best_bbox_i = bbox_coder.decode(best_anchor_i,
-                                                     best_pred_i)
+                img_shape = img_metas[img_id]['img_shape']
+                best_bbox_i = delta2bbox_rotated(best_anchor_i, best_pred_i, self.target_means,
+                                            self.target_stds, img_shape)
                 bboxes_list[img_id].append(best_bbox_i.detach())
 
         return bboxes_list
@@ -470,7 +467,6 @@ class R3Head(nn.Module):
                         num_total_samples,
                         cfg):
         # classification loss
-        # print('init_cls_score: ', init_cls_score.shape)
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         init_cls_score = init_cls_score.permute(
@@ -511,8 +507,6 @@ class R3Head(nn.Module):
                         num_total_samples,
                         cfg):
         # classification loss
-        # print('refine_cls_score: ', refine_cls_score.shape)
-        # print('refine_bbox_pred: ', refine_bbox_pred.shape)
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         refine_cls_score = refine_cls_score.permute(0, 2, 3,
@@ -654,10 +648,10 @@ class R3Head(nn.Module):
             return img_metas
         return gt_bboxes,gt_labels,img_metas,gt_bboxes_ignore
 
-    def execute(self, feats,targets):
+    def execute(self, feats, targets):
 
         init_outs = multi_apply(self.init_forward_single, feats)
-        rois = self.filter_bboxes(*init_outs)
+        rois = self.filter_bboxes(*init_outs, self.parse_targets(targets,is_train=False))
         x_refine = self.feat_refine_module(feats, rois)
         refine_outs =  multi_apply(self.refine_forward_single, x_refine)
 
