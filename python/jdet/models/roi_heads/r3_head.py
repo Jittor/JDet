@@ -214,7 +214,7 @@ class R3Head(nn.Module):
         bbox_pred = self.refine_reg(reg_feat)
         return cls_score, bbox_pred
 
-    def filter_bboxes(self, cls_scores, bbox_preds, img_metas):
+    def filter_bboxes(self, cls_scores, bbox_preds):
         """Filter predicted bounding boxes at each position of the feature
         maps. Only one bounding boxes with highest score will be left at each
         position. This filter will be used in R3Det prior to the first feature
@@ -266,9 +266,8 @@ class R3Head(nn.Module):
                 best_anchor_i = anchors.gather(
                     dim=-2, index=best_ind_i).squeeze(dim=-2)
 
-                img_shape = img_metas[img_id]['img_shape']
                 best_bbox_i = delta2bbox_rotated(best_anchor_i, best_pred_i, self.target_means,
-                                            self.target_stds, img_shape)
+                                            self.target_stds, wh_ratio_clip=1e-6)
                 bboxes_list[img_id].append(best_bbox_i.detach())
 
         return bboxes_list
@@ -651,7 +650,7 @@ class R3Head(nn.Module):
     def execute(self, feats, targets):
 
         init_outs = multi_apply(self.init_forward_single, feats)
-        rois = self.filter_bboxes(*init_outs, self.parse_targets(targets,is_train=False))
+        rois = self.filter_bboxes(*init_outs)
         x_refine = self.feat_refine_module(feats, rois)
         refine_outs =  multi_apply(self.refine_forward_single, x_refine)
 
