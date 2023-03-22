@@ -9,12 +9,10 @@ from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,LOSSES,BOXES,build_from_cfg
 
 
-from jdet.ops.dcn_v1 import DeformConv
-from jdet.ops.orn import ORConv2d, RotationInvariantPooling
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.box_ops import delta2bbox_rotated, rotated_box_to_poly
 from jdet.models.boxes.anchor_target import images_to_levels,anchor_target
-from jdet.models.boxes.anchor_generator import AnchorGeneratorRotatedS2ANet
+from jdet.models.boxes.anchor_generator import PseudoAnchorGenerator
 from jdet.models.boxes.anchor_generator import AnchorGeneratorRotatedRetinaNet
 
 
@@ -28,7 +26,6 @@ class R3Head(nn.Module):
                  stacked_convs=2,
                  octave_base_scale=4,
                  scales_per_octave=3,
-                 anchor_scales=[4],
                  anchor_ratios=[1.0],
                  anchor_strides=[8, 16, 32, 64, 128],
                  anchor_base_sizes=None,
@@ -75,8 +72,8 @@ class R3Head(nn.Module):
                     refine_cfg=dict(
                         assigner=dict(
                             type='MaxIoUAssigner',
-                            pos_iou_thr=0.5,
-                            neg_iou_thr=0.4,
+                            pos_iou_thr=0.6,
+                            neg_iou_thr=0.5,
                             min_pos_iou=0,
                             ignore_iof_thr=-1,
                             iou_calculator=dict(type='BboxOverlaps2D_rotated')),
@@ -92,7 +89,6 @@ class R3Head(nn.Module):
         self.in_channels = in_channels
         self.feat_channels = feat_channels
         self.stacked_convs = stacked_convs
-        self.anchor_scales = anchor_scales
         self.anchor_ratios = anchor_ratios
         self.anchor_strides = anchor_strides
         self.anchor_base_sizes = list(
@@ -119,9 +115,11 @@ class R3Head(nn.Module):
         self.test_cfg = test_cfg
 
         self.anchor_generators = []
+        self.refine_anchor_generators = []
         for anchor_base in self.anchor_base_sizes:
             self.anchor_generators.append(AnchorGeneratorRotatedRetinaNet(anchor_base, None, anchor_ratios, 
                 octave_base_scale=octave_base_scale, scales_per_octave=scales_per_octave))
+            self.refine_anchor_generators.append(PseudoAnchorGenerator(anchor_base))
         self.num_anchors = self.anchor_generators[0].num_base_anchors
         # anchor cache
         self.base_anchors = dict()
@@ -148,6 +146,8 @@ class R3Head(nn.Module):
                     stride=1,
                     padding=1))
 
+        # self.init_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 3, padding=1)
+        # self.init_cls = nn.Conv2d(self.feat_channels, self.num_anchors * self.cls_out_channels, 3, padding=1)
         self.init_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 1)
         self.init_cls = nn.Conv2d(self.feat_channels, self.num_anchors * self.cls_out_channels, 1)
 
@@ -171,8 +171,8 @@ class R3Head(nn.Module):
                     padding=1))
 
         self.refine_cls = nn.Conv2d(
-            self.feat_channels, self.num_anchors * self.cls_out_channels, 3, padding=1)
-        self.refine_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 5, 3, padding=1)
+            self.feat_channels, self.cls_out_channels, 3, padding=1)
+        self.refine_reg = nn.Conv2d(self.feat_channels, 5, 3, padding=1)
 
         self.init_weights()
 
@@ -236,25 +236,21 @@ class R3Head(nn.Module):
         for i in range(num_levels):
             assert num_imgs == cls_scores[i].size(0) == bbox_preds[i].size(0)
 
-        device = cls_scores[0].device
         featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
-        mlvl_anchors = self.anchor_generator.grid_priors(
-            featmap_sizes, device=device)
 
         bboxes_list = [[] for _ in range(num_imgs)]
 
         for lvl in range(num_levels):
             cls_score = cls_scores[lvl]
             bbox_pred = bbox_preds[lvl]
-
-            anchors = mlvl_anchors[lvl]
+            anchors = self.anchor_generators[lvl].grid_anchors(featmap_sizes[lvl], self.anchor_strides[lvl])
 
             cls_score = cls_score.permute(0, 2, 3, 1)
             cls_score = cls_score.reshape(num_imgs, -1, self.num_anchors,
                                           self.cls_out_channels)
 
-            cls_score, _ = cls_score.max(dim=-1, keepdims=True)
-            best_ind = cls_score.argmax(dim=-2, keepdims=True)
+            cls_score = cls_score.max(dim=-1, keepdims=True)
+            best_ind, _ = cls_score.argmax(dim=2, keepdims=True)
             best_ind = best_ind.expand(-1, -1, -1, 5)
 
             bbox_pred = bbox_pred.permute(0, 2, 3, 1)
@@ -269,7 +265,12 @@ class R3Head(nn.Module):
                 best_pred_i = best_pred[img_id]
                 best_anchor_i = anchors.gather(
                     dim=-2, index=best_ind_i).squeeze(dim=-2)
-                best_bbox_i = self.bbox_coder.decode(best_anchor_i,
+
+                bbox_coder_cfg = self.train_cfg.init_cfg.get('bbox_coder', '')
+                if bbox_coder_cfg == '':
+                    bbox_coder_cfg = dict(type='DeltaXYWHBBoxCoder')
+                bbox_coder = build_from_cfg(bbox_coder_cfg,BOXES)
+                best_bbox_i = bbox_coder.decode(best_anchor_i,
                                                      best_pred_i)
                 bboxes_list[img_id].append(best_bbox_i.detach())
 
@@ -320,13 +321,16 @@ class R3Head(nn.Module):
                            is_train=True):
         num_levels = len(featmap_sizes)
 
-        refine_anchors_list = []
-        for img_id, img_meta in enumerate(img_metas):
-            mlvl_refine_anchors = []
-            for i in range(num_levels):
-                refine_anchor = refine_anchors[i][img_id].reshape(-1, 5)
-                mlvl_refine_anchors.append(refine_anchor)
-            refine_anchors_list.append(mlvl_refine_anchors)
+        # refine_anchors_list = []
+        # for img_id, img_meta in enumerate(img_metas):
+        #     mlvl_refine_anchors = []
+        #     for i in range(num_levels):
+        #         refine_anchor = refine_anchors[i][img_id].reshape(-1, 5)
+        #         mlvl_refine_anchors.append(refine_anchor)
+        #     refine_anchors_list.append(mlvl_refine_anchors)
+        refine_anchors_list = [[
+            bboxes_img_lvl.clone().detach() for bboxes_img_lvl in bboxes_img
+        ] for bboxes_img in refine_anchors]
 
         valid_flag_list = []
         if is_train:
@@ -338,7 +342,7 @@ class R3Head(nn.Module):
                     w,h = img_meta['pad_shape'][:2]
                     valid_feat_h = min(int(np.ceil(h / anchor_stride)), feat_h)
                     valid_feat_w = min(int(np.ceil(w / anchor_stride)), feat_w)
-                    flags = self.anchor_generators[i].valid_flags((feat_h, feat_w), (valid_feat_h, valid_feat_w))
+                    flags = self.refine_anchor_generators[i].valid_flags((feat_h, feat_w), (valid_feat_h, valid_feat_w))
                     multi_level_flags.append(flags)
                 valid_flag_list.append(multi_level_flags)
         return refine_anchors_list, valid_flag_list
@@ -372,7 +376,7 @@ class R3Head(nn.Module):
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
         cls_reg_targets = anchor_target(
             anchor_list,
-            valid_flag_list,
+            valid_flag_list.copy(),
             gt_bboxes,
             img_metas,
             self.target_means,
@@ -400,9 +404,13 @@ class R3Head(nn.Module):
             num_total_samples=num_total_samples,
             cfg=cfg.init_cfg)
 
-        # Oriented Detection Module targets
+
+        # refine stage
         refine_anchors_list, valid_flag_list = self.get_refine_anchors(
             featmap_sizes, refine_anchors, img_metas)
+        # refine_anchors_list = [[
+        #     bboxes_img_lvl.clone().detach() for bboxes_img_lvl in bboxes_img
+        # ] for bboxes_img in refine_anchors]
 
         # anchor number of multi levels
         num_level_anchors = [anchors.size(0)
@@ -462,6 +470,7 @@ class R3Head(nn.Module):
                         num_total_samples,
                         cfg):
         # classification loss
+        # print('init_cls_score: ', init_cls_score.shape)
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         init_cls_score = init_cls_score.permute(
@@ -502,6 +511,8 @@ class R3Head(nn.Module):
                         num_total_samples,
                         cfg):
         # classification loss
+        # print('refine_cls_score: ', refine_cls_score.shape)
+        # print('refine_bbox_pred: ', refine_bbox_pred.shape)
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         refine_cls_score = refine_cls_score.permute(0, 2, 3,
@@ -532,8 +543,6 @@ class R3Head(nn.Module):
         return loss_refine_cls, loss_refine_bbox
 
     def get_bboxes(self,
-                   init_cls_scores,
-                   init_bbox_preds,
                    refine_anchors,
                    refine_cls_scores,
                    refine_bbox_preds,
@@ -647,106 +656,12 @@ class R3Head(nn.Module):
 
     def execute(self, feats,targets):
 
-        init_outs = multi_apply(self.init_forward_single, feats, self.anchor_strides)
+        init_outs = multi_apply(self.init_forward_single, feats)
         rois = self.filter_bboxes(*init_outs)
         x_refine = self.feat_refine_module(feats, rois)
-        refine_outs =  multi_apply(self.refine_forward_single, x_refine, self.anchor_strides)
+        refine_outs =  multi_apply(self.refine_forward_single, x_refine)
 
         if self.is_training():
             return self.loss(*init_outs, rois, *refine_outs, *self.parse_targets(targets))
         else:
-            return self.get_bboxes(*init_outs, rois, *refine_outs, self.parse_targets(targets,is_train=False))
-
-def bbox_decode(
-        bbox_preds,
-        anchors,
-        means=[0, 0, 0, 0, 0],
-        stds=[1, 1, 1, 1, 1]):
-    """
-    Decode bboxes from deltas
-    :param bbox_preds: [N,5,H,W]
-    :param anchors: [H*W,5]
-    :param means: mean value to decode bbox
-    :param stds: std value to decode bbox
-    :return: [N,H,W,5]
-    """
-    num_imgs, _, H, W = bbox_preds.shape
-    bboxes_list = []
-    for img_id in range(num_imgs):
-        bbox_pred = bbox_preds[img_id]
-        # bbox_pred.shape=[5,H,W]
-        bbox_delta = bbox_pred.permute(1, 2, 0).reshape(-1, 5)
-        bboxes = delta2bbox_rotated(
-            anchors, bbox_delta, means, stds, wh_ratio_clip=1e-6)
-        bboxes = bboxes.reshape(H, W, 5)
-        bboxes_list.append(bboxes)
-    return jt.stack(bboxes_list, dim=0)
-
-
-class AlignConv(nn.Module):
-
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=3,
-                 deformable_groups=1):
-        super(AlignConv, self).__init__()
-        self.kernel_size = kernel_size
-        self.deform_conv = DeformConv(in_channels,
-                                      out_channels,
-                                      kernel_size=kernel_size,
-                                      padding=(kernel_size - 1) // 2,
-                                      deformable_groups=deformable_groups)
-        self.relu = nn.ReLU()
-
-    def init_weights(self):
-        normal_init(self.deform_conv, std=0.01)
-
-    @jt.no_grad()
-    def get_offset(self, anchors, featmap_size, stride):
-        dtype = anchors.dtype
-        feat_h, feat_w = featmap_size
-        pad = (self.kernel_size - 1) // 2
-        idx = jt.arange(-pad, pad + 1, dtype=dtype)
-        yy, xx = jt.meshgrid(idx, idx)
-        xx = xx.reshape(-1)
-        yy = yy.reshape(-1)
-
-        # get sampling locations of default conv
-        xc = jt.arange(0, feat_w, dtype=dtype)
-        yc = jt.arange(0, feat_h, dtype=dtype)
-        yc, xc = jt.meshgrid(yc, xc)
-        xc = xc.reshape(-1)
-        yc = yc.reshape(-1)
-        x_conv = xc[:, None] + xx
-        y_conv = yc[:, None] + yy
-
-        # get sampling locations of anchors
-        x_ctr, y_ctr, w, h, a = jt.unbind(anchors, dim=1)
-        x_ctr, y_ctr, w, h = x_ctr / stride, y_ctr / stride, w / stride, h / stride
-        cos, sin = jt.cos(a), jt.sin(a)
-        dw, dh = w / self.kernel_size, h / self.kernel_size
-        x, y = dw[:, None] * xx, dh[:, None] * yy
-        xr = cos[:, None] * x - sin[:, None] * y
-        yr = sin[:, None] * x + cos[:, None] * y
-        x_anchor, y_anchor = xr + x_ctr[:, None], yr + y_ctr[:, None]
-        # get offset filed
-        offset_x = x_anchor - x_conv
-        offset_y = y_anchor - y_conv
-        # x, y in anchors is opposite in image coordinates,
-        # so we stack them with y, x other than x, y
-        offset = jt.stack([offset_y, offset_x], dim=-1)
-        # NA,ks*ks*2
-        offset = offset.reshape(anchors.size(
-            0), -1).permute(1, 0).reshape(-1, feat_h, feat_w)
-        return offset
-
-    def execute(self, x, anchors, stride):
-        num_imgs, H, W = anchors.shape[:3]
-        offset_list = [
-            self.get_offset(anchors[i].reshape(-1, 5), (H, W), stride)
-            for i in range(num_imgs)
-        ]
-        offset_tensor = jt.stack(offset_list, dim=0)
-        x = self.relu(self.deform_conv(x, offset_tensor))
-        return x
+            return self.get_bboxes(rois, *refine_outs, self.parse_targets(targets,is_train=False))

@@ -10,7 +10,7 @@ class R3Det(nn.Module):
     """
 
     def __init__(self,backbone,neck=None,bbox_head=None):
-        super(self).__init__()
+        super().__init__()
         self.backbone = build_from_cfg(backbone,BACKBONES)
         self.neck = build_from_cfg(neck,NECKS)
         self.bbox_head = build_from_cfg(bbox_head,HEADS)

@@ -1,8 +1,53 @@
+import collections.abc
 from calendar import c
 import jittor as jt
 import numpy as np
 from jittor.misc import _pair
 from jdet.utils.registry import BOXES
+from itertools import repeat
+
+
+def to_2tuple(x):
+    if isinstance(x, collections.abc.Iterable):
+        return x
+    return tuple(repeat(x, 2))
+
+@BOXES.register_module()
+class PseudoAnchorGenerator:
+    def __init__(self, base_size):
+        self.strides = to_2tuple(base_size)
+
+    @property
+    def num_base_anchors(self):
+        """list[int]: total number of base anchors in a feature grid"""
+        return 1
+
+    def _meshgrid(self, x, y, row_major=True):
+        xx = x.repeat(len(y))
+        yy = y.view(-1, 1).repeat(1, len(x)).view(-1)
+        if row_major:
+            return xx, yy
+        else:
+            return yy, xx
+
+    def valid_flags(self, featmap_size, valid_size):
+        feat_h, feat_w = featmap_size
+        valid_h, valid_w = valid_size
+        assert valid_h <= feat_h and valid_w <= feat_w
+        valid_x = jt.zeros((feat_w,)).bool()
+        valid_y = jt.zeros((feat_h,)).bool()
+        valid_x[:valid_w] = 1
+        valid_y[:valid_h] = 1
+        valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)
+        valid = valid_xx & valid_yy
+        valid = valid[:, None].expand((valid.size(0), self.num_base_anchors)).view(-1)
+        return valid
+
+    def __repr__(self):
+        indent_str = '    '
+        repr_str = self.__class__.__name__ + '(\n'
+        repr_str += f'{indent_str}strides={self.strides})'
+        return repr_str
 
 @BOXES.register_module()
 class AnchorGeneratorRotatedRetinaNet:
