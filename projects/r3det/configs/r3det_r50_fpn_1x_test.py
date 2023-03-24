@@ -90,7 +90,7 @@ dataset = dict(
                 min_size=1024,
                 max_size=1024
             ),
-            dict(type='RotatedRandomFlip', prob=0.5),
+            # dict(type='RotatedRandomFlip', prob=0.5),
             dict(
                 type = "Pad",
                 size_divisor=32),

@@ -118,6 +118,7 @@ python run_net.py --config-file=configs/base.py --task=test
 | RSDet-R50-FPN | DOTA1.0|1024/200|Flip|-| SGD | 1x | 68.41 | [arxiv](https://arxiv.org/abs/1911.08299) | [config](configs/rotated_retinanet/rsdet_obb_r50_fpn_1x_dota_lmr5p.py) | [model](https://cloud.tsinghua.edu.cn/f/642e200f5a8a420eb726/?dl=1) |
 | ATSS-R50-FPN|DOTA1.0|1024/200| flip|-| SGD | 1x | 72.44 | [arxiv](https://arxiv.org/abs/1912.02424) | [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota_atss.py) | [model](https://cloud.tsinghua.edu.cn/f/5168189dcd364eaebce5/?dl=1) |
 | Reppoints-R50-FPN|DOTA1.0|1024/200| flip|-| SGD | 1x | 56.34 | [arxiv](https://arxiv.org/abs/1904.11490) | [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota_atss.py) | [model](https://cloud.tsinghua.edu.cn/f/be359ac932c84f9c839e/?dl=1) |
+| R3Det-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 64.41 | [arxiv](https://arxiv.org/pdf/1908.05612.pdf)| [config](configs/projects/r3det/r3det_r50_fpn_1x_dota.py) | [model]() |
 
 
 **Notice**:
@@ -153,7 +154,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Reppoints
 - :heavy_check_mark: RSDet
 - :heavy_check_mark: ATSS
-- :clock3: R3Det
+- :heavy_check_mark: R3Det
 - :clock3: Cascade R-CNN
 - :clock3: Oriented Reppoints
 - :heavy_plus_sign: DCL
