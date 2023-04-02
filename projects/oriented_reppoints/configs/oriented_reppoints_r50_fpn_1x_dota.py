@@ -15,7 +15,7 @@ model = dict(
         norm_cfg = dict(type='GN', num_groups=32),
         num_outs=5),
     bbox_head=dict(
-        type='RotatedRepPointsHead',
+        type='OrientedRepPointsHead',
         num_classes=15,
         in_channels=256,
         feat_channels=256,
@@ -34,10 +34,14 @@ model = dict(
             loss_weight=1.0),
         loss_bbox_init=dict(type='ConvexGIoULoss', loss_weight=0.375),
         loss_bbox_refine=dict(type='ConvexGIoULoss', loss_weight=1.0),
+        loss_spatial_init=dict(type='SpatialBorderLoss', loss_weight=0.05),
+        loss_spatial_refine=dict(type='SpatialBorderLoss', loss_weight=0.1),
         transform_method='rotrect',
         use_reassign=False,
-        topk=6,
-        anti_factor=0.75,
+        init_qua_weight=0.2,
+        top_ratio=0.4,
+        # topk=6,
+        # anti_factor=0.75,
         train_cfg=dict(
             init=dict(
                 assigner=dict(type='ConvexAssigner', scale=4, pos_num=1, assigned_labels_filled=-1),
@@ -47,8 +51,8 @@ model = dict(
             refine=dict(
                 assigner=dict(
                     type='MaxConvexIoUAssigner',
-                    pos_iou_thr=0.4,
-                    neg_iou_thr=0.3,
+                    pos_iou_thr=0.1,
+                    neg_iou_thr=0.1,
                     min_pos_iou=0,
                     ignore_iof_thr=-1,
                     assigned_labels_filled=-1,
@@ -137,7 +141,6 @@ dataset = dict(
 
 optimizer = dict(
     type='SGD', 
-    # lr=0.01/4., #0.0,#0.01*(1/8.), 
     lr=0.008,
     momentum=0.9, 
     weight_decay=0.0001,
