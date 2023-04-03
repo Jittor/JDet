@@ -14,8 +14,7 @@ import math
 import jittor as jt
 from jittor import nn
 import numpy as np
-from jittor.nn import _pair
-
+from jittor.nn import _pair, grid_sample
 
 import numpy as np
 def deleteme(a, b, size = 10):
@@ -69,6 +68,18 @@ def transpose_to(a, b):
         print(type(b))
         raise NotImplementedError
 
+def fake_argsort2(x, dim=0, descending=False):
+    x_ = x.data
+    if (descending):
+        x__ = -x_
+    else:
+        x__ = x_
+    index_ = np.argsort(x__, axis=dim, kind="stable")
+    y_ = x_[index_]
+    index = jt.array(index_)
+    y = jt.array(y_)
+    return index, y
+
 def ChamferDistance2D(point_set_1,
                       point_set_2,
                       distance_weight=0.05,
@@ -85,9 +96,9 @@ def ChamferDistance2D(point_set_1,
         dist (jt.tensor): chamfer distance between two point sets
                              with shape (N_pointsets,)
     """
-    assert point_set_1.dim() == point_set_2.dim()
+    assert point_set_1.shape == point_set_2.shape
     assert point_set_1.shape[-1] == point_set_2.shape[-1]
-    assert point_set_1.dim() <= 3
+    # assert point_set_1.dim() <= 3
     dist1, dist2, _, _ = chamfer_distance(point_set_1, point_set_2)
     dist1 = jt.sqrt(jt.clamp(dist1, eps))
     dist2 = jt.sqrt(jt.clamp(dist2, eps))
@@ -140,7 +151,6 @@ class OrientedRepPointsHead(nn.Module):
                  gradient_mul=0.1,
                  point_strides=[8, 16, 32, 64, 128],
                  point_base_scale=4,
-                 background_label=0,
                  conv_bias='auto',
                  loss_cls=dict(
                      type='FocalLoss',
@@ -221,7 +231,6 @@ class OrientedRepPointsHead(nn.Module):
         self.ori_qua_weight = ori_qua_weight
         self.poc_qua_weight = poc_qua_weight
         self.top_ratio = top_ratio
-        self.background_label = background_label
         self._init_layers()
 
     def _init_layers(self):
@@ -377,10 +386,10 @@ class OrientedRepPointsHead(nn.Module):
             features.size(1),
             pt_locations.size(1),
             pt_locations.size(2)
-        ]).to(pt_locations.device)
+        ])
 
         for i in range(batch_size):
-            feature = nn.functional.grid_sample(features[i:i + 1],
+            feature = grid_sample(features[i:i + 1],
                                                 pt_locations[i:i + 1])[0]
             sampled_features[i] = feature
 
@@ -397,22 +406,65 @@ class OrientedRepPointsHead(nn.Module):
                      shape (N_points_set, N_points, C)
         """
 
-        mean_points_feats = jt.mean(points_features, dim=1, keepdim=True)
+        mean_points_feats = jt.mean(points_features, dim=1, keepdims=True)
         norm_pts_feats = jt.norm(
-            points_features, p=2, dim=2).unsqueeze(dim=2).clamp(min=1e-2)
+            points_features, p=2, dim=2).unsqueeze(dim=2).clamp(min_v=1e-2)
         norm_mean_pts_feats = jt.norm(
-            mean_points_feats, p=2, dim=2).unsqueeze(dim=2).clamp(min=1e-2)
+            mean_points_feats, p=2, dim=2).unsqueeze(dim=2).clamp(min_v=1e-2)
 
         unity_points_features = points_features / norm_pts_feats
         unity_mean_points_feats = mean_points_feats / norm_mean_pts_feats
 
-        cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
-        feats_similarity = 1.0 - cos_similarity(unity_points_features,
-                                                unity_mean_points_feats)
+        # cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
+        unity_points_features = 1. * unity_points_features / (jt.norm(unity_points_features, 2, 2, keepdims=True).expand_as(unity_mean_points_feats) + 1e-6)
+        unity_mean_points_feats = 1. * unity_mean_points_feats / (jt.norm(unity_mean_points_feats, 2, 2, keepdims=True).expand_as(unity_mean_points_feats) + 1e-6)
+        feats_similarity = 1.0 - (unity_points_features * unity_mean_points_feats).sum(dim=-1)
+        # feats_similarity = 1.0 - cos_similarity(unity_points_features,
+        #                                         unity_mean_points_feats)
 
-        max_correlation, _ = jt.max(feats_similarity, dim=1)
+        max_correlation = jt.max(feats_similarity, dim=1)
 
         return max_correlation
+
+    def sampling_points(self, polygons, points_num):
+        """Sample edge points for polygon.
+
+        Args:
+            polygons (jt.tensor): polygons with shape (N, 8)
+            points_num (int): number of sampling points for each polygon edge.
+                              10 by default.
+
+        Returns:
+            sampling_points (jt.tensor): sampling points with shape (N,
+                             points_num*4, 2)
+        """
+        polygons_xs, polygons_ys = polygons[:, 0::2], polygons[:, 1::2]
+        ratio = jt.linspace(0, 1, points_num).repeat(
+            polygons.shape[0], 1)
+
+        edge_pts_x = []
+        edge_pts_y = []
+        for i in range(4):
+            if i < 3:
+                points_x = ratio * polygons_xs[:, i + 1:i + 2] + (
+                    1 - ratio) * polygons_xs[:, i:i + 1]
+                points_y = ratio * polygons_ys[:, i + 1:i + 2] + (
+                    1 - ratio) * polygons_ys[:, i:i + 1]
+            else:
+                points_x = ratio * polygons_xs[:, 0].unsqueeze(1) + (
+                    1 - ratio) * polygons_xs[:, i].unsqueeze(1)
+                points_y = ratio * polygons_ys[:, 0].unsqueeze(1) + (
+                    1 - ratio) * polygons_ys[:, i].unsqueeze(1)
+
+            edge_pts_x.append(points_x)
+            edge_pts_y.append(points_y)
+
+        sampling_points_x = jt.concat(edge_pts_x, dim=1).unsqueeze(dim=2)
+        sampling_points_y = jt.concat(edge_pts_y, dim=1).unsqueeze(dim=2)
+        sampling_points = jt.concat([sampling_points_x, sampling_points_y],
+                                    dim=2)
+
+        return sampling_points
 
     def pointsets_quality_assessment(self, pts_features, cls_score,
                                      pts_pred_init, pts_pred_refine, label,
@@ -439,7 +491,6 @@ class OrientedRepPointsHead(nn.Module):
             qua (jt.tensor) : weighted quality values for positive
                                  point set samples.
         """
-        device = cls_score.device
         pos_scores = cls_score[pos_inds]
         pos_pts_pred_init = pts_pred_init[pos_inds]
         pos_pts_pred_refine = pts_pred_refine[pos_inds]
@@ -463,10 +514,10 @@ class OrientedRepPointsHead(nn.Module):
         polygons_pred_init = reppoints_min_area_bbox(pos_pts_pred_init)
         polygons_pred_refine = reppoints_min_area_bbox(pos_pts_pred_refine)
         sampling_pts_pred_init = self.sampling_points(
-            polygons_pred_init, 10, device=device)
+            polygons_pred_init, 10)
         sampling_pts_pred_refine = self.sampling_points(
-            polygons_pred_refine, 10, device=device)
-        sampling_pts_gt = self.sampling_points(pos_bbox_gt, 10, device=device)
+            polygons_pred_refine, 10)
+        sampling_pts_gt = self.sampling_points(pos_bbox_gt, 10)
 
         # quality of orientation
         qua_ori_init = self.ori_qua_weight * ChamferDistance2D(
@@ -532,7 +583,7 @@ class OrientedRepPointsHead(nn.Module):
         """
 
         if len(pos_inds) == 0:
-            return label, label_weight, bbox_weight, 0, jt.tensor(
+            return label, label_weight, bbox_weight, 0, jt.array(
                 []).type_as(bbox_weight)
 
         num_gt = pos_gt_inds.max()
@@ -548,41 +599,50 @@ class OrientedRepPointsHead(nn.Module):
         pos_inds_after_select = []
         ignore_inds_after_select = []
 
-        for gt_ind in range(num_gt):
+        if int(num_gt) == 0:
+            return label, label_weight, bbox_weight, 0, jt.array(
+                []).type_as(bbox_weight)
+
+        for gt_ind in range(int(num_gt)):
             pos_inds_select = []
             pos_loss_select = []
-            gt_mask = pos_gt_inds == (gt_ind + 1)
+            gt_mask = pos_gt_inds == (gt_ind + 1) 
             for level in range(num_level):
                 level_mask = pos_level_mask[level]
                 level_gt_mask = level_mask & gt_mask
-                value, topk_inds = quality[level_gt_mask].topk(
-                    min(level_gt_mask.sum(), 6), largest=False)
+                mask_quality = quality[level_gt_mask]
+                if level_gt_mask.sum() <= 6:
+                    topk_inds, value = jt.argsort(mask_quality,dim=mask_quality.ndim-1,descending=False)
+                else:
+                    value, topk_inds = mask_quality.topk(
+                        6, largest=False)
                 pos_inds_select.append(pos_inds[level_gt_mask][topk_inds])
                 pos_loss_select.append(value)
-            pos_inds_select = jt.cat(pos_inds_select)
-            pos_loss_select = jt.cat(pos_loss_select)
+            pos_inds_select = jt.concat(pos_inds_select)
+            pos_loss_select = jt.concat(pos_loss_select)
 
             if len(pos_inds_select) < 2:
                 pos_inds_after_select.append(pos_inds_select)
-                ignore_inds_after_select.append(pos_inds_select.new_tensor([]))
+                ignore_inds_after_select.append(jt.empty([]))
 
             else:
-                pos_loss_select, sort_inds = pos_loss_select.sort(
-                )  # small to large
+                # pos_loss_select, sort_inds = pos_loss_select.sort()  # small to large
+                # pos_loss_select, sort_inds = fake_argsort2(pos_loss_select)
+                sort_inds, pos_loss_select = fake_argsort2(pos_loss_select)
                 pos_inds_select = pos_inds_select[sort_inds]
                 # dynamic top k
                 topk = math.ceil(pos_loss_select.shape[0] * self.top_ratio)
                 pos_inds_select_topk = pos_inds_select[:topk]
                 pos_inds_after_select.append(pos_inds_select_topk)
                 ignore_inds_after_select.append(
-                    pos_inds_select_topk.new_tensor([]))
+                    jt.empty([]))
 
-        pos_inds_after_select = jt.cat(pos_inds_after_select)
-        ignore_inds_after_select = jt.cat(ignore_inds_after_select)
+        pos_inds_after_select = jt.concat(pos_inds_after_select)
+        ignore_inds_after_select = jt.concat(ignore_inds_after_select)
 
         reassign_mask = (pos_inds.unsqueeze(1) != pos_inds_after_select).all(1)
         reassign_ids = pos_inds[reassign_mask]
-        label[reassign_ids] = self.num_classes
+        label[reassign_ids] = 0
         label_weight[ignore_inds_after_select] = 0
         bbox_weight[reassign_ids] = 0
         num_pos = len(pos_inds_after_select)
@@ -596,7 +656,7 @@ class OrientedRepPointsHead(nn.Module):
                                                   0).type_as(label)
         pos_normalize_term = pos_level_mask_after_select * (
             self.point_base_scale *
-            jt.as_tensor(self.point_strides).type_as(label)).reshape(-1, 1)
+            jt.array(self.point_strides).type_as(label)).reshape(-1, 1)
         pos_normalize_term = pos_normalize_term[
             pos_normalize_term > 0].type_as(bbox_weight)
         assert len(pos_normalize_term) == len(pos_inds_after_select)
@@ -641,7 +701,7 @@ class OrientedRepPointsHead(nn.Module):
         pos_proposals = jt.zeros_like(proposals)
         proposals_weights = jt.zeros(num_valid_proposals, dtype=proposals.dtype)
         labels = jt.full((num_valid_proposals, ),
-                                    self.background_label,
+                                    0,
                                     dtype=jt.int32)
         label_weights = jt.zeros((num_valid_proposals,), dtype=jt.float32)
 
@@ -653,10 +713,6 @@ class OrientedRepPointsHead(nn.Module):
             pos_proposals[pos_inds, :] = proposals[pos_inds, :]
             proposals_weights[pos_inds] = 1.0
             if gt_labels is None:
-                # Only rpn gives gt_labels as None
-                # Foreground is the first class
-                # TODO(514flowey): first class is 1
-                # labels[pos_inds] = 0
                 labels[pos_inds] = 1
             else:
                 labels[pos_inds] = gt_labels[
@@ -691,8 +747,7 @@ class OrientedRepPointsHead(nn.Module):
         bbox_gt_init = bbox_gt_init.reshape(-1, 8)
         bbox_weights_init = bbox_weights_init.reshape(-1)
         pts_pred_init = pts_pred_init.reshape(-1, 2 * self.num_points)
-        pos_ind_init = (bbox_weights_init > 0).nonzero(
-            as_tuple=False).reshape(-1)
+        pos_ind_init = (bbox_weights_init > 0).nonzero().reshape(-1)
 
         pts_pred_init_norm = pts_pred_init[pos_ind_init]
         bbox_gt_init_norm = bbox_gt_init[pos_ind_init]
@@ -787,22 +842,35 @@ class OrientedRepPointsHead(nn.Module):
              all_overlaps_rotate_list,
              stage=stage,
              unmap_outputs=unmap_outputs)
-        # no valid points
-        if any([labels is None for labels in all_labels]):
-            return None
-        # sampled points of all images
-        num_total_pos = sum([max(inds.numel(), 1) for inds in pos_inds_list])
-        num_total_neg = sum([max(inds.numel(), 1) for inds in neg_inds_list])
-        labels_list = images_to_levels(all_labels, num_level_proposals)
-        label_weights_list = images_to_levels(all_label_weights,
-                                              num_level_proposals)
-        bbox_gt_list = images_to_levels(all_bbox_gt, num_level_proposals)
-        proposals_list = images_to_levels(all_proposals, num_level_proposals)
-        proposal_weights_list = images_to_levels(all_proposal_weights,
-                                                 num_level_proposals)
 
-        return (labels_list, label_weights_list, bbox_gt_list, proposals_list,
-                proposal_weights_list, num_total_pos, num_total_neg, None)
+        if stage == 'init':
+            # no valid points
+            if any([labels is None for labels in all_labels]):
+                return None
+            # sampled points of all images
+            num_total_pos = sum([max(inds.numel(), 1) for inds in pos_inds_list])
+            num_total_neg = sum([max(inds.numel(), 1) for inds in neg_inds_list])
+            labels_list = images_to_levels(all_labels, num_level_proposals)
+            label_weights_list = images_to_levels(all_label_weights,
+                                                num_level_proposals)
+            bbox_gt_list = images_to_levels(all_bbox_gt, num_level_proposals)
+            proposals_list = images_to_levels(all_proposals, num_level_proposals)
+            proposal_weights_list = images_to_levels(all_proposal_weights,
+                                                    num_level_proposals)
+
+            return (labels_list, label_weights_list, bbox_gt_list, proposals_list,
+                    proposal_weights_list, num_total_pos, num_total_neg, None)
+        else:
+            pos_inds = []
+            # pos_gt_index = []
+            for i, single_labels in enumerate(all_labels):
+                pos_mask = single_labels > 0
+                pos_inds.append(pos_mask.nonzero().view(-1))
+
+            gt_inds = [item.pos_assigned_gt_inds for item in sampling_result]
+
+            return (all_labels, all_label_weights, all_bbox_gt, all_proposals,
+                    all_proposal_weights, pos_inds, gt_inds)
 
     def loss(self,
              cls_scores,
@@ -825,11 +893,12 @@ class OrientedRepPointsHead(nn.Module):
             featmap_sizes, img_metas)
         pts_coordinate_preds_init = self.offset_to_pts(center_list,
                                                        pts_preds_init)
-        if self.use_reassign:  # get num_proposal_each_lvl and lvl_num
-            num_proposals_each_level = [(featmap.size(-1) * featmap.size(-2))
-                                        for featmap in cls_scores]
-            num_level = len(featmap_sizes)
-            assert num_level == len(pts_coordinate_preds_init)
+
+        num_proposals_each_level = [(featmap.size(-1) * featmap.size(-2))
+                                    for featmap in cls_scores]
+        num_level = len(featmap_sizes)
+        assert num_level == len(pts_coordinate_preds_init)
+
         if self.train_cfg.init.assigner['type'] == 'ConvexAssigner':
             candidate_list = center_list
         else:
@@ -935,23 +1004,22 @@ class OrientedRepPointsHead(nn.Module):
             num_pos = sum(num_pos)
 
         # convert all tensor list to a flatten tensor
-        cls_scores = jt.cat(cls_scores, 0).view(-1, cls_scores[0].size(-1))
-        pts_preds_refine = jt.cat(pts_coordinate_preds_refine_img, 0).view(
+        cls_scores = jt.concat(cls_scores, 0).view(-1, cls_scores[0].size(-1))
+        pts_preds_refine = jt.concat(pts_coordinate_preds_refine_img, 0).view(
             -1, pts_coordinate_preds_refine_img[0].size(-1))
 
-        labels = jt.cat(labels_list, 0).view(-1)
-        labels_weight = jt.cat(label_weights_list, 0).view(-1)
-        bbox_gt_refine = jt.cat(bbox_gt_list_refine,
+        labels = jt.concat(labels_list, 0).view(-1)
+        labels_weight = jt.concat(label_weights_list, 0).view(-1)
+        bbox_gt_refine = jt.concat(bbox_gt_list_refine,
                                    0).view(-1, bbox_gt_list_refine[0].size(-1))
-        bbox_weights_refine = jt.cat(bbox_weights_list_refine, 0).view(-1)
-        pos_normalize_term = jt.cat(pos_normalize_term, 0).reshape(-1)
-        pos_inds_flatten = ((0 <= labels) &
-                            (labels < self.num_classes)).nonzero(
-                                as_tuple=False).reshape(-1)
+        bbox_weights_refine = jt.concat(bbox_weights_list_refine, 0).view(-1)
+        pos_normalize_term = jt.concat(pos_normalize_term, 0).reshape(-1)
+        pos_inds_flatten = (labels > 0).nonzero().reshape(-1)
 
-        assert len(pos_normalize_term) == len(pos_inds_flatten)
+        # print('pos_normalize_term: ', pos_normalize_term.shape, pos_inds_flatten.shape)
+        # assert len(pos_normalize_term) == len(pos_inds_flatten)
 
-        if num_pos:
+        if bool(num_pos) and len(pos_normalize_term) == len(pos_inds_flatten):
             losses_cls = self.loss_cls(
                 cls_scores, labels, labels_weight, avg_factor=num_pos)
             pos_pts_pred_refine = pts_preds_refine[pos_inds_flatten]
@@ -1457,6 +1525,3 @@ class MlvlPointGenerator:
              self.offset) * self.strides[level_idx][1]
         prioris = jt.stack([x, y], 1).to(dtype)
         return prioris
-
-
-

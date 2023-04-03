@@ -3,7 +3,8 @@ from jittor import nn
 from jdet.utils.registry import LOSSES
 
 from jdet.models.boxes.box_ops import points_in_rotated_boxes
-
+from jdet.ops.bbox_transforms import poly2obb
+import numpy as np
 
 @LOSSES.register_module()
 class SpatialBorderLoss(nn.Module):
@@ -20,11 +21,20 @@ class SpatialBorderLoss(nn.Module):
         super(SpatialBorderLoss, self).__init__()
         self.loss_weight = loss_weight
 
-    def forward(self, pts, gt_bboxes, weight, *args, **kwargs):
+    def execute(self, pts, gt_bboxes, weight, *args, **kwargs):
         loss = self.loss_weight * weighted_spatial_border_loss(
             pts, gt_bboxes, weight, *args, **kwargs)
         return loss
 
+def to_le135(boxes):
+    # swap edge and angle if h >= w
+    x, y, w, h, t = boxes.unbind(dim=-1)
+    start_angle = -45 / 180 * np.pi
+    w_ = jt.where(w > h, w, h)
+    h_ = jt.where(w > h, h, w)
+    t = jt.where(w > h, t, t + np.pi / 2)
+    t = ((t - start_angle) % np.pi) + start_angle
+    return jt.stack([x, y, w_, h_, t], dim=-1)
 
 def spatial_border_loss(pts, gt_bboxes):
     """The loss is used to penalize the learning points out of the assigned
@@ -35,9 +45,11 @@ def spatial_border_loss(pts, gt_bboxes):
     Returns:
         loss (jt.Tensor)
     """
+    
     num_gts, num_pointsets = gt_bboxes.size(0), pts.size(0)
     num_point = int(pts.size(1) / 2.0)
-    loss = pts.new_zeros([0])
+    loss = jt.zeros([0])
+    gt_bboxes_ = to_le135(poly2obb(gt_bboxes))
 
     if num_gts > 0:
         inside_flag_list = []
@@ -45,7 +57,7 @@ def spatial_border_loss(pts, gt_bboxes):
             pt = pts[:, (2 * i):(2 * i + 2)].reshape(num_pointsets,
                                                      2).contiguous()
             # inside_pt_flag = points_in_polygons(pt, gt_bboxes)
-            inside_pt_flag = points_in_rotated_boxes(pt, gt_bboxes)
+            inside_pt_flag = points_in_rotated_boxes(pt, gt_bboxes_)
             inside_pt_flag = jt.diag(inside_pt_flag)
             inside_flag_list.append(inside_pt_flag)
 
@@ -79,7 +91,7 @@ def weighted_spatial_border_loss(pts, gt_bboxes, weight, avg_factor=None):
     """
 
     weight = weight.unsqueeze(dim=1).repeat(1, 4)
-    assert weight.dim() == 2
+    assert len(weight.shape) == 2
     if avg_factor is None:
         avg_factor = jt.sum(weight > 0).float().item() / 4 + 1e-6
     loss = spatial_border_loss(pts, gt_bboxes)
