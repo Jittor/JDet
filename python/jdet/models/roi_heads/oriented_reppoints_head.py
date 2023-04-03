@@ -7,6 +7,7 @@ from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.anchor_target import images_to_levels
 from jdet.ops.reppoints_convex_iou import reppoints_convex_iou
 from jdet.ops.reppoints_min_area_bbox import reppoints_min_area_bbox
+from jdet.ops.chamfer_distance import chamfer_distance
 from jdet.models.boxes.box_ops import rotated_box_to_poly
 
 import jittor as jt
@@ -67,6 +68,31 @@ def transpose_to(a, b):
         print(type(b))
         raise NotImplementedError
 
+def ChamferDistance2D(point_set_1,
+                      point_set_2,
+                      distance_weight=0.05,
+                      eps=1e-12):
+    """Compute the Chamfer distance between two point sets.
+
+    Args:
+        point_set_1 (jt.tensor): point set 1 with shape (N_pointsets,
+                                    N_points, 2)
+        point_set_2 (jt.tensor): point set 2 with shape (N_pointsets,
+                                    N_points, 2)
+
+    Returns:
+        dist (jt.tensor): chamfer distance between two point sets
+                             with shape (N_pointsets,)
+    """
+    assert point_set_1.dim() == point_set_2.dim()
+    assert point_set_1.shape[-1] == point_set_2.shape[-1]
+    assert point_set_1.dim() <= 3
+    dist1, dist2, _, _ = chamfer_distance(point_set_1, point_set_2)
+    dist1 = jt.sqrt(jt.clamp(dist1, eps))
+    dist2 = jt.sqrt(jt.clamp(dist2, eps))
+    dist = distance_weight * (dist1.mean(-1) + dist2.mean(-1)) / 2.0
+
+    return dist
 
 
 @HEADS.register_module()
