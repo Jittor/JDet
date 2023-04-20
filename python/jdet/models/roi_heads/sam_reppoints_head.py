@@ -5,9 +5,9 @@ from jdet.ops.bbox_transforms import obb2poly, poly2obb
 from jdet.utils.general import multi_apply, unmap
 from jdet.ops.nms_rotated import multiclass_nms_rotated
 from jdet.models.boxes.anchor_target import images_to_levels
-from jdet.ops.reppoints_convex_iou import reppoints_convex_iou
 from jdet.ops.reppoints_min_area_bbox import reppoints_min_area_bbox
 from jdet.models.boxes.box_ops import rotated_box_to_poly
+
 
 import jittor as jt
 from jittor import nn
@@ -15,8 +15,55 @@ import numpy as np
 from jittor.nn import _pair
 
 
+def get_num_level_anchors_inside(num_level_anchors, inside_flags):
+    """Get number of every level anchors inside.
 
-import numpy as np
+    Args:
+        num_level_anchors (List[int]): List of number of every level's anchors.
+        inside_flags (jt.Tensor): Flags of all anchors.
+
+    Returns:
+        List[int]: List of number of inside anchors.
+    """
+    split_inside_flags = jt.split(inside_flags, num_level_anchors)
+    num_level_anchors_inside = [
+        int(flags.sum()) for flags in split_inside_flags
+    ]
+    return num_level_anchors_inside
+
+def points_center_pts(RPoints, y_first=True):
+    """Compute center point of Pointsets.
+
+    Args:
+        RPoints (jt.Tensor): the  lists of Pointsets, shape (k, 18).
+        y_first (bool, optional): if True, the sequence of Pointsets is (y,x).
+
+    Returns:
+        center_pts (jt.Tensor): the mean_center coordination of Pointsets,
+            shape (k, 18).
+    """
+    RPoints = RPoints.reshape(-1, 9, 2)
+
+    if y_first:
+        pts_dy = RPoints[:, :, 0::2]
+        pts_dx = RPoints[:, :, 1::2]
+    else:
+        pts_dx = RPoints[:, :, 0::2]
+        pts_dy = RPoints[:, :, 1::2]
+    pts_dy_mean = pts_dy.mean(dim=1).reshape(-1, 1)
+    pts_dx_mean = pts_dx.mean(dim=1).reshape(-1, 1)
+    center_pts = jt.concat([pts_dx_mean, pts_dy_mean], dim=1).reshape(-1, 2)
+    return center_pts
+
+def to_oc(boxes):
+    x, y, w, h, t = boxes.unbind(dim=-1)
+    start_angle = -0.5 * np.pi
+    t = ((t - start_angle) % np.pi)
+    w_ = jt.where(t < np.pi / 2, w, h)
+    h_ = jt.where(t < np.pi / 2, h, w)
+    t = jt.where(t < np.pi / 2, t, t - np.pi / 2) + start_angle
+    return jt.stack([x, y, w_, h_, t], dim=-1)
+
 def deleteme(a, b, size = 10):
     if a is None and b is None:
         return
@@ -81,8 +128,8 @@ def fake_argsort2(x, dim=0, descending=False):
     return y, index
 
 @HEADS.register_module()
-class RotatedRepPointsHead(nn.Module):
-    """Rotated RepPoints head.
+class SAMRepPointsHead(nn.Module):
+    """Rotated RepPoints head for SASM.
 
     Args:
         num_classes (int): Number of classes.
@@ -107,7 +154,6 @@ class RotatedRepPointsHead(nn.Module):
         center_init (bool, optional): Whether to use center point assignment.
         transform_method (str, optional): The methods to transform RepPoints
             to bbox.
-        use_reassign (bool, optional): Whether to reassign samples.
         topk (int, optional): Number of the highest topk points. Defaults to 9.
         anti_factor (float, optional): Feature anti-aliasing coefficient.
     """
@@ -140,7 +186,6 @@ class RotatedRepPointsHead(nn.Module):
                  test_cfg=None,
                  center_init=True,
                  transform_method='rotrect',
-                 use_reassign=False,
                  topk=6,
                  anti_factor=0.75,
                  **kwargs):
@@ -194,7 +239,6 @@ class RotatedRepPointsHead(nn.Module):
             self.cls_out_channels = self.num_classes + 1
         self.loss_bbox_init = build_from_cfg(loss_bbox_init, LOSSES)
         self.loss_bbox_refine = build_from_cfg(loss_bbox_refine, LOSSES)
-        self.use_reassign = use_reassign
         self.topk = topk
         self.anti_factor = anti_factor
         self.background_label = background_label
@@ -331,6 +375,7 @@ class RotatedRepPointsHead(nn.Module):
 
     def _point_target_single(self,
                              flat_proposals,
+                             num_level_proposals,
                              valid_flags,
                              gt_bboxes,
                              gt_bboxes_ignore,
@@ -339,21 +384,40 @@ class RotatedRepPointsHead(nn.Module):
                              stage='init',
                              unmap_outputs=True):
         """Single point target function."""
-        print('A: ', flat_proposals.shape, valid_flags.shape, gt_bboxes.shape,  gt_labels.shape)
+        # print('A: ', flat_proposals.shape, valid_flags.shape, gt_bboxes.shape,  gt_labels.shape)
         inside_flags = valid_flags
         if not inside_flags.any():
-            return (None, ) * 8
+            return (None, ) * 9
         # assign gt and sample proposals
         proposals = flat_proposals[inside_flags, :]
-        print(' proposals: ', len(proposals))
+
+        num_level_anchors_inside = get_num_level_anchors_inside(
+            num_level_proposals, inside_flags)
+
+        # convert gt from obb to poly
+        gt_bboxes = obb2poly(gt_bboxes)
 
         if stage == 'init':
             assigner = self.init_assigner
             pos_weight = self.train_cfg.init.pos_weight
+            assign_result = assigner.assign(proposals, gt_bboxes,
+                                        gt_bboxes_ignore,
+                                        None if self.sampling else gt_labels)
         else:
             assigner = self.refine_assigner
             pos_weight = self.train_cfg.refine.pos_weight
+            if self.train_cfg.refine.assigner.type not in (
+                    'ATSSAssigner', 'ATSSConvexAssigner', 'SASAssigner'):
+                assign_result = assigner.assign(
+                    proposals, gt_bboxes, overlaps, gt_bboxes_ignore,
+                    None if self.sampling else gt_labels)
+            else:
+                assign_result = assigner.assign(
+                    proposals, num_level_anchors_inside, gt_bboxes,
+                    gt_bboxes_ignore, None if self.sampling else gt_labels)
 
+        sampling_result = self.sampler.sample(assign_result, proposals,
+                                              gt_bboxes)
         # if stage != 'init':
         #     import pickle
         #     input_dict = pickle.load(open("/mnt/disk/flowey/remote/JDet-debug/weights/input_dict.pkl", "rb"))
@@ -362,30 +426,36 @@ class RotatedRepPointsHead(nn.Module):
         #     gt_labels = transpose_to(input_dict['gt_labels'], gt_labels)
         #     gt_bboxes_ignore = transpose_to(input_dict['gt_bboxes_ignore'], gt_bboxes_ignore)
 
-        # convert gt from obb to poly
-        gt_bboxes = obb2poly(gt_bboxes)
+
 
 
         # if stage != 'init':
-        assign_result = assigner.assign(proposals, gt_bboxes,
-                                        gt_bboxes_ignore,
-                                        None if self.sampling else gt_labels)
         # assign_result = assigner.assign(proposals, gt_bboxes,
-        #                                 gt_bboxes_ignore, gt_labels)
-        sampling_result = self.sampler.sample(assign_result, proposals,
-                                              gt_bboxes)
+        #                                 gt_bboxes_ignore,
+        #                                 None if self.sampling else gt_labels)
+        # # assign_result = assigner.assign(proposals, gt_bboxes,
+        # #                                 gt_bboxes_ignore, gt_labels)
+        # sampling_result = self.sampler.sample(assign_result, proposals,
+        #                                       gt_bboxes)
 
         
 
-        # if stage != 'init':
-            # out_list = [sampling_result.pos_inds, sampling_result.neg_inds,
-            #             sampling_result.pos_gt_bboxes, sampling_result.pos_assigned_gt_inds,
-            #             assign_result.gt_inds]
-            # print('sampling_result: ',  len(sampling_result.pos_inds), len(sampling_result.neg_inds), len(sampling_result.pos_gt_bboxes), len(sampling_result.pos_assigned_gt_inds), len(assign_result.gt_inds))
-        #     result_list = pickle.load(open("/mnt/disk/flowey/remote/JDet-debug/weights/result_dict.pkl", "rb"))
-        #     deleteme(out_list, result_list)
+        # if stage != 'init' and len(sampling_result.pos_inds) == 21824:
+        #     import pickle
+        #     input_list = [flat_proposals, valid_flags, proposals, gt_bboxes, gt_labels]
+        #     print('input_list: ', proposals[0],proposals[10000], proposals[20000])
+        #     print('input_list: ', gt_bboxes[0])
+        #     result_list = pickle.dump(input_list, open("/home/zytx121/jittor/JDet-refactor_r3det/input_dict.pkl", 'wb'))
+
+        #     out_list = [sampling_result.pos_inds, sampling_result.neg_inds,
+        #                 sampling_result.pos_gt_bboxes, sampling_result.pos_assigned_gt_inds,
+        #                 assign_result.gt_inds]
+        #     result_list = pickle.dump(out_list, open("/home/zytx121/jittor/JDet-refactor_r3det/result_dict.pkl", 'wb'))
+        #     # print('out_list: ', out_list)
+ 
         #     exit(0)
 
+        gt_inds = assign_result.gt_inds
         num_valid_proposals = proposals.shape[0]
         bbox_gt = jt.zeros([num_valid_proposals, 8], dtype=proposals.dtype)
         pos_proposals = jt.zeros_like(proposals)
@@ -398,7 +468,7 @@ class RotatedRepPointsHead(nn.Module):
 
         pos_inds = sampling_result.pos_inds
         neg_inds = sampling_result.neg_inds
-        print('pos_inds', len(pos_inds))
+        # print('pos_inds', len(pos_inds))
         if len(pos_inds) > 0:
             pos_gt_bboxes = sampling_result.pos_gt_bboxes
             bbox_gt[pos_inds, :] = pos_gt_bboxes
@@ -420,6 +490,59 @@ class RotatedRepPointsHead(nn.Module):
         if len(neg_inds) > 0:
             label_weights[neg_inds] = 1.0
 
+        # use la
+        rbboxes_center, width, height, angles = jt.split(
+           to_oc(poly2obb(bbox_gt)), [2, 1, 1, 1], dim=-1)
+
+        if stage == 'init':
+            points_xy = pos_proposals[:, :2]
+        else:
+            points_xy = points_center_pts(pos_proposals, y_first=True)
+
+        distances = jt.zeros_like(angles).reshape(-1)
+        # print('angles: ', angles.max(), angles.min())
+        # angles_index_wh = ((width != 0) & (angles >= 0) &
+        #                    (angles <= 1.57)).squeeze()
+        # angles_index_hw = ((width != 0) & ((angles < 0) |
+        #                                    (angles > 1.57))).squeeze()
+
+        # print('angles_index_hw: ', bool(angles_index_hw.sum()), bool(angles_index_wh.sum()))
+
+        # 01_la:compution of distance
+        distances = jt.sqrt(
+            (jt.pow(
+                rbboxes_center[:, 0] -
+                points_xy[:, 0], 2) /
+            width.squeeze()) +
+            (jt.pow(
+                rbboxes_center[:, 1] -
+                points_xy[:, 1], 2) /
+            height.squeeze()))
+        # if bool(angles_index_wh.sum()):
+        #     distances[angles_index_wh] = jt.sqrt(
+        #         (jt.pow(
+        #             rbboxes_center[angles_index_wh, 0] -
+        #             points_xy[angles_index_wh, 0], 2) /
+        #         width[angles_index_wh].squeeze()) +
+        #         (jt.pow(
+        #             rbboxes_center[angles_index_wh, 1] -
+        #             points_xy[angles_index_wh, 1], 2) /
+        #         height[angles_index_wh].squeeze()))
+        # if bool(angles_index_hw.sum()):
+        #     distances[angles_index_hw] = jt.sqrt(
+        #         (jt.pow(
+        #             rbboxes_center[angles_index_hw, 0] -
+        #             points_xy[angles_index_hw, 0], 2) /
+        #         height[angles_index_hw].squeeze()) +
+        #         (jt.pow(
+        #             rbboxes_center[angles_index_hw, 1] -
+        #             points_xy[angles_index_hw, 1], 2) /
+        #         width[angles_index_hw].squeeze()))
+        distances[distances == float('nan')] = 0.
+
+        sam_weights = label_weights * (jt.exp(1 / (distances + 1)))
+        sam_weights[sam_weights == float('inf')] = 0.
+
         # map up to original set of proposals
         if unmap_outputs:
             num_total_proposals = flat_proposals.size(0)
@@ -431,11 +554,13 @@ class RotatedRepPointsHead(nn.Module):
                                   inside_flags)
             proposals_weights = unmap(proposals_weights, num_total_proposals,
                                       inside_flags)
-                                      
-        print('In _point_target_single: ', len(labels), len((labels > 0).nonzero().view(-1)))
+            gt_inds = unmap(gt_inds, num_total_proposals, inside_flags)
+            sam_weights = unmap(sam_weights, num_total_proposals, inside_flags)
+
+        # print('In _point_target_single: ', len(labels), len((labels > 0).nonzero().view(-1)))
 
         return (labels, label_weights, bbox_gt, pos_proposals,
-                proposals_weights, pos_inds, neg_inds, sampling_result)
+                proposals_weights, pos_inds, neg_inds, gt_inds, sam_weights)
 
     def get_targets(self,
                     proposals_list,
@@ -484,11 +609,12 @@ class RotatedRepPointsHead(nn.Module):
         """
         assert stage in ['init', 'refine']
         num_imgs = len(img_metas)
-        print('num_imgs: ', num_imgs)
+        # print('num_imgs: ', num_imgs)
         assert len(proposals_list) == len(valid_flag_list) == num_imgs
 
         # points number of multi levels
         num_level_proposals = [points.size(0) for points in proposals_list[0]]
+        num_level_proposals_list = [num_level_proposals] * num_imgs
 
         # concat all level points and flags to a single tensor
         for i in range(num_imgs):
@@ -501,12 +627,14 @@ class RotatedRepPointsHead(nn.Module):
             gt_bboxes_ignore_list = [None for _ in range(num_imgs)]
         if gt_labels_list is None:
             gt_labels_list = [None for _ in range(num_imgs)]
-        all_overlaps_rotate_list = [None] * len(proposals_list)
+        len_gt_labels = len(gt_bboxes_list)
+        all_overlaps_rotate_list = [None] * len_gt_labels
         (all_labels, all_label_weights, all_bbox_gt, all_proposals,
-         all_proposal_weights, pos_inds_list, neg_inds_list,
-         sampling_result) = multi_apply(
+         all_proposal_weights, pos_inds_list, neg_inds_list, all_gt_inds_list,
+         all_sam_init_weights) = multi_apply(
              self._point_target_single,
              proposals_list,
+             num_level_proposals_list,
              valid_flag_list,
              gt_bboxes_list,
              gt_bboxes_ignore_list,
@@ -527,152 +655,62 @@ class RotatedRepPointsHead(nn.Module):
         proposals_list = images_to_levels(all_proposals, num_level_proposals)
         proposal_weights_list = images_to_levels(all_proposal_weights,
                                                  num_level_proposals)
+        gt_inds_list = images_to_levels(all_gt_inds_list, num_level_proposals)
+        sam_init_weights_list = images_to_levels(all_sam_init_weights,
+                                                 num_level_proposals)
 
         return (labels_list, label_weights_list, bbox_gt_list, proposals_list,
-                proposal_weights_list, num_total_pos, num_total_neg, None)
-
-    def get_cfa_targets(self,
-                        proposals_list,
-                        valid_flag_list,
-                        gt_bboxes_list,
-                        img_metas,
-                        gt_bboxes_ignore_list=None,
-                        gt_labels_list=None,
-                        stage='init',
-                        label_channels=1,
-                        unmap_outputs=True):
-        """Compute corresponding GT box and classification targets for
-        proposals.
-
-        Args:
-            proposals_list (list[list]): Multi level points/bboxes of each
-                image.
-            valid_flag_list (list[list]): Multi level valid flags of each
-                image.
-            gt_bboxes_list (list[Tensor]): Ground truth bboxes of each image.
-            img_metas (list[dict]): Meta info of each image.
-            gt_bboxes_ignore_list (list[Tensor]): Ground truth bboxes to be
-                ignored.
-            gt_bboxes_list (list[Tensor]): Ground truth labels of each box.
-            stage (str): `init` or `refine`. Generate target for init stage or
-                refine stage
-            label_channels (int): Channel of label.
-            unmap_outputs (bool): Whether to map outputs back to the original
-                set of anchors.
-
-        Returns:
-            tuple:
-                - all_labels (list[Tensor]): Labels of each level.
-                - all_label_weights (list[Tensor]): Label weights of each \
-                    level.
-                - all_bbox_gt (list[Tensor]): Ground truth bbox of each level.
-                - all_proposals (list[Tensor]): Proposals(points/bboxes) of \
-                    each level.
-                - all_proposal_weights (list[Tensor]): Proposal weights of \
-                    each level.
-                - pos_inds (list[Tensor]): Index of positive samples in all \
-                    images.
-                - gt_inds (list[Tensor]): Index of ground truth bbox in all \
-                    images.
-        """
-        assert stage in ['init', 'refine']
-        num_imgs = len(img_metas)
-        assert len(proposals_list) == len(valid_flag_list) == num_imgs
-
-        # concat all level points and flags to a single tensor
-        for i in range(num_imgs):
-            assert len(proposals_list[i]) == len(valid_flag_list[i])
-            proposals_list[i] = jt.concat(proposals_list[i])
-            valid_flag_list[i] = jt.concat(valid_flag_list[i])
-
-        # compute targets for each image
-        if gt_bboxes_ignore_list is None:
-            gt_bboxes_ignore_list = [None for _ in range(num_imgs)]
-        if gt_labels_list is None:
-            gt_labels_list = [None for _ in range(num_imgs)]
-        all_overlaps_rotate_list = [None] * len(proposals_list)
-        (all_labels, all_label_weights, all_bbox_gt, all_proposals,
-         all_proposal_weights, pos_inds_list, neg_inds_list,
-         sampling_result) = multi_apply(
-             self._point_target_single,
-             proposals_list,
-             valid_flag_list,
-             gt_bboxes_list,
-             gt_bboxes_ignore_list,
-             gt_labels_list,
-             all_overlaps_rotate_list,
-             stage=stage,
-             unmap_outputs=unmap_outputs)
-        pos_inds = []
-        # pos_gt_index = []
-        for i, single_labels in enumerate(all_labels):
-            # pos_mask = (0 < single_labels) & (
-            #     single_labels <= self.num_classes) #TODO(514flowey): num_class not include background
-            # print('single_labels: ', single_labels)
-            pos_mask = single_labels > 0
-            # pos_mask = (0 < single_labels) & (
-            #     single_labels <= self.num_classes)
-            pos_inds.append(pos_mask.nonzero().view(-1))
-            print('In get_cfa_targets pos_mask.nonzero().view(-1): ', len(pos_mask.nonzero().view(-1)), len(single_labels))
-
-        gt_inds = [item.pos_assigned_gt_inds for item in sampling_result]
-
-        return (all_labels, all_label_weights, all_bbox_gt, all_proposals,
-                all_proposal_weights, pos_inds, gt_inds)
+                proposal_weights_list, num_total_pos, num_total_neg,
+                gt_inds_list, sam_init_weights_list)
 
     def loss_single(self, cls_score, pts_pred_init, pts_pred_refine, labels,
                     label_weights, rbbox_gt_init, convex_weights_init,
-                    rbbox_gt_refine, convex_weights_refine, stride,
-                    num_total_samples_refine):
+                    sam_weights_init, rbbox_gt_refine, convex_weights_refine,
+                    sam_weights_refine, stride, num_total_samples_refine):
         """Single loss function."""
         normalize_term = self.point_base_scale * stride
-        if self.use_reassign:
-            rbbox_gt_init = rbbox_gt_init.reshape(-1, 8)
-            convex_weights_init = convex_weights_init.reshape(-1)
-            pts_pred_init = pts_pred_init.reshape(-1, 2 * self.num_points)
-            pos_ind_init = (convex_weights_init > 0).nonzero().reshape(-1)
-            pts_pred_init_norm = pts_pred_init[pos_ind_init]
-            rbbox_gt_init_norm = rbbox_gt_init[pos_ind_init]
-            convex_weights_pos_init = convex_weights_init[pos_ind_init]
-            loss_pts_init = self.loss_bbox_init(
-                pts_pred_init_norm / normalize_term,
-                rbbox_gt_init_norm / normalize_term, convex_weights_pos_init)
-            return 0, loss_pts_init, 0
-        else:
-            rbbox_gt_init = rbbox_gt_init.reshape(-1, 8)
-            convex_weights_init = convex_weights_init.reshape(-1)
-            # init points loss
-            pts_pred_init = pts_pred_init.reshape(-1, 2 * self.num_points)
-            pos_ind_init = (convex_weights_init > 0).nonzero().reshape(-1)
-            pts_pred_init_norm = pts_pred_init[pos_ind_init]
-            rbbox_gt_init_norm = rbbox_gt_init[pos_ind_init]
-            convex_weights_pos_init = convex_weights_init[pos_ind_init]
-            loss_pts_init = self.loss_bbox_init(
-                pts_pred_init_norm / normalize_term,
-                rbbox_gt_init_norm / normalize_term, convex_weights_pos_init)
-            # refine points loss
-            rbbox_gt_refine = rbbox_gt_refine.reshape(-1, 8)
-            pts_pred_refine = pts_pred_refine.reshape(-1, 2 * self.num_points)
-            convex_weights_refine = convex_weights_refine.reshape(-1)
-            pos_ind_refine = (convex_weights_refine > 0).nonzero().reshape(-1)
-            pts_pred_refine_norm = pts_pred_refine[pos_ind_refine]
-            rbbox_gt_refine_norm = rbbox_gt_refine[pos_ind_refine]
-            convex_weights_pos_refine = convex_weights_refine[pos_ind_refine]
-            loss_pts_refine = self.loss_bbox_refine(
-                pts_pred_refine_norm / normalize_term,
-                rbbox_gt_refine_norm / normalize_term,
-                convex_weights_pos_refine)
-            # classification loss
-            labels = labels.reshape(-1)
-            label_weights = label_weights.reshape(-1)
-            cls_score = cls_score.permute(0, 2, 3,
-                                          1).reshape(-1, self.cls_out_channels)
-            loss_cls = self.loss_cls(
-                cls_score,
-                labels,
-                label_weights,
-                avg_factor=num_total_samples_refine)
-            return loss_cls, loss_pts_init, loss_pts_refine
+
+        rbbox_gt_init = rbbox_gt_init.reshape(-1, 8)
+        convex_weights_init = convex_weights_init.reshape(-1)
+        sam_weights_init = sam_weights_init.reshape(-1)
+        # init points loss
+        pts_pred_init = pts_pred_init.reshape(-1, 2 * self.num_points)
+        pos_ind_init = (convex_weights_init > 0).nonzero().reshape(-1)
+        pts_pred_init_norm = pts_pred_init[pos_ind_init]
+        rbbox_gt_init_norm = rbbox_gt_init[pos_ind_init]
+        convex_weights_pos_init = convex_weights_init[pos_ind_init]
+        sam_weights_pos_init = sam_weights_init[pos_ind_init]
+        loss_pts_init = self.loss_bbox_init(
+            pts_pred_init_norm / normalize_term,
+            rbbox_gt_init_norm / normalize_term,
+            convex_weights_pos_init * sam_weights_pos_init)
+        # refine points loss
+        rbbox_gt_refine = rbbox_gt_refine.reshape(-1, 8)
+        pts_pred_refine = pts_pred_refine.reshape(-1, 2 * self.num_points)
+        convex_weights_refine = convex_weights_refine.reshape(-1)
+        sam_weights_refine = sam_weights_refine.reshape(-1)
+        pos_ind_refine = (convex_weights_refine > 0).nonzero().reshape(-1)
+        pts_pred_refine_norm = pts_pred_refine[pos_ind_refine]
+        rbbox_gt_refine_norm = rbbox_gt_refine[pos_ind_refine]
+        # print('pts_pred_refine_norm: ', pts_pred_refine_norm.shape)
+        # print('rbbox_gt_refine_norm: ', rbbox_gt_refine_norm.shape)
+        convex_weights_pos_refine = convex_weights_refine[pos_ind_refine]
+        sam_weights_pos_refine = sam_weights_refine[pos_ind_refine]
+        loss_pts_refine = self.loss_bbox_refine(
+            pts_pred_refine_norm / normalize_term,
+            rbbox_gt_refine_norm / normalize_term,
+            convex_weights_pos_refine * sam_weights_pos_refine)
+        # classification loss
+        labels = labels.reshape(-1)
+        label_weights = label_weights.reshape(-1)
+        cls_score = cls_score.permute(0, 2, 3,
+                                      1).reshape(-1, self.cls_out_channels)
+        loss_cls = self.loss_cls(
+            cls_score,
+            labels,
+            label_weights * sam_weights_refine,
+            avg_factor=num_total_samples_refine)
+        return loss_cls, loss_pts_init, loss_pts_refine
 
     def loss(self,
              cls_scores,
@@ -682,7 +720,7 @@ class RotatedRepPointsHead(nn.Module):
              gt_labels,
              img_metas,
              gt_bboxes_ignore=None):
-        """Loss function of CFA head."""
+        """Loss function of SAM RepPoints head."""
 
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         assert len(featmap_sizes) == self.prior_generator.num_levels
@@ -705,11 +743,7 @@ class RotatedRepPointsHead(nn.Module):
             featmap_sizes, img_metas)
         pts_coordinate_preds_init = self.offset_to_pts(center_list,
                                                        pts_preds_init)
-        if self.use_reassign:  # get num_proposal_each_lvl and lvl_num
-            num_proposals_each_level = [(featmap.size(-1) * featmap.size(-2))
-                                        for featmap in cls_scores]
-            num_level = len(featmap_sizes)
-            assert num_level == len(pts_coordinate_preds_init)
+
         if self.train_cfg.init.assigner['type'] == 'ConvexAssigner':
             candidate_list = center_list
         else:
@@ -724,7 +758,8 @@ class RotatedRepPointsHead(nn.Module):
             stage='init',
             label_channels=label_channels)
         (*_, rbbox_gt_list_init, candidate_list_init, convex_weights_list_init,
-         num_total_pos_init, num_total_neg_init, _) = cls_reg_targets_init
+         num_total_pos_init, num_total_neg_init, gt_inds_init,
+         sam_weights_list_init) = cls_reg_targets_init
 
         # target for refinement stage
         center_list, valid_flag_list = self.get_points(
@@ -747,161 +782,44 @@ class RotatedRepPointsHead(nn.Module):
                     points_shift[i_img].reshape(-1, 2 * self.num_points))
             points_list.append(points)
 
-        if self.use_reassign:
-            cls_reg_targets_refine = self.get_cfa_targets(
-                points_list,
-                valid_flag_list,
-                gt_bboxes,
-                img_metas,
-                gt_bboxes_ignore_list=gt_bboxes_ignore,
-                gt_labels_list=gt_labels,
-                stage='refine',
-                label_channels=label_channels)
-            (labels_list, label_weights_list, rbbox_gt_list_refine, _,
-             convex_weights_list_refine, pos_inds_list_refine,
-             pos_gt_index_list_refine) = cls_reg_targets_refine
-            cls_scores = levels_to_images(cls_scores)
-            cls_scores = [
-                item.reshape(-1, self.cls_out_channels) for item in cls_scores
-            ]
-            pts_coordinate_preds_init_cfa = levels_to_images(
-                pts_coordinate_preds_init, flatten=True)
-            pts_coordinate_preds_init_cfa = [
-                item.reshape(-1, 2 * self.num_points)
-                for item in pts_coordinate_preds_init_cfa
-            ]
-            pts_coordinate_preds_refine = levels_to_images(
-                pts_coordinate_preds_refine, flatten=True)
-            pts_coordinate_preds_refine = [
-                item.reshape(-1, 2 * self.num_points)
-                for item in pts_coordinate_preds_refine
-            ]
-
-            # labels_init = jt.concat(labels_list, 0).view(-1)
-            # pos_inds_flatten_init = (labels_init > 0).nonzero().reshape(-1)
-
-            with jt.no_grad():
-                pos_losses_list, = multi_apply(
-                    self.get_pos_loss, cls_scores,
-                    pts_coordinate_preds_init_cfa, labels_list,
-                    rbbox_gt_list_refine, label_weights_list,
-                    convex_weights_list_refine, pos_inds_list_refine)
-                # print('pos_inds_list_refine: ', len(pos_inds_list_refine[0]))
-                labels_list, label_weights_list, convex_weights_list_refine, \
-                    num_pos, pos_normalize_term = multi_apply(
-                        self.reassign,
-                        pos_losses_list,
-                        labels_list,
-                        label_weights_list,
-                        pts_coordinate_preds_init_cfa,
-                        convex_weights_list_refine,
-                        gt_bboxes,
-                        pos_inds_list_refine,
-                        pos_gt_index_list_refine,
-                        num_proposals_each_level=num_proposals_each_level,
-                        num_level=num_level
-                    )
-                num_pos = sum(num_pos)
-            # convert all tensor list to a flatten tensor
-            cls_scores = jt.concat(cls_scores, 0).view(-1,
-                                                       cls_scores[0].size(-1))
-            pts_preds_refine = jt.concat(pts_coordinate_preds_refine, 0).view(
-                -1, pts_coordinate_preds_refine[0].size(-1))
-            labels = jt.concat(labels_list, 0).view(-1)
-            labels_weight = jt.concat(label_weights_list, 0).view(-1)
-            rbbox_gt_refine = jt.concat(rbbox_gt_list_refine, 0).view(
-                -1, rbbox_gt_list_refine[0].size(-1))
-            convex_weights_refine = jt.concat(convex_weights_list_refine,
-                                              0).view(-1)
-            pos_normalize_term = jt.concat(pos_normalize_term, 0).reshape(-1)
-            # pos_inds_flatten = ((0 <= labels) &
-            #                     (labels < self.num_classes)).nonzero(
-            #                         ).reshape(-1)
-            pos_inds_flatten = (labels > 0).nonzero().reshape(-1)
-            
-            # labels = jt.concat(labels_list, 0).view(-1)
-            # pos_normalize_term = jt.concat(pos_normalize_term, 0).reshape(-1)
-            # if len(pos_normalize_term) != len(pos_inds_flatten):
-            #     print('len(pos_normalize_term): ', len(pos_normalize_term))
-            #     print('len(pos_inds_flatten): ', len(pos_inds_flatten))
-            #     print('len(pos_inds_flatten_init): ', len(pos_inds_flatten_init))
-            #     exit()
-            assert len(pos_normalize_term) == len(pos_inds_flatten)
-
-
-            if bool(num_pos):
-                losses_cls = self.loss_cls(
-                    cls_scores, labels, labels_weight, avg_factor=num_pos)
-                pos_pts_pred_refine = pts_preds_refine[pos_inds_flatten]
-                pos_rbbox_gt_refine = rbbox_gt_refine[pos_inds_flatten]
-                pos_convex_weights_refine = convex_weights_refine[
-                    pos_inds_flatten]
-                losses_pts_refine = self.loss_bbox_refine(
-                    pos_pts_pred_refine / pos_normalize_term.reshape(-1, 1),
-                    pos_rbbox_gt_refine / pos_normalize_term.reshape(-1, 1),
-                    pos_convex_weights_refine)
-            else:
-                losses_cls = cls_scores.sum() * 0
-                losses_pts_refine = pts_preds_refine.sum() * 0
-            None_list = [None] * num_level
-            _, losses_pts_init, _ = multi_apply(
-                self.loss_single,
-                None_list,
-                pts_coordinate_preds_init,
-                None_list,
-                None_list,
-                None_list,
-                rbbox_gt_list_init,
-                convex_weights_list_init,
-                None_list,
-                None_list,
-                self.point_strides,
-                num_total_samples_refine=None,
-            )
-            loss_dict_all = {
-                'loss_cls': losses_cls,
-                'loss_pts_init': losses_pts_init,
-                'loss_pts_refine': losses_pts_refine
-            }
-            return loss_dict_all
-        else:
-            cls_reg_targets_refine = self.get_targets(
-                points_list,
-                valid_flag_list,
-                gt_bboxes,
-                img_metas,
-                gt_bboxes_ignore_list=gt_bboxes_ignore,
-                gt_labels_list=gt_labels,
-                stage='refine',
-                label_channels=label_channels)
-            (labels_list, label_weights_list, rbbox_gt_list_refine,
-             candidate_list_refine, convex_weights_list_refine,
-             num_total_pos_refine, num_total_neg_refine,
-             _) = cls_reg_targets_refine
-
-            num_total_samples_refine = (
-                num_total_pos_refine + num_total_neg_refine
-                if self.sampling else num_total_pos_refine)
-
-            losses_cls, losses_pts_init, losses_pts_refine = multi_apply(
-                self.loss_single,
-                cls_scores,
-                pts_coordinate_preds_init,
-                pts_coordinate_preds_refine,
-                labels_list,
-                label_weights_list,
-                rbbox_gt_list_init,
-                convex_weights_list_init,
-                rbbox_gt_list_refine,
-                convex_weights_list_refine,
-                self.point_strides,
-                num_total_samples_refine=num_total_samples_refine)
-            loss_dict_all = {
-                'loss_cls': losses_cls,
-                'loss_pts_init': losses_pts_init,
-                'loss_pts_refine': losses_pts_refine
-            }
-            return loss_dict_all
+        cls_reg_targets_refine = self.get_targets(
+            points_list,
+            valid_flag_list,
+            gt_bboxes,
+            img_metas,
+            gt_bboxes_ignore_list=gt_bboxes_ignore,
+            gt_labels_list=gt_labels,
+            stage='refine',
+            label_channels=label_channels)
+        (labels_list, label_weights_list, rbbox_gt_list_refine,
+         candidate_list_refine, convex_weights_list_refine,
+         num_total_pos_refine, num_total_neg_refine, gt_inds_refine,
+         sam_weights_list_refine) = cls_reg_targets_refine
+        num_total_samples_refine = (
+            num_total_pos_refine +
+            num_total_neg_refine if self.sampling else num_total_pos_refine)
+     
+        losses_cls, losses_pts_init, losses_pts_refine = multi_apply(
+            self.loss_single,
+            cls_scores,
+            pts_coordinate_preds_init,
+            pts_coordinate_preds_refine,
+            labels_list,
+            label_weights_list,
+            rbbox_gt_list_init,
+            convex_weights_list_init,
+            sam_weights_list_init,
+            rbbox_gt_list_refine,
+            convex_weights_list_refine,
+            sam_weights_list_refine,
+            self.point_strides,
+            num_total_samples_refine=num_total_samples_refine)
+        loss_dict_all = {
+            'loss_cls': losses_cls,
+            'loss_pts_init': losses_pts_init,
+            'loss_pts_refine': losses_pts_refine
+        }
+        return loss_dict_all
 
     def get_pos_loss(self, cls_score, pts_pred, label, bbox_gt, label_weight,
                      convex_weight, pos_inds):
@@ -950,188 +868,6 @@ class RotatedRepPointsHead(nn.Module):
         loss_cls = loss_cls.sum(-1)
         pos_loss = loss_bbox + loss_cls
         return pos_loss,
-
-    def reassign(self,
-                 pos_losses,
-                 label,
-                 label_weight,
-                 pts_pred_init,
-                 convex_weight,
-                 gt_bbox,
-                 pos_inds,
-                 pos_gt_inds,
-                 num_proposals_each_level=None,
-                 num_level=None):
-        """CFA reassign process.
-
-        Args:
-            pos_losses (Tensor): Losses of all positive samples in
-                single image.
-            label (Tensor): classification target of each anchor with
-                shape (num_anchors,)
-            label_weight (Tensor): Classification loss weight of each
-                anchor with shape (num_anchors).
-            pts_pred_init (Tensor):
-            convex_weight (Tensor): Bbox weight of each anchor with shape
-                (num_anchors, 4).
-            gt_bbox (Tensor): Ground truth box.
-            pos_inds (Tensor): Index of all positive samples got from
-                first assign process.
-            pos_gt_inds (Tensor): Gt_index of all positive samples got
-                from first assign process.
-            num_proposals_each_level (list, optional): Number of proposals
-                of each level.
-            num_level (int, optional): Number of level.
-
-        Returns:
-            tuple: Usually returns a tuple containing learning targets.
-
-                - label (Tensor): classification target of each anchor after \
-                  paa assign, with shape (num_anchors,)
-                - label_weight (Tensor): Classification loss weight of each \
-                  anchor after paa assign, with shape (num_anchors).
-                - convex_weight (Tensor): Bbox weight of each anchor with \
-                    shape (num_anchors, 4).
-                - pos_normalize_term (list): pos normalize term for refine \
-                  points losses.
-        """
-        # print('label: ', label.shape)
-        print('pos_inds: ', len(pos_inds), len(pos_gt_inds))
-
-        if len(pos_inds) == 0:
-            return label, label_weight, convex_weight, 0, jt.array([]).type_as(convex_weight)
-
-        num_gt = pos_gt_inds.max() + 1
-
-        num_proposals_each_level_ = num_proposals_each_level.copy()
-        num_proposals_each_level_.insert(0, 0)
-        inds_level_interval = np.cumsum(num_proposals_each_level_)
-        pos_level_mask = []
-        for i in range(num_level):
-            mask = (pos_inds >= inds_level_interval[i]) & (
-                pos_inds < inds_level_interval[i + 1])
-            pos_level_mask.append(mask)
-
-        # convert gt from obb to poly
-        gt_bbox = obb2poly(gt_bbox)
-        overlaps_matrix = reppoints_convex_iou(pts_pred_init, gt_bbox)
-        overlaps_matrix = jt.transpose(overlaps_matrix)
-        pos_inds_after_cfa = []
-        ignore_inds_after_cfa = []
-        re_assign_weights_after_cfa = []
-        for gt_ind in range(int(num_gt)):
-            pos_inds_cfa = []
-            pos_loss_cfa = []
-            pos_overlaps_init_cfa = []
-            gt_mask = pos_gt_inds == gt_ind
-            for level in range(num_level):
-                level_mask = pos_level_mask[level]
-                level_gt_mask = level_mask & gt_mask
-                value, topk_inds = pos_losses[level_gt_mask].topk(
-                    int(min(level_gt_mask.sum(), self.topk)), largest=False)
-                pos_inds_cfa.append(pos_inds[level_gt_mask][topk_inds])
-                pos_loss_cfa.append(value)
-                pos_overlaps_init_cfa.append(
-                    overlaps_matrix[:, pos_inds[level_gt_mask][topk_inds]])
-            pos_inds_cfa = jt.concat(pos_inds_cfa)
-            pos_loss_cfa = jt.concat(pos_loss_cfa)
-            pos_overlaps_init_cfa = jt.concat(pos_overlaps_init_cfa, 1)
-            if len(pos_inds_cfa) < 2:
-                pos_inds_after_cfa.append(pos_inds_cfa)
-                ignore_inds_after_cfa.append(jt.empty([]))
-                re_assign_weights_after_cfa.append(jt.ones([len(pos_inds_cfa)]))
-            else:
-                # pos_loss_cfa, sort_inds = pos_loss_cfa.sort()
-                pos_loss_cfa, sort_inds = fake_argsort2(pos_loss_cfa)
-                pos_inds_cfa = pos_inds_cfa[sort_inds]
-                pos_overlaps_init_cfa = pos_overlaps_init_cfa[:, sort_inds] \
-                    .reshape(-1, len(pos_inds_cfa))
-                pos_loss_cfa = pos_loss_cfa.reshape(-1)
-                loss_mean = pos_loss_cfa.mean()
-                loss_var = pos_loss_cfa.var()
-
-                gauss_prob_density = \
-                    (-(pos_loss_cfa - loss_mean) ** 2 / loss_var) \
-                    .exp() / loss_var.sqrt()
-                # index_inverted, _ = jt.arange(
-                #     len(gauss_prob_density)).sort(descending=True)
-                index_inverted, _ = fake_argsort2(jt.arange(len(gauss_prob_density)), descending=True)
-                gauss_prob_inverted = jt.cumsum(
-                    gauss_prob_density[index_inverted], 0)
-                gauss_prob = gauss_prob_inverted[index_inverted]
-                gauss_prob_norm = (gauss_prob - gauss_prob.min()) / \
-                                  (gauss_prob.max() - gauss_prob.min())
-
-                # splitting by gradient consistency
-                loss_curve = gauss_prob_norm * pos_loss_cfa
-                _, max_thr = loss_curve.topk(1)
-                max_thr = int(max_thr)
-                reweights = gauss_prob_norm[:max_thr + 1]
-                # feature anti-aliasing coefficient
-                pos_overlaps_init_cfa = pos_overlaps_init_cfa[:, :max_thr + 1]
-                overlaps_level = pos_overlaps_init_cfa[gt_ind] / (
-                    pos_overlaps_init_cfa.sum(0) + 1e-6)
-                reweights = \
-                    self.anti_factor * overlaps_level * reweights + \
-                    1e-6
-                re_assign_weights = \
-                    reweights.reshape(-1) / reweights.sum() * \
-                    jt.ones(len(reweights)).type_as(
-                        gauss_prob_norm).sum()
-                pos_inds_temp = pos_inds_cfa[:max_thr + 1]
-                # print('pos_inds_cfa: ', pos_inds_cfa)
-                # print('pos_inds_temp: ', pos_inds_temp)
-                ignore_inds_temp = jt.empty([])
-            
-                pos_inds_after_cfa.append(pos_inds_temp)
-                ignore_inds_after_cfa.append(ignore_inds_temp)
-                re_assign_weights_after_cfa.append(re_assign_weights)
-        
-        pos_inds_after_cfa = jt.concat(pos_inds_after_cfa)
-        ignore_inds_after_cfa = jt.concat(ignore_inds_after_cfa)
-        re_assign_weights_after_cfa = jt.concat(re_assign_weights_after_cfa)
-        print('pos_inds_after_cfa: ', len(pos_inds), len(pos_inds_after_cfa))
-        reassign_mask = (pos_inds.unsqueeze(1) != pos_inds_after_cfa).all(1)
-        print('reassign_mask: ', len(reassign_mask))
-        reassign_ids = pos_inds[reassign_mask]
-        # label[reassign_ids] = self.num_classes
-        # print('reassign_ids: ', reassign_ids)
-        label[reassign_ids] = 0
-        label_weight[ignore_inds_after_cfa] = 0
-        convex_weight[reassign_ids] = 0
-        num_pos = len(pos_inds_after_cfa)
-
-        re_assign_weights_mask = (
-            pos_inds.unsqueeze(1) == pos_inds_after_cfa).any(1)
-        reweight_ids = pos_inds[re_assign_weights_mask]
-        label_weight[reweight_ids] = re_assign_weights_after_cfa
-        convex_weight[reweight_ids] = re_assign_weights_after_cfa
-
-        pos_level_mask_after_cfa = []
-        for i in range(num_level):
-            mask = (pos_inds_after_cfa >= inds_level_interval[i]) & (
-                pos_inds_after_cfa < inds_level_interval[i + 1])
-            pos_level_mask_after_cfa.append(mask)
-        pos_level_mask_after_cfa = jt.stack(pos_level_mask_after_cfa,
-                                               0).type_as(label)
-        pos_normalize_term = pos_level_mask_after_cfa * (
-            self.point_base_scale *
-            jt.array(self.point_strides).type_as(label)).reshape(-1, 1)
-        pos_normalize_term = pos_normalize_term[
-            pos_normalize_term > 0].type_as(convex_weight)
-        assert len(pos_normalize_term) == len(pos_inds_after_cfa)
-
-        # label = jt.concat(label, 0).view(-1)
-        pos_inds_flatten = (label > 0).nonzero().reshape(-1)
-        # print('len(pos_normalize_term): ', len(pos_normalize_term))
-        # print('len(pos_inds_flatten): ', len(pos_inds_flatten))
-        # pos_normalize_term = jt.concat(pos_normalize_term, 0).reshape(-1)
-        # if len(pos_normalize_term) != len(pos_inds_flatten):
-            # print('len(pos_normalize_term): ', len(pos_normalize_term))
-            # print('len(pos_inds_flatten): ', len(pos_inds_flatten))
-            # exit()
-
-        return label, label_weight, convex_weight, num_pos, pos_normalize_term
 
     def get_bboxes(self,
                    cls_scores,
@@ -1359,38 +1095,6 @@ def select_single_mlvl(mlvl_tensors, batch_id, detach=True):
         ]
     return mlvl_tensor_list
 
-def levels_to_images(mlvl_tensor, flatten=False):
-    """Concat multi-level feature maps by image.
-
-    [feature_level0, feature_level1...] -> [feature_image0, feature_image1...]
-    Convert the shape of each element in mlvl_tensor from (N, C, H, W) to
-    (N, H*W , C), then split the element to N elements with shape (H*W, C), and
-    concat elements in same image of all level along first dimension.
-
-    Args:
-        mlvl_tensor (list[torch.Tensor]): list of Tensor which collect from
-            corresponding level. Each element is of shape (N, C, H, W)
-        flatten (bool, optional): if shape of mlvl_tensor is (N, C, H, W)
-            set False, if shape of mlvl_tensor is  (N, H, W, C) set True.
-
-    Returns:
-        list[torch.Tensor]: A list that contains N tensors and each tensor is
-            of shape (num_elements, C)
-    """
-    batch_size = mlvl_tensor[0].size(0)
-    batch_list = [[] for _ in range(batch_size)]
-    if flatten:
-        channels = mlvl_tensor[0].size(-1)
-    else:
-        channels = mlvl_tensor[0].size(1)
-    for t in mlvl_tensor:
-        if not flatten:
-            t = t.permute(0, 2, 3, 1)
-        t = t.view(batch_size, -1, channels)
-        for img in range(batch_size):
-            batch_list[img].append(t[img])
-    return [jt.concat(item, 0) for item in batch_list]
-
 class MlvlPointGenerator:
     """Standard points generator for multi-level (Mlvl) feature maps in 2D
     points-based detectors.
@@ -1437,13 +1141,13 @@ class MlvlPointGenerator:
             featmap_sizes (list[tuple]): List of feature map sizes in
                 multiple feature levels, each size arrange as
                 as (h, w).
-            dtype (:obj:`dtype`): Dtype of priors. Default: torch.float32.
+            dtype (:obj:`dtype`): Dtype of priors. Default: jt.float32.
             device (str): The device where the anchors will be put on.
             with_stride (bool): Whether to concatenate the stride to
                 the last dimension of points.
 
         Return:
-            list[torch.Tensor]: Points of  multiple feature levels.
+            list[jt.Tensor]: Points of  multiple feature levels.
             The sizes of each tensor should be (N, 2) when with stride is
             ``False``, where N = width * height, width and height
             are the sizes of the corresponding feature level,
@@ -1478,7 +1182,7 @@ class MlvlPointGenerator:
             featmap_size (tuple[int]): Size of the feature maps, arrange as
                 (h, w).
             level_idx (int): The index of corresponding feature map level.
-            dtype (:obj:`dtype`): Dtype of priors. Default: torch.float32.
+            dtype (:obj:`dtype`): Dtype of priors. Default: jt.float32.
             device (str, optional): The device the tensor will be put on.
                 Defaults to 'cuda'.
             with_stride (bool): Concatenate the stride to the last dimension
@@ -1531,7 +1235,7 @@ class MlvlPointGenerator:
             device (str): The device where the anchors will be put on.
 
         Return:
-            list(torch.Tensor): Valid flags of points of multiple levels.
+            list(jt.Tensor): Valid flags of points of multiple levels.
         """
         assert self.num_levels == len(featmap_sizes)
         multi_level_flags = []
@@ -1560,7 +1264,7 @@ class MlvlPointGenerator:
                 Defaults to 'cuda'.
 
         Returns:
-            torch.Tensor: The valid flags of each points in a single level \
+            jt.Tensor: The valid flags of each points in a single level \
                 feature map.
         """
         feat_h, feat_w = featmap_size
@@ -1587,9 +1291,9 @@ class MlvlPointGenerator:
             featmap_size (tuple[int]): feature map size arrange as (w, h).
             level_idx (int): The level index of corresponding feature
                 map.
-            dtype (obj:`torch.dtype`): Date type of points. Defaults to
-                ``torch.float32``.
-            device (obj:`torch.device`): The device where the points is
+            dtype (obj:`jt.dtype`): Date type of points. Defaults to
+                ``jt.float32``.
+            device (obj:`jt.device`): The device where the points is
                 located.
         Returns:
             Tensor: Anchor with shape (N, 2), N should be equal to
@@ -1602,6 +1306,3 @@ class MlvlPointGenerator:
              self.offset) * self.strides[level_idx][1]
         prioris = jt.stack([x, y], 1).to(dtype)
         return prioris
-
-
-

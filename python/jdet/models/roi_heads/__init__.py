@@ -19,4 +19,6 @@ from . import h2rbox_head
 from . import rsdet_head
 from . import rotated_atss_head
 from . import rotated_reppoints_head
+from . import oriented_reppoints_head
+from . import sam_reppoints_head
 __all__ = []
