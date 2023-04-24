@@ -1,3 +1,4 @@
+import numpy as np
 import jittor as jt
 from jittor import nn
 from jdet.models.utils.weight_init import normal_init
@@ -328,6 +329,15 @@ class FeatureRefineModule(nn.Module):
         normal_init(self.conv_1_5, std=0.01)
         normal_init(self.conv_1_1, std=0.01)
 
+    def le135_to_oc(self, boxes):
+        x, y, w, h, t = boxes.unbind(dim=-1)
+        start_angle = -0.5 * np.pi
+        t = ((t - start_angle) % np.pi)
+        w_ = jt.where(t < np.pi / 2, w, h)
+        h_ = jt.where(t < np.pi / 2, h, w)
+        t = jt.where(t < np.pi / 2, t, t - np.pi / 2) + start_angle
+        return jt.stack([x, y, w_, h_, t], dim=-1)
+
     def execute(self, x, best_rbboxes):
         """
         Args:
@@ -342,6 +352,8 @@ class FeatureRefineModule(nn.Module):
             feat_scale_1 = self.conv_5_1(self.conv_1_5(x_scale))
             feat_scale_2 = self.conv_1_1(x_scale)
             feat_scale = feat_scale_1 + feat_scale_2
+            # convert 'le135' to 'oc', because feature_refine op only support 'oc'.
+            best_rbboxes_scale = self.le135_to_oc(best_rbboxes_scale)
             feat_refined_scale = fr_scale(feat_scale, best_rbboxes_scale)
             out.append(x_scale + feat_refined_scale)
         return out
