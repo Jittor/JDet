@@ -233,6 +233,7 @@ class ReFPN(nn.Module):
             else:
                 for i in range(used_backbone_levels + 1, self.num_outs):
                     self.relus.append(ennReLU(self.gspace, out_channels))
+        self.init_weights()
 
     # default init_weights for conv(msra) and norm in ConvModule
     def init_weights(self):
