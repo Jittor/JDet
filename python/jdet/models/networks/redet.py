@@ -156,8 +156,8 @@ class ReDet(nn.Module):
         # (batch_ind, x_ctr, y_ctr, w, h, angle)
         rrois = dbbox2roi([res.bboxes for res in sampling_results])
         # feat enlarge
-        rrois[:, 3] = rrois[:, 3] * self.rbbox_roi_extractor.w_enlarge
-        rrois[:, 4] = rrois[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        # rrois[:, 3] = rrois[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        # rrois[:, 4] = rrois[:, 4] * self.rbbox_roi_extractor.h_enlarge
         rbbox_feats = self.rbbox_roi_extractor(x[:self.rbbox_roi_extractor.num_inputs], rrois)
         # rbbox_feats = self.shared_head_rbbox(rbbox_feats)
         cls_score, rbbox_pred = self.rbbox_head(rbbox_feats)
@@ -200,8 +200,8 @@ class ReDet(nn.Module):
         rrois = self.bbox_head.regress_by_class_rbbox(roi2droi(rois), bbox_label, bbox_pred, img_meta[0])
 
         rrois_enlarge = copy.deepcopy(rrois)
-        rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
-        rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        # rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        # rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
 
         rbbox_feats = self.rbbox_roi_extractor(x[:len(self.rbbox_roi_extractor.featmap_strides)], rrois_enlarge)
         # rbbox_feats = self.shared_head_rbbox(rbbox_feats)
