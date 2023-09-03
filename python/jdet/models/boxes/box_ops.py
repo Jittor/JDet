@@ -284,6 +284,152 @@ def delta2bbox_rotated(rois, deltas, means=(0., 0., 0., 0., 0.), stds=(1., 1., 1
     bboxes = jt.stack([gx, gy, gw, gh, ga], dim=-1).view_as(deltas)
     return bboxes
 
+def bbox2delta_v0(proposals,
+               gt,
+               means=None,
+               stds=None,
+               weights = None):
+    """Compute deltas of proposals w.r.t. gt in the MMDet V1.x manner.
+
+    We usually compute the deltas of x, y, w, h of proposals w.r.t ground
+    truth bboxes to get regression target.
+    This is the inverse function of `delta2bbox()`
+
+    Args:
+        proposals (Tensor): Boxes to be transformed, shape (N, ..., 4)
+        gt (Tensor): Gt bboxes to be used as base, shape (N, ..., 4)
+        means (Sequence[float]): Denormalizing means for delta coordinates
+        stds (Sequence[float]): Denormalizing standard deviation for delta
+            coordinates
+
+    Returns:
+        Tensor: deltas with shape (N, 4), where columns represent dx, dy,
+            dw, dh.
+    """
+    assert proposals.size() == gt.size()
+
+    proposals = proposals.float()
+    gt = gt.float()
+    px = (proposals[..., 0] + proposals[..., 2]) * 0.5
+    py = (proposals[..., 1] + proposals[..., 3]) * 0.5
+    pw = proposals[..., 2] - proposals[..., 0]
+    ph = proposals[..., 3] - proposals[..., 1]
+
+    gx = (gt[..., 0] + gt[..., 2]) * 0.5
+    gy = (gt[..., 1] + gt[..., 3]) * 0.5
+    gw = gt[..., 2] - gt[..., 0]
+    gh = gt[..., 3] - gt[..., 1]
+
+    dx = (gx - px) / pw
+    dy = (gy - py) / ph
+    dw = jt.safe_log(gw / pw)
+    dh = jt.safe_log(gh / ph)
+    deltas = jt.stack([dx, dy, dw, dh], dim=-1)
+
+    if means is not None and stds is not None:
+        means = jt.array(means).unsqueeze(0)
+        stds = jt.array(stds).unsqueeze(0)
+        deltas = (deltas-means)/stds
+    
+    if weights is not None:
+        assert deltas.shape[-1] == weights.shape[-1]
+        weights = jt.array(weights)
+        deltas*=weights
+
+    return deltas
+
+def delta2bbox_v0(rois,
+               deltas,
+               means=None,
+               stds=None,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000,
+               weights = None,):
+    """Apply deltas to shift/scale base boxes in the MMDet V1.x manner.
+
+    Typically the rois are anchor or proposed bounding boxes and the deltas are
+    network outputs used to shift/scale those boxes.
+    This is the inverse function of `bbox2delta()`
+
+    Args:
+        rois (Tensor): Boxes to be transformed. Has shape (N, 4)
+        deltas (Tensor): Encoded offsets with respect to each roi.
+            Has shape (N, 4 * num_classes). Note N = num_anchors * W * H when
+            rois is a grid of anchors. Offset encoding follows [1]_.
+        means (Sequence[float]): Denormalizing means for delta coordinates
+        stds (Sequence[float]): Denormalizing standard deviation for delta
+            coordinates
+        max_shape (tuple[int, int]): Maximum bounds for boxes. specifies (H, W)
+        wh_ratio_clip (float): Maximum aspect ratio for boxes.
+
+    Returns:
+        Tensor: Boxes with shape (N, 4), where columns represent
+            tl_x, tl_y, br_x, br_y.
+
+    References:
+        .. [1] https://arxiv.org/abs/1311.2524
+
+    Example:
+        >>> rois = jt.Tensor([[ 0.,  0.,  1.,  1.],
+        >>>                      [ 0.,  0.,  1.,  1.],
+        >>>                      [ 0.,  0.,  1.,  1.],
+        >>>                      [ 5.,  5.,  5.,  5.]])
+        >>> deltas = jt.Tensor([[  0.,   0.,   0.,   0.],
+        >>>                        [  1.,   1.,   1.,   1.],
+        >>>                        [  0.,   0.,   2.,  -1.],
+        >>>                        [ 0.7, -1.9, -0.5,  0.3]])
+        >>> legacy_delta2bbox(rois, deltas, max_shape=(32, 32))
+        tensor([[0.0000, 0.0000, 1.5000, 1.5000],
+                [0.0000, 0.0000, 5.2183, 5.2183],
+                [0.0000, 0.1321, 7.8891, 0.8679],
+                [5.3967, 2.4251, 6.0033, 3.7749]])
+    """
+    if weights is not None:
+        assert deltas.shape[-1] == len(weights)
+        weights = jt.array(weights)
+        deltas /= weights
+
+    if means is not None and stds is not None:
+        means = jt.array(means).view(1, -1).repeat(1, deltas.size(-1) // 4)
+        stds = jt.array(stds).view(1, -1).repeat(1, deltas.size(-1) // 4)
+        deltas = deltas * stds + means
+    dx = deltas[..., 0::4]
+    dy = deltas[..., 1::4]
+    dw = deltas[..., 2::4]
+    dh = deltas[..., 3::4]
+    max_ratio = np.abs(np.log(wh_ratio_clip))
+    dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+    dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+    # Compute center of each roi
+    px = ((rois[..., 0] + rois[..., 2]) *
+          0.5).unsqueeze(-1)  # .expand_as(dx)
+    py = ((rois[..., 1] + rois[..., 3]) *
+          0.5).unsqueeze(-1)  # .expand_as(dy)
+    # Compute width/height of each roi
+    pw = (rois[..., 2] - rois[..., 0]).unsqueeze(-1)  # .expand_as(dw)
+    ph = (rois[..., 3] - rois[..., 1]).unsqueeze(-1)  # .expand_as(dh)
+    # Use exp(network energy) to enlarge/shrink each roi
+    gw = pw * dw.exp()
+    gh = ph * dh.exp()
+    # Use network energy to shift the center of each roi
+    gx = px + pw * dx
+    gy = py + ph * dy
+    # Convert center-xy/width/height to top-left, bottom-right
+
+    # The true legacy box coder should +- 0.5 here.
+    # However, current implementation improves the performance when testing
+    # the models trained in MMDetection 1.X (~0.5 bbox AP, 0.2 mask AP)
+    x1 = gx - gw * 0.5
+    y1 = gy - gh * 0.5
+    x2 = gx + gw * 0.5
+    y2 = gy + gh * 0.5
+    if max_shape is not None:
+        x1 = x1.clamp(min_v=0, max_v=max_shape[1])
+        y1 = y1.clamp(min_v=0, max_v=max_shape[0])
+        x2 = x2.clamp(min_v=0, max_v=max_shape[1])
+        y2 = y2.clamp(min_v=0, max_v=max_shape[0])
+    bboxes = jt.stack([x1, y1, x2, y2], dim=-1).view_as(deltas)
+    return bboxes
 
 def bbox2delta(proposals,
                gt,
@@ -498,7 +644,7 @@ def poly_to_rotated_box(polys):
 
     angles1 = jt.atan2((pt2[..., 1] - pt1[..., 1]), (pt2[..., 0] - pt1[..., 0]))
     angles2 = jt.atan2((pt4[..., 1] - pt1[..., 1]), (pt4[..., 0] - pt1[..., 0]))
-    angles = polys.new_zeros(polys.shape[0])
+    angles = jt.zeros_like(angles1)
     angles[edge1 > edge2] = angles1[edge1 > edge2]
     angles[edge1 <= edge2] = angles2[edge1 <= edge2]
 

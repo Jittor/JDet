@@ -513,8 +513,8 @@ def box_iou_rotated_v1(boxes1,boxes2):
     ious = ious.reshape(num_boxes1,num_boxes2)
 
     # same bug will happen when bbox size is to small
-    too_small1 = boxes1[:, [2, 3]].min(1)[0] < 0.001
-    too_small2 = boxes2[:, [2, 3]].min(1)[0] < 0.001
+    too_small1 = boxes1[:, [2, 3]].min(1) < 0.001
+    too_small2 = boxes2[:, [2, 3]].min(1) < 0.001
     if too_small1.any_() or too_small2.any_():
         inds1 = jt.nonzero(too_small1)
         inds2 = jt.nonzero(too_small2)

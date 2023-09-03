@@ -1,5 +1,5 @@
 from jdet.ops.bbox_transforms import *
-from .box_ops import delta2bbox,bbox2delta,delta2bbox_rotated,bbox2delta_rotated
+from .box_ops import delta2bbox,bbox2delta,delta2bbox_rotated,bbox2delta_rotated,delta2bbox_v0,bbox2delta_v0
 from jdet.utils.registry import BOXES
 
 import jittor as jt
@@ -69,6 +69,74 @@ class DeltaXYWHBBoxCoder:
         """
         assert pred_bboxes.size(0) == bboxes.size(0)
         decoded_bboxes = delta2bbox(bboxes, pred_bboxes, self.means,
+                                    self.stds, max_shape, wh_ratio_clip,weights=self.weights)
+
+        return decoded_bboxes
+
+@BOXES.register_module()
+class DeltaXYWHBBoxCoder_v0:
+    """Delta XYWH BBox coder used in MMDet V1.x.
+
+    Following the practice in R-CNN [1]_, this coder encodes bbox (x1, y1, x2,
+    y2) into delta (dx, dy, dw, dh) and decodes delta (dx, dy, dw, dh)
+    back to original bbox (x1, y1, x2, y2).
+
+    References:
+        .. [1] https://arxiv.org/abs/1311.2524
+
+    Args:
+        target_means (Sequence[float]): denormalizing means of target for
+            delta coordinates
+        target_stds (Sequence[float]): denormalizing standard deviation of
+            target for delta coordinates
+    """
+
+    def __init__(self,
+                 target_means=(0., 0., 0., 0.),
+                 target_stds=(1., 1., 1., 1.),
+                 weights=None):
+        self.means = target_means
+        self.stds = target_stds
+        self.weights = None
+
+    def encode(self, bboxes, gt_bboxes):
+        """Get box regression transformation deltas that can be used to
+        transform the ``bboxes`` into the ``gt_bboxes``.
+
+        Args:
+            bboxes (jt.Var): source boxes, e.g., object pred_bboxes.
+            gt_bboxes (jt.Var): target of the transformation, e.g.,
+                ground-truth boxes.
+
+        Returns:
+            jt.Var: Box transformation deltas
+        """
+        assert bboxes.size(0) == gt_bboxes.size(0)
+        assert bboxes.size(-1) == gt_bboxes.size(-1) == 4
+        encoded_bboxes = bbox2delta_v0(bboxes, gt_bboxes, self.means,
+                                    self.stds,weights=self.weights)
+        return encoded_bboxes
+
+    def decode(self,
+               bboxes,
+               pred_bboxes,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000):
+        """Apply transformation `pred_bboxes` to `boxes`.
+
+        Args:
+            boxes (jt.Var): Basic boxes.
+            pred_bboxes (jt.Var): Encoded boxes with shape
+            max_shape (tuple[int], optional): Maximum shape of boxes.
+                Defaults to None.
+            wh_ratio_clip (float, optional): The allowed ratio between
+                width and height.
+
+        Returns:
+            jt.Var: Decoded boxes.
+        """
+        assert pred_bboxes.size(0) == bboxes.size(0)
+        decoded_bboxes = delta2bbox_v0(bboxes, pred_bboxes, self.means,
                                     self.stds, max_shape, wh_ratio_clip,weights=self.weights)
 
         return decoded_bboxes
@@ -437,6 +505,18 @@ class MidpointOffsetCoder:
         return obboxes
 
 @BOXES.register_module()
+class MidpointOffsetCoder_v1(MidpointOffsetCoder):
+    def encode(self, bboxes, gt_bboxes):
+        gt_bboxes = gt_bboxes.clone()
+        gt_bboxes[:, -1] *= -1
+        return super().encode(bboxes, gt_bboxes)
+    
+    def decode(self, bboxes, pred_bboxes, max_shape=None, wh_ratio_clip=16 / 1000):
+        rbboxes = super().decode(bboxes, pred_bboxes, max_shape, wh_ratio_clip)
+        rbboxes[:, -1] *= -1
+        return regular_obb(rbboxes)
+
+@BOXES.register_module()
 class OrientedDeltaXYWHTCoder:
 
     def __init__(self,
@@ -518,6 +598,179 @@ class OrientedDeltaXYWHTCoder:
         return new_bboxes.view_as(pred_bboxes)
 
 @BOXES.register_module()
+class OrientedDeltaXYWHTCoder_v1:
+
+    def __init__(self,
+                 target_means=(0., 0., 0., 0., 0.),
+                 target_stds=(1., 1., 1., 1., 1.)):
+        self.means = target_means
+        self.stds = target_stds
+
+    def encode(self, bboxes, gt_bboxes):
+
+        assert bboxes.size(0) == gt_bboxes.size(0)
+        assert bboxes.size(-1) == gt_bboxes.size(-1) == 5
+
+        pred_bboxes = bboxes.float()
+        gt = gt_bboxes.float()
+        px, py, pw, ph, ptheta = pred_bboxes.unbind(dim=-1)
+        gx, gy, gw, gh, gtheta = gt.unbind(dim=-1)
+
+        dtheta1 = regular_theta(gtheta - ptheta)
+        dtheta2 = regular_theta(gtheta - ptheta + np.pi/2)
+        abs_dtheta1 = jt.abs(dtheta1)
+        abs_dtheta2 = jt.abs(dtheta2)
+
+        gw_regular = gw * (abs_dtheta1 < abs_dtheta2) + gh * (1 - (abs_dtheta1 < abs_dtheta2))
+        gh_regular = gh * (abs_dtheta1 < abs_dtheta2) + gw * (1 - (abs_dtheta1 < abs_dtheta2))
+        dtheta = dtheta1 * (abs_dtheta1 < abs_dtheta2) + dtheta2 * (1 - (abs_dtheta1 < abs_dtheta2))
+        # gw_regular = jt.where(abs_dtheta1 < abs_dtheta2, gw, gh)
+        # gh_regular = jt.where(abs_dtheta1 < abs_dtheta2, gh, gw)
+        # dtheta = jt.where(abs_dtheta1 < abs_dtheta2, dtheta1, dtheta2)
+        dx = (jt.cos(ptheta) * (gx - px) + jt.sin(ptheta) * (gy - py)) / pw
+        dy = (-jt.sin(ptheta) * (gx - px) + jt.cos(ptheta) * (gy - py)) / ph
+        dw = jt.log(gw_regular / pw)
+        dh = jt.log(gh_regular / ph)
+        deltas = jt.stack([dx, dy, dw, dh, dtheta], dim=-1)
+
+        means = jt.array(self.means, dtype=deltas.dtype).unsqueeze(0)
+        stds = jt.array(self.stds, dtype=deltas.dtype).unsqueeze(0)
+        deltas = (deltas - means) / stds
+
+        return deltas
+
+    def decode(self,
+               bboxes,
+               pred_bboxes,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000):
+
+        assert pred_bboxes.size(0) == bboxes.size(0)
+
+        means = jt.array(self.means, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 5)
+        stds = jt.array(self.stds, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 5)
+        denorm_deltas = pred_bboxes * stds + means
+        
+        dx = denorm_deltas[:, 0::5]
+        dy = denorm_deltas[:, 1::5]
+        dw = denorm_deltas[:, 2::5]
+        dh = denorm_deltas[:, 3::5]
+        dtheta = denorm_deltas[:, 4::5]
+        max_ratio = np.abs(np.log(wh_ratio_clip))
+        dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+        dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+
+        px, py, pw, ph, ptheta = bboxes.unbind(dim=-1)
+
+        px = px.unsqueeze(1).expand_as(dx)
+        py = py.unsqueeze(1).expand_as(dy)
+        pw = pw.unsqueeze(1).expand_as(dw)
+        ph = ph.unsqueeze(1).expand_as(dh)
+        ptheta = ptheta.unsqueeze(1).expand_as(dtheta)
+
+        gx = dx * pw * jt.cos(ptheta) - dy * ph * jt.sin(ptheta) + px
+        gy = dx * pw * jt.sin(ptheta) + dy * ph * jt.cos(ptheta) + py
+        gw = pw * dw.exp()
+        gh = ph * dh.exp()
+        gtheta = regular_theta(dtheta + ptheta)
+
+        new_bboxes = jt.stack([gx, gy, gw, gh, gtheta], dim=-1)
+        new_bboxes = regular_obb(new_bboxes)
+        return new_bboxes.view_as(pred_bboxes)
+
+@BOXES.register_module()
+class HProposalDeltaXYWHTCoder:
+
+    def __init__(self,
+                 angle_norm_factor=None,
+                 target_means=(0., 0., 0., 0., 0.),
+                 target_stds=(1., 1., 1., 1., 1.)):
+        self.means = target_means
+        self.stds = target_stds
+        self.angle_norm_factor = angle_norm_factor
+
+    def encode(self, bboxes, gt_bboxes):
+
+        assert bboxes.size(0) == gt_bboxes.size(0)
+        assert bboxes.size(-1) == 4
+        assert gt_bboxes.size(-1) == 5
+
+        bboxes = bboxes.float()
+        gt = gt_bboxes.float()
+
+        px = (bboxes[..., 0] + bboxes[..., 2]) * 0.5
+        py = (bboxes[..., 1] + bboxes[..., 3]) * 0.5
+        pw = bboxes[..., 2] - bboxes[..., 0]
+        ph = bboxes[..., 3] - bboxes[..., 1]
+
+        gx, gy, gw, gh, gtheta = gt.unbind(dim=-1)
+
+        dtheta1 = regular_theta(gtheta)
+        dtheta2 = regular_theta(gtheta + np.pi/2)
+        abs_dtheta1 = jt.abs(dtheta1)
+        abs_dtheta2 = jt.abs(dtheta2)
+
+        gw_regular = gw * (abs_dtheta1 < abs_dtheta2) + gh * (1 - (abs_dtheta1 < abs_dtheta2))
+        gh_regular = gh * (abs_dtheta1 < abs_dtheta2) + gw * (1 - (abs_dtheta1 < abs_dtheta2))
+        dtheta = dtheta1 * (abs_dtheta1 < abs_dtheta2) + dtheta2 * (1 - (abs_dtheta1 < abs_dtheta2))
+        dw = jt.log(gw_regular / pw)
+        dh = jt.log(gh_regular / ph)
+        dx = (gx - px) / pw
+        dy = (gy - py) / ph
+        
+        if self.angle_norm_factor:
+            dtheta /= self.angle_norm_factor * np.pi
+        deltas = jt.stack([dx, dy, dw, dh, dtheta], dim=-1)
+
+        means = jt.array(self.means, dtype=deltas.dtype).unsqueeze(0)
+        stds = jt.array(self.stds, dtype=deltas.dtype).unsqueeze(0)
+        deltas = (deltas - means) / stds
+
+        return deltas
+
+    def decode(self,
+               bboxes,
+               pred_bboxes,
+               max_shape=None,
+               wh_ratio_clip=16 / 1000):
+
+        assert pred_bboxes.size(0) == bboxes.size(0)
+
+        means = jt.array(self.means, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 5)
+        stds = jt.array(self.stds, dtype=pred_bboxes.dtype).repeat(1, pred_bboxes.size(1) // 5)
+        denorm_deltas = pred_bboxes * stds + means
+        
+        dx = denorm_deltas[:, 0::5]
+        dy = denorm_deltas[:, 1::5]
+        dw = denorm_deltas[:, 2::5]
+        dh = denorm_deltas[:, 3::5]
+        dtheta = denorm_deltas[:, 4::5]
+        if self.angle_norm_factor:
+            dtheta *= self.angle_norm_factor * np.pi
+        max_ratio = np.abs(np.log(wh_ratio_clip))
+        dw = dw.clamp(min_v=-max_ratio, max_v=max_ratio)
+        dh = dh.clamp(min_v=-max_ratio, max_v=max_ratio)
+
+        px = (bboxes[..., 0] + bboxes[..., 2]) * 0.5
+        py = (bboxes[..., 1] + bboxes[..., 3]) * 0.5
+        pw = bboxes[..., 2] - bboxes[..., 0]
+        ph = bboxes[..., 3] - bboxes[..., 1]
+
+        px = px.unsqueeze(1).expand_as(dx)
+        py = py.unsqueeze(1).expand_as(dy)
+        pw = pw.unsqueeze(1).expand_as(dw)
+        ph = ph.unsqueeze(1).expand_as(dh)
+
+        gx = dx * pw + px
+        gy = dy * ph + py
+        gw = pw * dw.exp()
+        gh = ph * dh.exp()
+        gtheta = regular_theta(dtheta)
+
+        new_bboxes = jt.stack([gx, gy, gw, gh, gtheta], dim=-1)
+        new_bboxes = regular_obb(new_bboxes)
+        return new_bboxes.view_as(pred_bboxes)
+
 class CSLCoder:
     """Circular Smooth Label Coder.
     `Circular Smooth Label (CSL)

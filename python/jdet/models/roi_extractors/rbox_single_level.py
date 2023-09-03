@@ -4,6 +4,8 @@ import jittor.nn as nn
 from jdet.utils.registry import ROI_EXTRACTORS
 from jdet.ops import roi_align_rotated, roi_align
 
+from copy import deepcopy
+
 #TODO: replace with SingleRoIExtractor
 @ROI_EXTRACTORS.register_module()
 class RboxSingleRoIExtractor(nn.Module):
@@ -70,9 +72,13 @@ class RboxSingleRoIExtractor(nn.Module):
         target_lvls = target_lvls.clamp(min_v=0, max_v=num_levels - 1).long()
         return target_lvls
 
-    def execute(self, feats, rois):
+    def execute(self, feats, rrois):
         if len(feats) == 1:
-            return self.roi_layers[0](feats[0], rois)
+            return self.roi_layers[0](feats[0], rrois)
+
+        rois = deepcopy(rrois)
+        rois[:, 3] *= self.w_enlarge
+        rois[:, 4] *= self.h_enlarge
 
         out_size = self.roi_layers[0].output_size[0]            #not sure
         num_levels = len(feats)

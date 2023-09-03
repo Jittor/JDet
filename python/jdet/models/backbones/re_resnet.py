@@ -402,6 +402,7 @@ class ReResNet(nn.Module):
 
         self.feat_dim = res_layer[-1].out_channels
         self.pretrained = pretrained
+        self.init_weights()
 
     def make_res_layer(self, **kwargs):
         return ResLayer(**kwargs)

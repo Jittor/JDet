@@ -156,8 +156,8 @@ class ReDet(nn.Module):
         # (batch_ind, x_ctr, y_ctr, w, h, angle)
         rrois = dbbox2roi([res.bboxes for res in sampling_results])
         # feat enlarge
-        rrois[:, 3] = rrois[:, 3] * self.rbbox_roi_extractor.w_enlarge
-        rrois[:, 4] = rrois[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        # rrois[:, 3] = rrois[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        # rrois[:, 4] = rrois[:, 4] * self.rbbox_roi_extractor.h_enlarge
         rbbox_feats = self.rbbox_roi_extractor(x[:self.rbbox_roi_extractor.num_inputs], rrois)
         # rbbox_feats = self.shared_head_rbbox(rbbox_feats)
         cls_score, rbbox_pred = self.rbbox_head(rbbox_feats)
@@ -200,8 +200,8 @@ class ReDet(nn.Module):
         rrois = self.bbox_head.regress_by_class_rbbox(roi2droi(rois), bbox_label, bbox_pred, img_meta[0])
 
         rrois_enlarge = copy.deepcopy(rrois)
-        rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
-        rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        # rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        # rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
 
         rbbox_feats = self.rbbox_roi_extractor(x[:len(self.rbbox_roi_extractor.featmap_strides)], rrois_enlarge)
         # rbbox_feats = self.shared_head_rbbox(rbbox_feats)
@@ -228,6 +228,60 @@ class ReDet(nn.Module):
     
     def train(self):
         super(ReDet, self).train()
+        for v in self.__dict__.values():
+            if isinstance(v, nn.Module):
+                v.train()
+
+@MODELS.register_module()
+class ReDetNew(nn.Module):
+    def __init__(self,
+                 backbone,
+                 rpn_head,
+                 bbox_head,
+                 bbox_refine_head,
+                 neck=None,
+                 ):
+        super(ReDetNew, self).__init__()
+        self.backbone = build_from_cfg(backbone, BACKBONES)
+        self.neck = build_from_cfg(neck, NECKS)
+        self.rpn_head = build_from_cfg(rpn_head, HEADS)
+        self.bbox_head = build_from_cfg(bbox_head, HEADS)
+        self.rbbox_head = build_from_cfg(bbox_refine_head, HEADS)
+
+    def execute(self, images, targets=None):
+        '''
+        Args:
+            images (jt.Var): image tensors, shape is [N,C,H,W]
+            targets (list[dict]): targets for each image
+        Rets:
+            losses (dict): losses
+        '''
+        losses = dict()
+
+        features = self.backbone(images)
+        if self.neck:
+            features = self.neck(features)
+
+        proposal_list, rpn_losses = self.rpn_head(features, targets)
+        if self.is_training():
+            for k, v in rpn_losses.items():
+                losses[f'rpn_{k}'] = v
+
+        if self.is_training():
+            s0_losses, proposal_list = self.bbox_head(features, proposal_list, targets, as_proposals=True)
+            for k, v in s0_losses.items():
+                losses[f's0_{k}'] = v
+            s1_losses = self.rbbox_head(features, proposal_list, targets, as_proposals=False)
+            for k, v in s1_losses.items():
+                losses[f's1_{k}'] = v
+            return losses
+        else:
+            proposal_list = self.bbox_head(features, proposal_list, targets, as_proposals=True)
+            det_result = self.rbbox_head(features, proposal_list, targets, as_proposals=False)
+            return det_result
+
+    def train(self):
+        super(ReDetNew, self).train()
         for v in self.__dict__.values():
             if isinstance(v, nn.Module):
                 v.train()

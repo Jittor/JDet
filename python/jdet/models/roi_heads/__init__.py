@@ -16,7 +16,16 @@ from . import fasterrcnn_head
 from . import fcos_head
 from . import kfiou_rotated_retina_head
 from . import h2rbox_head
+from . import fake_fasterrcnn_head
+from . import fake_rotated_retina_head
+from . import fake_s2anet_head
+from . import fake_oriented_rpn_head
+from . import fake_rotated_retina_refine_head
+from . import convfc_roi_head
+from . import gliding_roi_head
 from . import rsdet_head
 from . import rotated_atss_head
 from . import rotated_reppoints_head
+from . import smooth_gliding_roi_head
+
 __all__ = []
