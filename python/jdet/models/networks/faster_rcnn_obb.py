@@ -156,3 +156,51 @@ class FasterRCNNOBB(nn.Module):
             return self.execute_train(images, targets)
         else:
             return self.execute_test(images, targets)
+
+@MODELS.register_module()
+class FasterRCNNOBBNew(nn.Module):
+    def __init__(self,
+                 backbone,
+                 rpn_head,
+                 bbox_head,
+                 neck=None,
+                 ):
+        super(FasterRCNNOBBNew, self).__init__()
+        self.backbone = build_from_cfg(backbone, BACKBONES)
+        self.neck = build_from_cfg(neck, NECKS)
+        self.rpn_head = build_from_cfg(rpn_head, HEADS)
+        self.bbox_head = build_from_cfg(bbox_head, HEADS)
+
+    def execute(self, images, targets=None):
+        '''
+        Args:
+            images (jt.Var): image tensors, shape is [N,C,H,W]
+            targets (list[dict]): targets for each image
+        Rets:
+            losses (dict): losses
+        '''
+        losses = dict()
+
+        features = self.backbone(images)
+        if self.neck:
+            features = self.neck(features)
+
+        proposal_list, rpn_losses = self.rpn_head(features, targets)
+        if self.is_training():
+            for k, v in rpn_losses.items():
+                losses[f'rpn_{k}'] = v
+
+        if self.is_training():
+            bbox_losses = self.bbox_head(features, proposal_list, targets)
+            for k, v in bbox_losses.items():
+                losses[f'bbox_{k}'] = v
+            return losses
+        else:
+            det_result = self.bbox_head(features, proposal_list, targets)
+            return det_result
+
+    def train(self):
+        super(FasterRCNNOBBNew, self).train()
+        for v in self.__dict__.values():
+            if isinstance(v, nn.Module):
+                v.train()

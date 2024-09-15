@@ -104,7 +104,7 @@ class RoITransformer(nn.Module):
             rotated_proposal_list = self.bbox_head.refine_rbboxes(
                 roi2droi(rois), roi_labels, bbox_pred, pos_is_gts, image_meta
             )
-        
+
         # assign gts and sample proposals (rbb assign)
         bbox_assigner = build_from_cfg(self.train_cfg.rcnn[1].assigner, BOXES)
         bbox_sampler = build_from_cfg(self.train_cfg.rcnn[1].sampler, BOXES)
@@ -128,8 +128,8 @@ class RoITransformer(nn.Module):
         # feat enlarge
         # rrois[:, 3] = rrois[:, 3] * 1.2
         # rrois[:, 4] = rrois[:, 4] * 1.4
-        rrois[:, 3] = rrois[:, 3] * self.rbbox_roi_extractor.w_enlarge
-        rrois[:, 4] = rrois[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        # rrois[:, 3] = rrois[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        # rrois[:, 4] = rrois[:, 4] * self.rbbox_roi_extractor.h_enlarge       
         rbbox_feats = self.rbbox_roi_extractor(features[:self.rbbox_roi_extractor.num_inputs], rrois)
         cls_score, rbbox_pred = self.rbbox_head(rbbox_feats)
         rbbox_targets = self.rbbox_head.get_target_rbbox(
@@ -179,8 +179,8 @@ class RoITransformer(nn.Module):
         rrois = self.bbox_head.regress_by_class_rbbox(roi2droi(rois), bbox_label, bbox_pred,
                                                       img_meta[0])
         rrois_enlarge = copy.deepcopy(rrois)
-        rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
-        rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        # rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        # rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
         rbbox_feats = self.rbbox_roi_extractor(
             x[:len(self.rbbox_roi_extractor.featmap_strides)], rrois_enlarge)
         rcls_score, rbbox_pred = self.rbbox_head(rbbox_feats)
@@ -201,3 +201,57 @@ class RoITransformer(nn.Module):
             return self.execute_train(images, targets)
         else:
             return self.execute_test(images, targets)
+
+@MODELS.register_module()
+class RoITransformerNew(nn.Module):
+    def __init__(self,
+                 backbone,
+                 rpn_head,
+                 bbox_head,
+                 bbox_refine_head,
+                 neck=None,
+                 ):
+        super(RoITransformerNew, self).__init__()
+        self.backbone = build_from_cfg(backbone, BACKBONES)
+        self.neck = build_from_cfg(neck, NECKS)
+        self.rpn_head = build_from_cfg(rpn_head, HEADS)
+        self.bbox_head = build_from_cfg(bbox_head, HEADS)
+        self.rbbox_head = build_from_cfg(bbox_refine_head, HEADS)
+
+    def execute(self, images, targets=None):
+        '''
+        Args:
+            images (jt.Var): image tensors, shape is [N,C,H,W]
+            targets (list[dict]): targets for each image
+        Rets:
+            losses (dict): losses
+        '''
+        losses = dict()
+
+        features = self.backbone(images)
+        if self.neck:
+            features = self.neck(features)
+
+        proposal_list, rpn_losses = self.rpn_head(features, targets)
+        if self.is_training():
+            for k, v in rpn_losses.items():
+                losses[f'rpn_{k}'] = v
+
+        if self.is_training():
+            s0_losses, proposal_list = self.bbox_head(features, proposal_list, targets, as_proposals=True)
+            for k, v in s0_losses.items():
+                losses[f's0_{k}'] = v
+            s1_losses = self.rbbox_head(features, proposal_list, targets, as_proposals=False)
+            for k, v in s1_losses.items():
+                losses[f's1_{k}'] = v
+            return losses
+        else:
+            proposal_list = self.bbox_head(features, proposal_list, targets, as_proposals=True)
+            det_result = self.rbbox_head(features, proposal_list, targets, as_proposals=False)
+            return det_result
+
+    def train(self):
+        super(RoITransformerNew, self).train()
+        for v in self.__dict__.values():
+            if isinstance(v, nn.Module):
+                v.train()

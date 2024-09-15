@@ -1,5 +1,22 @@
 import jittor as jt 
 
+def nms_v0(dets,thresh):
+    '''
+      dets jt.array [x1,y1,x2,y2,score]
+      x(:,0)->x1,x(:,1)->y1,x(:,2)->x2,x(:,3)->y2,x(:,4)->score
+    '''
+    threshold = str(thresh)
+    order = jt.argsort(dets[:,4],descending=True)[0]
+    dets = dets[order]
+    s_1 = '(@x(j,2)-@x(j,0))*(@x(j,3)-@x(j,1))'
+    s_2 = '(@x(i,2)-@x(i,0))*(@x(i,3)-@x(i,1))'
+    s_inter_w = 'max((Tx)0,min(@x(j,2),@x(i,2))-max(@x(j,0),@x(i,0)))'
+    s_inter_h = 'max((Tx)0,min(@x(j,3),@x(i,3))-max(@x(j,1),@x(i,1)))'
+    s_inter = s_inter_h+'*'+s_inter_w
+    iou = s_inter + '/(' + s_1 +'+' + s_2 + '-' + s_inter + ')'
+    fail_cond = iou+'>'+threshold
+    selected = jt.candidate(dets, fail_cond)
+    return order[selected]
 
 def nms(boxes,scores,thresh):
     assert boxes.shape[-1]==4 and len(scores)==len(boxes)

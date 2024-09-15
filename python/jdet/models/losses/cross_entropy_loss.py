@@ -54,6 +54,10 @@ class CrossEntropyLossForRcnn(nn.Module):
             cls_score, label, label_weight, *args, **kwargs)
         return loss_cls
 
+@LOSSES.register_module()
+class WeightCrossEntropyLoss(CrossEntropyLossForRcnn):
+    pass
+
 def cross_entropy_loss(pred,target,weight=None,avg_factor=None,reduction="mean"):
     target = target.reshape((-1, ))
     

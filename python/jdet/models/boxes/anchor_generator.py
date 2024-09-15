@@ -594,7 +594,147 @@ class AnchorGenerator:
         repr_str += f'{indent_str}center_offset={self.center_offset})'
         return repr_str
 
+@BOXES.register_module()
+class AnchorGeneratorRotatedXYWHA(AnchorGenerator):
+    def __init__(self, *args, angles=[0, ], **kwargs):
+        self.angles = jt.array(angles).float32()
+        super(AnchorGeneratorRotatedXYWHA, self).__init__(*args, **kwargs)
 
+    def gen_base_anchors(self):
+        """Generate base anchors.
+        Returns:
+            list(jt.array): Base anchors of a feature grid in multiple \
+                feature levels.
+        """
+        multi_level_base_anchors = []
+        for i, base_size in enumerate(self.base_sizes):
+            center = None
+            if self.centers is not None:
+                center = self.centers[i]
+            multi_level_base_anchors.append(
+                self.gen_single_level_base_anchors(
+                    base_size,
+                    scales=self.scales,
+                    ratios=self.ratios,
+                    angles=self.angles,
+                    center=center))
+        return multi_level_base_anchors
+
+    def gen_single_level_base_anchors(self,
+                                      base_size,
+                                      scales,
+                                      ratios,
+                                      angles,
+                                      center=None):
+        """Generate base anchors of a single level.
+        Args:
+            base_size (int | float): Basic size of an anchor.
+            scales (jt.array): Scales of the anchor.
+            ratios (jt.array): The ratio between between the height
+                and width of anchors in a single level.
+            center (tuple[float], optional): The center of the base anchor
+                related to a single feature grid. Defaults to None.
+        Returns:
+            jt.array: Anchors in a single-level feature maps.
+        """
+        w = base_size
+        h = base_size
+        if center is None:
+            x_center = self.center_offset * w
+            y_center = self.center_offset * h
+        else:
+            x_center, y_center = center
+
+        h_ratios = jt.sqrt(ratios)
+        w_ratios = 1 / h_ratios
+        assert self.scale_major, "AnchorGeneratorRotatedXYWHA only support scale-major anchors!"
+
+        ws = (w * w_ratios[:, None, None] * scales[None, :, None] *
+              jt.ones_like(angles)[None, None, :]).view(-1)
+        hs = (h * h_ratios[:, None, None] * scales[None, :, None] *
+              jt.ones_like(angles)[None, None, :]).view(-1)
+        angles = angles.repeat(len(scales) * len(ratios))
+
+        # use float anchor and the anchor's center is aligned with the
+        # pixel center
+        x_center += jt.zeros_like(ws)
+        y_center += jt.zeros_like(ws)
+        base_anchors = jt.stack([x_center, y_center, ws, hs, angles], dim=-1)
+
+        return base_anchors
+
+    def single_level_grid_anchors(self,
+                                  base_anchors,
+                                  featmap_size,
+                                  stride=(16, 16),):
+        """Generate grid anchors of a single level.
+        Note:
+            This function is usually called by method ``self.grid_anchors``.
+        Args:
+            base_anchors (jt.array): The base anchors of a feature grid.
+            featmap_size (tuple[int]): Size of the feature maps.
+            stride (tuple[int], optional): Stride of the feature map in order
+                (w, h). Defaults to (16, 16).
+        Returns:
+            jt.array: Anchors in the overall feature maps.
+        """
+
+        # keep featmap_size as Tensor instead of int, so that we
+        # can covert to ONNX correctly
+        feat_h, feat_w = featmap_size
+        shift_x = jt.arange(0, feat_w) * stride[0]
+        shift_y = jt.arange(0, feat_h) * stride[1]
+
+        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
+        shift_others = jt.zeros_like(shift_xx)
+        shifts = jt.stack([shift_xx, shift_yy, shift_others, shift_others, shift_others], dim=-1)
+        shifts = shifts.type_as(base_anchors)
+        # first feat_w elements correspond to the first row of shifts
+        # add A anchors (1, A, 5) to K shifts (K, 1, 5) to get
+        # shifted anchors (K, A, 5), reshape to (K*A, 5)
+
+        all_anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        all_anchors = all_anchors.view(-1, 5)
+        # first A rows correspond to A anchors of (0, 0) in feature map,
+        # then (0, 1), (0, 2), ...
+        return all_anchors
+
+@BOXES.register_module()
+class AnchorGeneratorXYWHARetinaNet(AnchorGeneratorRotatedXYWHA):
+    def gen_single_level_base_anchors(self,
+                                      base_size,
+                                      scales,
+                                      ratios,
+                                      angles,
+                                      center=None):
+        """
+        when calculating x/y center, w and h minus 1.
+        """
+        w = base_size
+        h = base_size
+        if center is None:
+            x_center = self.center_offset * (w - 1)
+            y_center = self.center_offset * (h - 1)
+        else:
+            x_center, y_center = center
+
+        h_ratios = jt.sqrt(ratios)
+        w_ratios = 1 / h_ratios
+        assert self.scale_major, "AnchorGeneratorRotatedXYWHA only support scale-major anchors!"
+
+        ws = (w * w_ratios[:, None, None] * scales[None, :, None] *
+              jt.ones_like(angles)[None, None, :]).view(-1)
+        hs = (h * h_ratios[:, None, None] * scales[None, :, None] *
+              jt.ones_like(angles)[None, None, :]).view(-1)
+        angles = angles.repeat(len(scales) * len(ratios))
+
+        # use float anchor and the anchor's center is aligned with the
+        # pixel center
+        x_center += jt.zeros_like(ws)
+        y_center += jt.zeros_like(ws)
+        base_anchors = jt.stack([x_center, y_center, ws, hs, angles], dim=-1)
+
+        return base_anchors
 
 @BOXES.register_module()
 class AnchorGeneratorRotated:

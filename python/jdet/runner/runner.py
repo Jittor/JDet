@@ -92,7 +92,7 @@ class Runner:
         warmup = 10
         rerun = 100
         self.model.train()
-        for batch_idx,(images,targets) in enumerate(self.train_dataset):
+        for batch_idx,(images,targets) in enumerate(self.val_dataset):
             break
         print("warmup...")
         for i in tqdm(range(warmup)):
@@ -112,7 +112,21 @@ class Runner:
         batch_size = len(targets)*jt.world_size
         ptime = time.time()-start_time
         fps = batch_size*rerun/ptime
-        print("FPS:", fps)
+        v = jt.get_max_memory_treemap(do_print=False)[0]['size'] / 1024 / 1024 / 1024
+        num_param = 0
+        for param in self.model.parameters():
+            if param.dtype == jt.float32:
+                num_param += param.numel() * 4
+            elif param.dtype == jt.uint8:
+                num_param += param.numel()
+            elif param.dtype == jt.int32:
+                num_param += param.numel() * 4
+            else:
+                print(param.dtype)
+                raise NotImplementedError
+        with open(os.path.join(self.work_dir, 'time_result.txt'), 'w') as f:
+            line = '{} {} {}\n'.format(fps, v, num_param / 1024 / 1024 / 1024)
+            f.write(line)
 
     def train(self):
 

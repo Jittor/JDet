@@ -62,7 +62,7 @@ class SingleRoIExtractor(nn.Module):
             Tensor: Level index (0-based) of each RoI, shape (k, )
         """
         scale = jt.sqrt(
-            (rois[:, 3] - rois[:, 1] + 1) * (rois[:, 4] - rois[:, 2] + 1))
+            (rois[:, 3] - rois[:, 1]) * (rois[:, 4] - rois[:, 2]))
         target_lvls = jt.floor(jt.log2(scale / self.finest_scale + 1e-6))
         target_lvls = target_lvls.clamp(min_v=0, max_v=num_levels - 1).long()
         return target_lvls
