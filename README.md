@@ -159,6 +159,7 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_plus_sign: DCL
 - :heavy_plus_sign: Double Head OBB
 - :heavy_plus_sign: Guided Anchoring
+- :heavy_plus_sign: Sampling Equivariant Self-attention Networks
 - :heavy_plus_sign: ...
 
 ### Plan of Datasets
