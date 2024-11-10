@@ -176,6 +176,7 @@ class GDLoss_v1(nn.Module):
                  tau=1.0,
                  reduction='mean',
                  loss_weight=1.0,
+                 beta=None,                 # place holder
                  **kwargs):
         super(GDLoss_v1, self).__init__()
         assert reduction in ['none', 'sum', 'mean']

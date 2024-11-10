@@ -92,7 +92,7 @@ class OrientedSingleRoIExtractor(nn.Module):
         if len(feats) == 1:
             return self.roi_layers[0](feats[0], rois)
 
-        out_size = self.roi_layers[0].output_size[0]           
+        out_size = self.roi_layers[0].output_size[0]
         num_levels = len(feats)
         target_lvls = self.map_roi_levels(rois, num_levels)
         roi_feats = jt.zeros((rois.shape[0], self.out_channels,

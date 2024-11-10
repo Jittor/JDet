@@ -219,6 +219,129 @@ class MaxIoUAssigner:
         return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
 
 @BOXES.register_module()
+class MaxIoUAssignerFixMem(MaxIoUAssigner):
+    # Fix Mememory bugs.
+    def __init__(self, *args, mem_limit=30000000, **kwargs):
+        self.mem_limit = mem_limit
+        super(MaxIoUAssignerFixMem, self).__init__(*args, **kwargs)
+
+    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
+        """Assign gt to bboxes.
+
+        This method assign a gt bbox to every bbox (proposal/anchor), each bbox
+        will be assigned with -1, 0, or a positive number. -1 means don't care,
+        0 means negative sample, positive number is the index (1-based) of
+        assigned gt.
+        The assignment is done in following steps, the order matters.
+
+        1. assign every bbox to -1
+        2. assign proposals whose iou with all gts < neg_iou_thr to 0
+        3. for each bbox, if the iou with its nearest gt >= pos_iou_thr,
+           assign it to that bbox
+        4. for each gt bbox, assign its nearest proposals (may be more than
+           one) to itself
+
+        Args:
+            bboxes (Tensor): Bounding boxes to be assigned, shape(n, 4).
+            gt_bboxes (Tensor): Groundtruth boxes, shape (k, 4).
+            gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
+                labelled as `ignored`, e.g., crowd boxes in COCO.
+            gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+
+        Returns:
+            :obj:`AssignResult`: The assign result.
+        """
+        if bboxes.shape[0] == 0 or gt_bboxes.shape[0] == 0:
+            raise ValueError('No gt or bboxes')
+        assert len(bboxes.shape) == len(gt_bboxes.shape) == 2
+
+        if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
+                gt_bboxes_ignore.numel() > 0):
+            raise NotImplementedError
+
+        assign_result = self.assign_wrt_overlaps(bboxes, gt_bboxes, gt_labels)
+        return assign_result
+
+    def assign_wrt_overlaps(self, bboxes, gt_bboxes, gt_labels=None):
+        """Assign w.r.t. the overlaps of bboxes with gts.
+
+        Args:
+            overlaps (Tensor): Overlaps between k gt_bboxes and n bboxes,
+                shape(k, n).
+            gt_labels (Tensor, optional): Labels of k gt_bboxes, shape (k, ).
+
+        Returns:
+            :obj:`AssignResult`: The assign result.
+        """
+        if bboxes.numel() == 0 or gt_bboxes.numel() == 0:
+            raise ValueError('No gt or proposals')
+
+        num_gts, num_bboxes = gt_bboxes.shape[0], bboxes.shape[0]
+
+        # 1. assign -1 by default
+        assigned_gt_inds = jt.full((num_bboxes,), -1).int()
+
+        # for each anchor, which gt best overlaps with it
+        # for each anchor, the max iou of all gts
+        argmax_overlaps,max_overlaps = [], []
+        bboxes_batch = self.mem_limit // num_gts
+        for start_idx in range(0, num_bboxes, bboxes_batch):
+            end_idx = min(start_idx + bboxes_batch, num_bboxes)
+            temp_overlaps = self.iou_calculator(gt_bboxes, bboxes[start_idx:end_idx])
+            temp_argmax_overlaps, temp_max_overlaps = temp_overlaps.argmax(dim=0)
+            argmax_overlaps.append(temp_argmax_overlaps)
+            max_overlaps.append(temp_max_overlaps)
+        argmax_overlaps = jt.concat(argmax_overlaps, dim=0)
+        max_overlaps = jt.concat(max_overlaps, dim=0)
+
+        # 2. assign negative: below
+        if isinstance(self.neg_iou_thr, float):
+            assigned_gt_inds[(max_overlaps >= 0)
+                             & (max_overlaps < self.neg_iou_thr)] = 0
+        elif isinstance(self.neg_iou_thr, tuple):
+            assert len(self.neg_iou_thr) == 2
+            assigned_gt_inds[(max_overlaps >= self.neg_iou_thr[0])
+                             & (max_overlaps < self.neg_iou_thr[1])] = 0
+
+        # 3. assign positive: above positive IoU threshold
+        pos_inds = max_overlaps >= self.pos_iou_thr
+        assigned_gt_inds[pos_inds] = argmax_overlaps[pos_inds] + 1
+
+        # 4. assign fg: for each gt, proposals with highest IoU
+        if self.match_low_quality:
+            # for each gt, which anchor best overlaps with it
+            # for each gt, the max iou of all proposals
+            low_quality_index = jt.zeros((num_bboxes,), dtype=jt.int)
+            gt_batch = self.mem_limit // num_bboxes
+            for start_idx in range(0, num_gts, gt_batch):
+                end_idx = min(start_idx + gt_batch, num_gts)
+                temp_overlaps = self.iou_calculator(gt_bboxes[start_idx:end_idx], bboxes)
+                if self.gt_max_assign_all:
+                    temp_gt_max_overlaps = temp_overlaps.max(dim=1, keepdims=True)
+                    valid_pairs = jt.logical_and(temp_gt_max_overlaps == temp_overlaps, temp_gt_max_overlaps >= self.min_pos_iou)
+                    temp_index = (valid_pairs.int() * jt.arange(start_idx+1, end_idx+1).unsqueeze(-1)).max(dim=0)
+                else:
+                    temp_gt_argmax_overlaps, _ = temp_overlaps.argmax(dim=1)
+                    index_holder = jt.zeros((num_gts, num_bboxes), dtype=jt.int)
+                    valid_index = jt.arange(start_idx+1, end_idx+1)
+                    valid_index[temp_gt_max_overlaps < self.min_pos_iou] = 0
+                    index_holder[(jt.arange(0, end_idx - start_idx), temp_gt_argmax_overlaps)] = valid_index
+                    temp_index = index_holder.max(dim=0)
+                low_quality_index = jt.maximum(low_quality_index, temp_index)
+            valid = low_quality_index > 0
+            assigned_gt_inds[valid] = low_quality_index[valid]
+
+        if gt_labels is not None:
+            assigned_labels = jt.full((num_bboxes, ), self.assigned_labels_filled, dtype=assigned_gt_inds.dtype)
+            pos_inds = jt.nonzero(assigned_gt_inds > 0).squeeze(-1)
+            if pos_inds.numel() > 0:
+                assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
+        else:
+            assigned_labels = None
+
+        return AssignResult(num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+
+@BOXES.register_module()
 class MaxIoUAssignerRbbox(MaxIoUAssigner):
     def __init__(self,
                  pos_iou_thr,
