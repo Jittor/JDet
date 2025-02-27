@@ -118,6 +118,9 @@ python run_net.py --config-file=configs/base.py --task=test
 | RSDet-R50-FPN | DOTA1.0|1024/200|Flip|-| SGD | 1x | 68.41 | [arxiv](https://arxiv.org/abs/1911.08299) | [config](configs/rotated_retinanet/rsdet_obb_r50_fpn_1x_dota_lmr5p.py) | [model](https://cloud.tsinghua.edu.cn/f/fb98782e976f4fa69045/?dl=1) |
 | ATSS-R50-FPN|DOTA1.0|1024/200| flip|-| SGD | 1x | 72.44 | [arxiv](https://arxiv.org/abs/1912.02424) | [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota_atss.py) | [model](https://cloud.tsinghua.edu.cn/f/b9e9dc675e9742a28383/?dl=1) |
 | Reppoints-R50-FPN|DOTA1.0|1024/200| flip|-| SGD | 1x | 56.34 | [arxiv](https://arxiv.org/abs/1904.11490) | [config](configs/rotated_retinanet/rotated_retinanet_obb_r50_fpn_1x_dota_atss.py) | [model](https://cloud.tsinghua.edu.cn/f/af7dcbb1a16e450c8182/?dl=1) |
+| OrientedRCNN-LSKNet-S-FPN |DOTA1.0|1024/200| flip+ra90 |-| AdamW | 1x | 77.17 | [IJCV](https://link.springer.com/article/10.1007/s11263-024-02247-9?utm_source=rct_congratemailt&utm_medium=email&utm_campaign=nonoa_20241007&utm_content=10.1007/s11263-024-02247-9) | [config](configs/lsknet-s_fpn_1x_dota_with_flip.py) | [pretrained](https://cloud.tsinghua.edu.cn/f/e927ce9b43824444bb43/?dl=1) |
+| StripRCNN-StripNet-S-FPN |DOTA1.0|1024/200| flip+ra90 |-| AdamW | 1x | 77.36 | [arxiv](https://arxiv.org/pdf/2501.03775v3) | [config](configs/lsknet-s_fpn_1x_dota_with_flip.py) | [pretrained](https://cloud.tsinghua.edu.cn/f/9e204513fcfb4334a500/?dl=1) |
+
 
 
 **Notice**:
@@ -233,5 +236,6 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
 11. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
 12. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
 13. [OBBDetection](https://github.com/jbwang1997/OBBDetection)
+14. [nk-remote](https://github.com/NK-JittorCV/nk-remote)
 
 
