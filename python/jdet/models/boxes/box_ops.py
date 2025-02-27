@@ -457,15 +457,15 @@ def poly_to_rotated_box_single(poly):
     angle = 0
     if edge1 > edge2:
         angle = np.arctan2(
-            np.float(pt2[1] - pt1[1]), np.float(pt2[0] - pt1[0]))
+            np.float64(pt2[1] - pt1[1]), np.float64(pt2[0] - pt1[0]))
     elif edge2 >= edge1:
         angle = np.arctan2(
-            np.float(pt4[1] - pt1[1]), np.float(pt4[0] - pt1[0]))
+            np.float64(pt4[1] - pt1[1]), np.float64(pt4[0] - pt1[0]))
 
     angle = norm_angle(angle)
 
-    x_ctr = np.float(pt1[0] + pt3[0]) / 2
-    y_ctr = np.float(pt1[1] + pt3[1]) / 2
+    x_ctr = np.float64(pt1[0] + pt3[0]) / 2
+    y_ctr = np.float64(pt1[1] + pt3[1]) / 2
     rotated_box = np.array([x_ctr, y_ctr, width, height, angle])
     return rotated_box
 
