@@ -156,6 +156,8 @@ python run_net.py --config-file=configs/base.py --task=test
 - :heavy_check_mark: Reppoints
 - :heavy_check_mark: RSDet
 - :heavy_check_mark: ATSS
+- :heavy_check_mark: LSKNet
+- :heavy_check_mark: StripRCNN
 - :clock3: R3Det
 - :clock3: Cascade R-CNN
 - :clock3: Oriented Reppoints
